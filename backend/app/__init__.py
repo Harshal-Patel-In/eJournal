@@ -1,1 +1,0 @@
-# eJournal Backend Application
