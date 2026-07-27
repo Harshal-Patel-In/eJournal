@@ -1,0 +1,75 @@
+"""Application configuration loaded from environment variables.
+
+RULE-CFG01: Configuration separate from source code.
+RULE-CFG03: Validated at startup.
+RULE-BE08: Connection config from env-based settings.
+"""
+
+from pydantic_settings import BaseSettings
+from pydantic import Field
+
+
+class Settings(BaseSettings):
+    """Application settings loaded from environment variables."""
+
+    # Environment
+    ENVIRONMENT: str = Field(default="development", description="Runtime environment")
+
+    # Backend
+    BACKEND_HOST: str = Field(default="0.0.0.0")
+    BACKEND_PORT: int = Field(default=8000)
+    BACKEND_CORS_ORIGINS: list[str] = Field(
+        default=["http://localhost:3000"],
+        description="Allowed CORS origins",
+    )
+
+    # MongoDB Atlas (RULE-BE08)
+    MONGODB_URI: str = Field(
+        default="mongodb://localhost:27017",
+        description="MongoDB connection URI (Atlas or local)",
+    )
+    MONGODB_DATABASE: str = Field(
+        default="ejournal",
+        description="MongoDB database name",
+    )
+    MONGODB_MIN_POOL_SIZE: int = Field(default=5)
+    MONGODB_MAX_POOL_SIZE: int = Field(default=50)
+
+    # Redis
+    REDIS_URL: str = Field(
+        default="redis://localhost:6379/0",
+        description="Redis connection URL",
+    )
+
+    # JWT / Authentication
+    JWT_SECRET_KEY: str = Field(
+        default="change-this-to-a-secure-random-string",
+        description="JWT signing secret",
+    )
+    JWT_ALGORITHM: str = Field(default="HS256")
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=30)
+    JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = Field(default=7)
+
+    # Email Service (Brevo/Resend HTTP API)
+    BREVO_API_KEY: str | None = Field(default=None, description="Brevo transaction API key")
+    RESEND_API_KEY: str | None = Field(default=None, description="Resend transaction API key")
+    SMTP_FROM_EMAIL: str = Field(default="noreply@ejournal.com", description="Sender email address")
+
+    # Logging
+    LOG_LEVEL: str = Field(default="INFO")
+
+    # Cloudinary Integration
+    CLOUDINARY_CLOUD_NAME: str | None = Field(default=None, description="Cloudinary cloud name")
+    CLOUDINARY_API_KEY: str | None = Field(default=None, description="Cloudinary API key")
+    CLOUDINARY_API_SECRET: str | None = Field(default=None, description="Cloudinary API secret")
+
+
+    model_config = {
+        "env_file": [".env", "../.env"],
+        "env_file_encoding": "utf-8",
+        "case_sensitive": True,
+        "extra": "ignore",
+    }
+
+
+settings = Settings()
