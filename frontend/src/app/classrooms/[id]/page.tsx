@@ -54,7 +54,7 @@ export default function ClassroomPage({ params }: PageProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
 
-  const [activeTab, setActiveTab] = useState<"assignments" | "roster">("assignments");
+  const [activeTab, setActiveTab] = useState<"assignments" | "submissions" | "roster">("assignments");
   const [showPublishModal, setShowPublishModal] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -77,12 +77,20 @@ export default function ClassroomPage({ params }: PageProps) {
     queryFn: () => api.get(`/classrooms/${classroomId}/assignments`),
   });
 
+  // 3.5 Fetch classroom submissions for teacher
+  const { data: submissions, isLoading: submissionsLoading } = useQuery<any[]>({
+    queryKey: ["submissions", classroomId],
+    queryFn: () => api.get(`/journals/classroom/${classroomId}/submissions`),
+    enabled: !!user && user.role === "teacher" && activeTab === "submissions",
+  });
+
   // 4. Fetch classroom members
   const { data: members, isLoading: membersLoading } = useQuery<any[]>({
     queryKey: ["members", classroomId],
     queryFn: () => api.get(`/classrooms/${classroomId}/members`),
     enabled: activeTab === "roster",
   });
+
 
   // 4.5 Fetch student's journals
   const { data: journals } = useQuery<any[]>({
@@ -173,8 +181,19 @@ export default function ClassroomPage({ params }: PageProps) {
       </div>
 
       {/* 2. Floating Capsule Header Bar */}
-      <header className="fixed top-4 left-16 sm:left-24 md:left-32 right-4 sm:right-8 md:right-16 z-40 flex items-center justify-between px-5 py-2.5 bg-gradient-to-b from-white/85 via-white/70 to-white/50 dark:from-zinc-900/95 dark:via-zinc-900/90 dark:to-zinc-950/85 backdrop-blur-2xl backdrop-saturate-180 border border-white/80 dark:border-zinc-700/60 ring-1 ring-black/5 dark:ring-white/10 shadow-[0_8px_32px_0_rgba(0,0,0,0.08)] dark:shadow-[0_8px_32px_0_rgba(0,0,0,0.5)] shadow-[inset_0_1px_1px_0_rgba(255,255,255,0.8)] dark:shadow-[inset_0_1px_1px_0_rgba(255,255,255,0.1)] rounded-2xl select-none transition-all duration-200">
+      <header className="fixed top-4 left-16 sm:left-24 md:left-32 right-4 sm:right-8 md:right-16 z-40 flex items-center justify-between px-5 py-2.5 bg-gradient-to-b from-white/80 via-white/65 to-white/50 dark:from-zinc-900/85 dark:via-zinc-900/75 dark:to-zinc-950/70 backdrop-blur-2xl backdrop-saturate-180 border border-white/80 dark:border-white/15 ring-1 ring-black/5 dark:ring-white/10 shadow-[0_16px_40px_-8px_rgba(0,0,0,0.1),_inset_0_1px_1px_0_rgba(255,255,255,0.95),_inset_0_-1px_1px_0_rgba(0,0,0,0.05)] dark:shadow-[0_20px_50px_-12px_rgba(0,0,0,0.7),_inset_0_1px_1px_0_rgba(255,255,255,0.18),_inset_0_-1px_1px_0_rgba(0,0,0,0.5)] rounded-2xl select-none transition-all duration-300">
         <div className="flex items-center gap-3">
+          <Link href="/dashboard" className="flex items-center gap-2 group select-none">
+            <img
+              src="/logo.png"
+              alt="eJournal Icon"
+              className="h-7 w-auto object-contain transition-transform group-hover:scale-105"
+            />
+            <span className="font-bold text-base tracking-tight text-foreground">
+              eJournal
+            </span>
+          </Link>
+          <span className="text-muted-foreground/40 font-light">|</span>
           <span className="font-bold text-base tracking-tight">{classroom.name}</span>
         </div>
 
@@ -190,7 +209,7 @@ export default function ClassroomPage({ params }: PageProps) {
       {/* Subject Space Container */}
       <main className="max-w-4xl w-full mx-auto p-6 md:p-8 pt-24 md:pt-24 flex flex-col gap-6 relative z-10">
         {/* Banner Section */}
-        <div className="p-6 md:p-8 rounded-2xl bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800/80 shadow-[0_4px_24px_-4px_rgba(0,0,0,0.04)] flex flex-col gap-5">
+        <div className="p-6 md:p-8 rounded-3xl glass-card relative overflow-hidden transition-all duration-300 flex flex-col gap-5">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="flex flex-col gap-1">
               <div className="flex items-center gap-2">
@@ -210,15 +229,15 @@ export default function ClassroomPage({ params }: PageProps) {
               </p>
             </div>
 
-            <div className="flex items-center gap-2 bg-muted/40 p-2 rounded-xl border border-border">
+            <div className="flex items-center gap-2 glass-pill p-2 rounded-2xl">
               <span className="text-xs font-semibold text-muted-foreground px-1">Join Code:</span>
-              <code className="font-mono text-xs font-bold bg-background px-2.5 py-1 rounded-lg border border-border text-foreground">
+              <code className="font-mono text-xs font-bold bg-background/80 px-2.5 py-1 rounded-xl border border-border text-foreground">
                 {classroom.joinCode}
               </code>
               <button
                 onClick={handleCopyCode}
                 title="Copy join code"
-                className="p-1.5 rounded-lg hover:bg-background text-muted-foreground hover:text-foreground transition-all cursor-pointer"
+                className="p-1.5 rounded-xl hover:bg-background/80 text-muted-foreground hover:text-foreground transition-all cursor-pointer"
               >
                 {copiedCode ? <Check className="size-3.5 text-emerald-500" /> : <Copy className="size-3.5" />}
               </button>
@@ -228,10 +247,10 @@ export default function ClassroomPage({ params }: PageProps) {
 
         {/* Tab switcher & Action bar */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-b border-border/80 pb-3">
-          <div className="flex items-center p-1 bg-muted/60 dark:bg-zinc-900/60 rounded-xl border border-border/60 max-w-fit">
+          <div className="flex items-center p-1.5 glass-pill rounded-2xl max-w-fit">
             <button
               onClick={() => setActiveTab("assignments")}
-              className={`flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+              className={`flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold rounded-xl transition-all cursor-pointer ${
                 activeTab === "assignments"
                   ? "bg-background text-foreground shadow-xs font-bold"
                   : "text-muted-foreground hover:text-foreground"
@@ -240,9 +259,22 @@ export default function ClassroomPage({ params }: PageProps) {
               <FileText className="size-3.5" />
               <span>Practicals & Experiments ({assignments?.length || 0})</span>
             </button>
+            {isTeacher && (
+              <button
+                onClick={() => setActiveTab("submissions")}
+                className={`flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold rounded-xl transition-all cursor-pointer ${
+                  activeTab === "submissions"
+                    ? "bg-background text-foreground shadow-xs font-bold"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <GraduationCap className="size-3.5" />
+                <span>Submissions & Grading</span>
+              </button>
+            )}
             <button
               onClick={() => setActiveTab("roster")}
-              className={`flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+              className={`flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold rounded-xl transition-all cursor-pointer ${
                 activeTab === "roster"
                   ? "bg-background text-foreground shadow-xs font-bold"
                   : "text-muted-foreground hover:text-foreground"
@@ -279,7 +311,7 @@ export default function ClassroomPage({ params }: PageProps) {
               assignments.map((asg) => (
                 <div
                   key={asg.id}
-                  className="group p-6 rounded-2xl border border-slate-200/80 dark:border-zinc-800/80 bg-white/95 dark:bg-zinc-900/95 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_24px_-4px_rgba(0,0,0,0.08)] transition-all duration-200 flex flex-col sm:flex-row justify-between sm:items-center gap-5"
+                  className="group p-6 rounded-2xl glass-card hover:scale-[1.01] transition-all duration-300 flex flex-col sm:flex-row justify-between sm:items-center gap-5"
                 >
                   <div className="flex flex-col gap-2 max-w-xl">
                     <div className="flex items-center gap-2">
@@ -308,8 +340,9 @@ export default function ClassroomPage({ params }: PageProps) {
                       return (
                         <Button
                           asChild
+                          variant="outline"
                           size="sm"
-                          className="sm:self-center font-semibold rounded-xl h-9 px-4 active:scale-95 transition-all duration-150 cursor-pointer shrink-0"
+                          className="font-semibold rounded-xl h-9 px-4 text-xs active:scale-95 transition-all duration-150 cursor-pointer sm:self-center shrink-0"
                         >
                           <Link href={`/classrooms/${classroomId}/grades?assignment=${asg.id}`}>
                             <span>Grade Submissions</span>
@@ -376,14 +409,14 @@ export default function ClassroomPage({ params }: PageProps) {
                 </div>
               ))
             ) : (
-              <div className="py-16 flex flex-col items-center justify-center border-2 border-dashed border-border rounded-2xl bg-white/80 dark:bg-zinc-900/80 shadow-xs">
+              <div className="py-16 flex flex-col items-center justify-center border-2 border-dashed border-border rounded-2xl glass-card">
                 <div className="size-14 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mb-4">
                   <FileText className="size-7" />
                 </div>
                 <h4 className="font-extrabold text-xl tracking-tight">No experiments published</h4>
                 <p className="text-xs text-muted-foreground mt-1.5 text-center max-w-sm leading-relaxed">
                   {isTeacher
-                    ? "Publish your first lab practical experiment by clicking 'Publish Experiment' above."
+                    ? "Click 'Publish Experiment' above to create a new lab assignment for your students."
                     : "Your teacher hasn't published any lab assignments in this workspace yet."}
                 </p>
                 {isTeacher && (
@@ -398,6 +431,77 @@ export default function ClassroomPage({ params }: PageProps) {
               </div>
             )}
           </div>
+        ) : activeTab === "submissions" ? (
+          <div className="flex flex-col gap-3">
+            {submissionsLoading ? (
+              <p className="text-xs text-muted-foreground animate-pulse font-medium">
+                Loading student submissions...
+              </p>
+            ) : !submissions || submissions.length === 0 ? (
+              <div className="py-16 flex flex-col items-center justify-center border-2 border-dashed border-border rounded-2xl glass-card">
+                <div className="size-14 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mb-4">
+                  <GraduationCap className="size-7" />
+                </div>
+                <h4 className="font-extrabold text-xl tracking-tight">No submissions yet</h4>
+                <p className="text-xs text-muted-foreground mt-1.5 text-center max-w-sm leading-relaxed">
+                  Student hand-ins for your practical experiments will appear here for grading and evaluation.
+                </p>
+              </div>
+            ) : (
+              submissions.map((sub) => (
+                <div
+                  key={sub.id}
+                  className="p-5 rounded-2xl glass-card flex flex-col sm:flex-row justify-between sm:items-center gap-4 hover:scale-[1.01] transition-all duration-300"
+                >
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-center gap-2">
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-primary/10 text-primary border border-primary/20">
+                        Exp #{sub.experimentNumber}
+                      </span>
+                      <h4 className="font-bold text-sm text-foreground">
+                        {sub.studentName} ({sub.enrollmentNumber})
+                      </h4>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {sub.assignmentTitle} • {sub.submittedAt ? `Handed in ${new Date(sub.submittedAt).toLocaleDateString()}` : "In Progress"}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <span
+                      className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase border ${
+                        sub.status === "approved"
+                          ? "bg-blue-500/10 text-blue-600 border-blue-500/20"
+                          : sub.status === "submitted"
+                          ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
+                          : sub.status === "changes_requested"
+                          ? "bg-amber-500/10 text-amber-600 border-amber-500/20"
+                          : "bg-muted text-muted-foreground border-border"
+                      }`}
+                    >
+                      {sub.status === "approved"
+                        ? `Approved (${sub.marks}/${sub.maxMarks})`
+                        : sub.status === "submitted"
+                        ? "Submitted"
+                        : sub.status === "changes_requested"
+                        ? "Changes Requested"
+                        : "Draft"}
+                    </span>
+
+                    <Button
+                      asChild
+                      size="sm"
+                      className="font-semibold rounded-xl h-8 px-3 text-xs active:scale-95 transition-all duration-150 cursor-pointer"
+                    >
+                      <Link href={`/editor/${sub.id}`}>
+                        <span>{sub.status === "approved" ? "View Evaluation" : "Review Journal"}</span>
+                      </Link>
+                    </Button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
         ) : (
           <div className="flex flex-col gap-3">
             {membersLoading ? (
@@ -408,7 +512,7 @@ export default function ClassroomPage({ params }: PageProps) {
               members.map((member) => (
                 <div
                   key={member.studentId}
-                  className="p-4 rounded-2xl border border-slate-200/80 dark:border-zinc-800/80 bg-white/95 dark:bg-zinc-900/95 shadow-xs flex items-center justify-between gap-4"
+                  className="p-4 rounded-2xl glass-card flex items-center justify-between gap-4"
                 >
                   <div className="flex items-center gap-3">
                     <div className="size-10 rounded-xl bg-primary/10 text-primary font-bold text-xs flex items-center justify-center border border-primary/20 uppercase">
@@ -416,24 +520,24 @@ export default function ClassroomPage({ params }: PageProps) {
                     </div>
                     <div className="flex flex-col">
                       <h4 className="font-bold text-sm text-foreground">
-                        {member.name || "Awaiting Profile setup"}
+                        {member.name || member.email}
                       </h4>
-                      <p className="text-xs text-muted-foreground">{member.email}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Enrollment: {member.enrollmentNumber} • Joined {new Date(member.joinedAt).toLocaleDateString()}
+                      </p>
                     </div>
                   </div>
-                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 capitalize border border-emerald-500/20">
-                    {member.status}
-                  </span>
                 </div>
               ))
             ) : (
-              <div className="py-16 flex flex-col items-center justify-center border-2 border-dashed border-border rounded-2xl bg-white/80 dark:bg-zinc-900/80 shadow-xs">
+              <div className="py-16 flex flex-col items-center justify-center border-2 border-dashed border-border rounded-2xl glass-card">
                 <div className="size-14 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mb-4">
                   <Users className="size-7" />
                 </div>
-                <h4 className="font-extrabold text-xl tracking-tight">No students enrolled</h4>
+                <h4 className="font-extrabold text-xl tracking-tight">No roster members yet</h4>
                 <p className="text-xs text-muted-foreground mt-1.5 text-center max-w-sm leading-relaxed">
-                  Share the join code <code className="font-mono bg-muted px-1.5 py-0.5 rounded text-foreground font-bold">{classroom.joinCode}</code> to enroll students into this workspace.
+                  Students will appear here after they join your classroom using join code{" "}
+                  <span className="font-mono font-bold text-foreground">{classroom.joinCode}</span>.
                 </p>
               </div>
             )}
@@ -444,7 +548,7 @@ export default function ClassroomPage({ params }: PageProps) {
       {/* Publish Assignment Modal (Teacher only) */}
       {showPublishModal && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-6 animate-fade-in">
-          <div className="bg-card w-full max-w-[500px] p-6 rounded-2xl border border-border shadow-xl flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
+          <div className="glass-card w-full max-w-[500px] p-6 rounded-3xl flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
             <h3 className="font-bold text-xl tracking-tight">Publish Practical Assignment</h3>
             <form
               onSubmit={publishForm.handleSubmit((data) => publishMutation.mutate(data))}

@@ -129,12 +129,18 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-slate-100/60 dark:bg-zinc-950 bg-textured-workspace text-foreground flex flex-col">
       {/* Dynamic Header Functional Layer (Apple Liquid Glass Floating Capsule Bar) */}
-      <header className="fixed top-4 left-4 sm:left-8 md:left-16 right-4 sm:right-8 md:right-16 z-40 flex items-center justify-between px-5 py-2.5 bg-gradient-to-b from-white/85 via-white/70 to-white/50 dark:from-zinc-900/95 dark:via-zinc-900/90 dark:to-zinc-950/85 backdrop-blur-2xl backdrop-saturate-180 border border-white/80 dark:border-zinc-700/60 ring-1 ring-black/5 dark:ring-white/10 shadow-[0_8px_32px_0_rgba(0,0,0,0.08)] dark:shadow-[0_8px_32px_0_rgba(0,0,0,0.5)] shadow-[inset_0_1px_1px_0_rgba(255,255,255,0.8)] dark:shadow-[inset_0_1px_1px_0_rgba(255,255,255,0.1)] rounded-2xl select-none transition-all duration-200">
+      <header className="fixed top-4 left-4 sm:left-8 md:left-16 right-4 sm:right-8 md:right-16 z-40 flex items-center justify-between px-5 py-2.5 bg-gradient-to-b from-white/80 via-white/65 to-white/50 dark:from-zinc-900/85 dark:via-zinc-900/75 dark:to-zinc-950/70 backdrop-blur-2xl backdrop-saturate-180 border border-white/80 dark:border-white/15 ring-1 ring-black/5 dark:ring-white/10 shadow-[0_16px_40px_-8px_rgba(0,0,0,0.1),_inset_0_1px_1px_0_rgba(255,255,255,0.95),_inset_0_-1px_1px_0_rgba(0,0,0,0.05)] dark:shadow-[0_20px_50px_-12px_rgba(0,0,0,0.7),_inset_0_1px_1px_0_rgba(255,255,255,0.18),_inset_0_-1px_1px_0_rgba(0,0,0,0.5)] rounded-2xl select-none transition-all duration-300">
         <div className="flex items-center gap-3">
-          <div className="h-8 w-8 rounded-xl bg-primary flex items-center justify-center text-primary-foreground font-extrabold text-xs shadow-xs">
-            eJ
-          </div>
-          <span className="font-bold text-base tracking-tight">eJournal</span>
+          <Link href="/dashboard" className="flex items-center gap-2.5 group select-none">
+            <img
+              src="/logo.png"
+              alt="eJournal Icon"
+              className="h-8 w-auto object-contain transition-transform group-hover:scale-105"
+            />
+            <span className="font-bold text-lg tracking-tight text-foreground">
+              eJournal
+            </span>
+          </Link>
         </div>
 
         <div className="flex items-center gap-3">
@@ -144,7 +150,7 @@ export default function DashboardPage() {
             Hello, <span className="font-semibold text-foreground">{userDisplayName}</span>
           </span>
           <Button
-            variant="outline"
+            variant="destructive"
             size="sm"
             onClick={() => logoutMutation.mutate()}
             disabled={logoutMutation.isPending}
@@ -158,7 +164,7 @@ export default function DashboardPage() {
       {/* Main Workspace */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-6 md:p-8 pt-24 md:pt-24 flex flex-col gap-8 relative z-10">
         {/* Banner Section */}
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 p-6 md:p-8 rounded-2xl bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800/80 shadow-[0_4px_24px_-4px_rgba(0,0,0,0.04)]">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 p-6 md:p-8 rounded-3xl glass-card relative overflow-hidden transition-all duration-300">
           <div className="flex flex-col gap-1.5 max-w-2xl">
             <div className="flex items-center gap-2">
               <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-primary/10 text-primary border border-primary/20 flex items-center gap-1">
@@ -201,7 +207,7 @@ export default function DashboardPage() {
 
         {/* Executive Stats Summary Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <div className="p-5 rounded-2xl bg-white/90 dark:bg-zinc-900/90 border border-slate-200/80 dark:border-zinc-800/80 shadow-xs flex items-center justify-between gap-4">
+          <div className="p-5 rounded-2xl glass-card flex items-center justify-between gap-4 hover:scale-[1.02] transition-all duration-300">
             <div className="flex flex-col gap-0.5">
               <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 {isStudent ? "Enrolled Subjects" : "Managed Batches"}
@@ -215,7 +221,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          <div className="p-5 rounded-2xl bg-white/90 dark:bg-zinc-900/90 border border-slate-200/80 dark:border-zinc-800/80 shadow-xs flex items-center justify-between gap-4">
+          <div className="p-5 rounded-2xl glass-card flex items-center justify-between gap-4 hover:scale-[1.02] transition-all duration-300">
             <div className="flex flex-col gap-0.5">
               <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 Department
@@ -229,7 +235,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          <div className="p-5 rounded-2xl bg-white/90 dark:bg-zinc-900/90 border border-slate-200/80 dark:border-zinc-800/80 shadow-xs flex items-center justify-between gap-4">
+          <div className="p-5 rounded-2xl glass-card flex items-center justify-between gap-4 hover:scale-[1.02] transition-all duration-300">
             <div className="flex flex-col gap-0.5">
               <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 Account Role
@@ -251,13 +257,13 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* Section Header */}
-        <div className="flex items-center justify-between border-b border-border/80 pb-3">
+        {/* Section Title */}
+        <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <h2 className="text-xl font-bold tracking-tight text-foreground">
-              {isStudent ? "My Classroom Workspaces" : "Active Teaching Batches"}
+            <h2 className="text-xl font-extrabold tracking-tight text-foreground">
+              My Classroom Workspaces
             </h2>
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-muted text-muted-foreground border border-border">
+            <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-muted text-muted-foreground">
               {classrooms?.length || 0}
             </span>
           </div>
@@ -269,11 +275,11 @@ export default function DashboardPage() {
             classrooms.map((room) => (
               <div
                 key={room.id}
-                className="group relative p-6 rounded-2xl border border-slate-200/80 dark:border-zinc-800/80 bg-white/95 dark:bg-zinc-900/95 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)] hover:shadow-[0_12px_32px_0_rgba(0,0,0,0.08)] hover:-translate-y-1 transition-all duration-200 flex flex-col justify-between h-[210px]"
+                className="group relative p-6 rounded-2xl glass-card hover:scale-[1.02] hover:-translate-y-0.5 transition-all duration-300 flex flex-col justify-between h-[210px]"
               >
                 <div>
                   <div className="flex items-start justify-between gap-2">
-                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-muted text-foreground border border-border uppercase tracking-wider">
+                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-muted/80 text-foreground border border-border uppercase tracking-wider">
                       {room.subject}
                     </span>
                     {!isStudent && (
@@ -308,7 +314,7 @@ export default function DashboardPage() {
               </div>
             ))
           ) : (
-            <div className="col-span-full py-16 flex flex-col items-center justify-center border-2 border-dashed border-border rounded-2xl bg-white/80 dark:bg-zinc-900/80 shadow-xs">
+            <div className="col-span-full py-16 flex flex-col items-center justify-center border-2 border-dashed border-border rounded-2xl glass-card">
               <div className="size-14 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mb-4">
                 <BookOpen className="size-7" />
               </div>
@@ -337,7 +343,7 @@ export default function DashboardPage() {
       {/* Join Classroom Modal (Student only) */}
       {showJoinModal && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-6 animate-fade-in">
-          <div className="bg-card w-full max-w-[400px] p-6 rounded-2xl border border-border shadow-xl flex flex-col gap-4">
+          <div className="glass-card w-full max-w-[400px] p-6 rounded-3xl flex flex-col gap-4">
             <h3 className="font-bold text-xl tracking-tight">Join Classroom</h3>
             <form onSubmit={joinForm.handleSubmit((data) => joinMutation.mutate(data))} className="flex flex-col gap-4">
               <div className="flex flex-col gap-1.5">
@@ -369,7 +375,7 @@ export default function DashboardPage() {
       {/* Create Classroom Modal (Teacher only) */}
       {showCreateModal && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-6 animate-fade-in">
-          <div className="bg-card w-full max-w-[450px] p-6 rounded-2xl border border-border shadow-xl flex flex-col gap-4">
+          <div className="glass-card w-full max-w-[450px] p-6 rounded-3xl flex flex-col gap-4">
             <h3 className="font-bold text-xl tracking-tight">Create Classroom</h3>
             <form onSubmit={createForm.handleSubmit((data) => createMutation.mutate(data))} className="flex flex-col gap-4">
               <div className="flex flex-col gap-1.5">

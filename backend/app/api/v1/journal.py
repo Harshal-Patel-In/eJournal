@@ -7,9 +7,19 @@ RULE-AUTH07: RBAC controls routes.
 from fastapi import APIRouter, Depends, Request, status
 
 from app.dependencies.auth import RoleChecker, get_active_user
-from app.schemas.journal import JournalCreateRequest, JournalSaveRequest, JournalResponse
+from app.schemas.journal import (
+    JournalCreateRequest,
+    JournalSaveRequest,
+    JournalResponse,
+    SingleBlockUpdateRequest,
+    BatchBlockUpdateRequest,
+    BlockOrderUpdateRequest,
+    BlockUpdateResponse,
+)
 from app.schemas.response import ApiResponse, success_response
 from app.services.journal_service import JournalService
+
+from app.schemas.comment import RequestChangesRequest, ApproveJournalRequest
 
 router = APIRouter(prefix="/journals")
 
@@ -41,6 +51,17 @@ async def list_my_journals(
     return success_response(journals)
 
 
+@router.get("/classroom/{classroomId}/submissions", response_model=ApiResponse[list])
+async def list_classroom_submissions(
+    classroomId: str,
+    user: dict = Depends(RoleChecker(["teacher"])),
+    journal_service: JournalService = Depends(),
+):
+    """List all submitted or graded student journals for a classroom (Teacher dashboard)."""
+    submissions = await journal_service.get_classroom_submissions(classroomId, user["id"])
+    return success_response(submissions)
+
+
 @router.get("/{journalId}", response_model=ApiResponse[JournalResponse])
 async def get_journal(
     journalId: str,
@@ -63,6 +84,55 @@ async def save_journal(
     """Save/Sync the complete document blocks content for a draft journal (Student only)."""
     ip_address = request.client.host if request.client else None
     journal = await journal_service.save_journal(
+        journalId, user["id"], payload, ip_address=ip_address
+    )
+    return success_response(journal)
+
+
+@router.patch("/{journalId}/blocks/{blockId}", response_model=ApiResponse[BlockUpdateResponse])
+async def update_single_block(
+    journalId: str,
+    blockId: str,
+    payload: SingleBlockUpdateRequest,
+    request: Request,
+    user: dict = Depends(RoleChecker(["student"])),
+    journal_service: JournalService = Depends(),
+):
+    """Incremental update for a single block content with revision checking (Student only)."""
+    ip_address = request.client.host if request.client else None
+    result = await journal_service.update_single_block(
+        journalId, user["id"], blockId, payload, ip_address=ip_address
+    )
+    return success_response(result)
+
+
+@router.patch("/{journalId}/blocks", response_model=ApiResponse[JournalResponse])
+async def update_blocks_batch(
+    journalId: str,
+    payload: BatchBlockUpdateRequest,
+    request: Request,
+    user: dict = Depends(RoleChecker(["student"])),
+    journal_service: JournalService = Depends(),
+):
+    """Batch update all document blocks with optimistic concurrency checking (Student only)."""
+    ip_address = request.client.host if request.client else None
+    journal = await journal_service.update_blocks_batch(
+        journalId, user["id"], payload, ip_address=ip_address
+    )
+    return success_response(journal)
+
+
+@router.put("/{journalId}/block-order", response_model=ApiResponse[JournalResponse])
+async def update_block_order(
+    journalId: str,
+    payload: BlockOrderUpdateRequest,
+    request: Request,
+    user: dict = Depends(RoleChecker(["student"])),
+    journal_service: JournalService = Depends(),
+):
+    """Update block sequence ordering with optimistic concurrency checking (Student only)."""
+    ip_address = request.client.host if request.client else None
+    journal = await journal_service.update_block_order(
         journalId, user["id"], payload, ip_address=ip_address
     )
     return success_response(journal)
@@ -104,6 +174,47 @@ async def unsubmit_journal(
         journalId, user["id"], ip_address=ip_address
     )
     return success_response(journal)
+
+
+@router.post(
+    "/{journalId}/request-changes",
+    response_model=ApiResponse[JournalResponse],
+    status_code=status.HTTP_200_OK,
+)
+async def request_changes(
+    journalId: str,
+    payload: RequestChangesRequest,
+    request: Request,
+    user: dict = Depends(RoleChecker(["teacher"])),
+    journal_service: JournalService = Depends(),
+):
+    """Teacher requests corrections from student, reopening journal to draft state."""
+    ip_address = request.client.host if request.client else None
+    journal = await journal_service.request_changes(
+        journalId, user["id"], payload, ip_address=ip_address
+    )
+    return success_response(journal)
+
+
+@router.post(
+    "/{journalId}/approve",
+    response_model=ApiResponse[JournalResponse],
+    status_code=status.HTTP_200_OK,
+)
+async def approve_journal(
+    journalId: str,
+    payload: ApproveJournalRequest,
+    request: Request,
+    user: dict = Depends(RoleChecker(["teacher"])),
+    journal_service: JournalService = Depends(),
+):
+    """Teacher approves student journal submission and assigns marks."""
+    ip_address = request.client.host if request.client else None
+    journal = await journal_service.approve_journal(
+        journalId, user["id"], payload, ip_address=ip_address
+    )
+    return success_response(journal)
+
 
 
 @router.get("/{journalId}/export/pdf")

@@ -83,12 +83,14 @@ function VerifyContent() {
   };
 
   return (
-    <div className="w-full max-w-[400px] p-8 rounded-2xl border border-border bg-card shadow-sm flex flex-col gap-6">
+    <div className="w-full max-w-[400px] p-8 rounded-3xl glass-card flex flex-col gap-6 relative transition-all duration-300">
       {/* Header */}
       <div className="flex flex-col items-center gap-1 text-center">
-        <div className="h-12 w-12 rounded-xl bg-primary flex items-center justify-center text-primary-foreground font-bold text-xl shadow-sm mb-2">
-          eJ
-        </div>
+        <img
+          src="/logo.png"
+          alt="eJournal Logo"
+          className="h-16 w-auto object-contain mb-2"
+        />
         <h2 className="text-2xl font-bold tracking-tight">Verify Account</h2>
         <p className="text-sm text-muted-foreground">
           We sent a verification code to <span className="font-semibold text-foreground">{emailParam}</span>

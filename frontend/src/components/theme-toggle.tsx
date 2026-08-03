@@ -47,14 +47,20 @@ export function ThemeToggle({ className }: { className?: string }) {
           ? "Light Mode — Click for Night Mode"
           : "System Theme — Click for Light Mode"
       }
-      className={`size-8 rounded-full bg-card/75 dark:bg-card/60 backdrop-blur-xl border border-white/60 dark:border-white/20 ring-1 ring-black/5 dark:ring-white/10 shadow-xs hover:scale-105 active:scale-95 transition-all cursor-pointer ${className}`}
+      className={`size-8 rounded-full ${
+        theme === "light"
+          ? "glass-btn-amber"
+          : theme === "dark"
+          ? "glass-btn-cyan"
+          : "glass-btn-indigo"
+      } hover:scale-105 active:scale-95 transition-all cursor-pointer ${className}`}
     >
       {theme === "dark" ? (
         <Moon className="size-3.5 text-sky-400 transition-all" />
       ) : theme === "light" ? (
         <Sun className="size-3.5 text-amber-500 transition-all" />
       ) : (
-        <Monitor className="size-3.5 text-muted-foreground transition-all" />
+        <Monitor className="size-3.5 text-indigo-500 transition-all" />
       )}
       <span className="sr-only">Toggle theme</span>
     </Button>

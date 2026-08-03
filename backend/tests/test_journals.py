@@ -209,9 +209,11 @@ async def test_save_journal_unauthorized(mock_journal):
 @patch("app.services.journal_service.ClassroomRepository")
 @patch("app.repositories.notification_repository.NotificationRepository")
 @patch("app.services.journal_service.AuditLogRepository")
+@patch("app.services.journal_service.VersionRepository")
 @patch("app.utils.email.send_notification_email")
 async def test_submit_journal_success(
     mock_send_email,
+    mock_version,
     mock_audit,
     mock_notification,
     mock_classroom,
@@ -239,6 +241,10 @@ async def test_submit_journal_success(
     )
     journal_repo.update_by_id = AsyncMock(return_value=True)
     mock_journal.return_value = journal_repo
+
+    version_repo = MagicMock()
+    version_repo.create_snapshot = AsyncMock(return_value={"id": "version_1"})
+    mock_version.return_value = version_repo
 
     user_repo = MagicMock()
     user_repo.find_by_id = AsyncMock(
@@ -293,9 +299,41 @@ async def test_submit_journal_success(
 
     assert result["status"] == "submitted"
     assert journal_repo.update_by_id.called
+    assert version_repo.create_snapshot.called
     assert notification_repo.create_notification.called
     assert mock_send_email.called
     assert audit_repo.log_event.called
+
+
+@pytest.mark.anyio
+@patch("app.services.journal_service.JournalRepository")
+@patch("app.services.journal_service.AssignmentRepository")
+@patch("app.services.journal_service.ClassroomRepository")
+async def test_approve_journal_unsubmitted_concurrency_rejection(
+    mock_classroom, mock_assignment, mock_journal
+):
+    """Verify that approving a journal that was unsubmitted into draft returns HTTP 400 INVALID_WORKFLOW_STATE."""
+    journal_repo = MagicMock()
+    journal_repo.find_by_id = AsyncMock(
+        return_value={
+            "id": "journal_999",
+            "studentId": "student_123",
+            "assignmentId": "assignment_123",
+            "status": "draft",  # Student un-submitted while teacher was grading!
+        }
+    )
+    mock_journal.return_value = journal_repo
+
+    from app.schemas.comment import ApproveJournalRequest
+
+    service = JournalService()
+    payload = ApproveJournalRequest(marks=10.0, remarks="Great work")
+
+    with pytest.raises(AppException) as excinfo:
+        await service.approve_journal("journal_999", "teacher_456", payload)
+    assert excinfo.value.code == ErrorCode.INVALID_WORKFLOW_STATE
+    assert excinfo.value.status_code == 400
+
 
 
 @pytest.mark.anyio
@@ -350,22 +388,79 @@ async def test_unsubmit_journal_success(mock_audit, mock_journal):
 
 @pytest.mark.anyio
 @patch("app.services.journal_service.JournalRepository")
-async def test_unsubmit_journal_not_submitted(mock_journal):
-    """Verify that unsubmitting a draft journal is rejected."""
+async def test_update_single_block_revision_conflict(mock_journal):
+    """Verify that updating a block with an outdated clientRevision raises a 409 REVISION_CONFLICT error."""
     journal_repo = MagicMock()
     journal_repo.find_by_id = AsyncMock(
         return_value={
             "id": "journal_999",
             "studentId": "student_123",
             "status": "draft",
+            "currentVersion": 5,
         }
     )
     mock_journal.return_value = journal_repo
 
+    from app.schemas.journal import SingleBlockUpdateRequest
+
     service = JournalService()
+    payload = SingleBlockUpdateRequest(
+        content={"text": "New Text"},
+        clientRevision=4,  # Mismatched client revision!
+    )
 
     with pytest.raises(AppException) as excinfo:
-        await service.unsubmit_journal("journal_999", "student_123")
-    assert excinfo.value.code == ErrorCode.INVALID_WORKFLOW_STATE
+        await service.update_single_block(
+            "journal_999", "student_123", "block_1", payload
+        )
+    assert excinfo.value.code == ErrorCode.REVISION_CONFLICT
+    assert excinfo.value.status_code == 409
+
+
+@pytest.mark.anyio
+@patch("app.services.journal_service.JournalRepository")
+@patch("app.services.journal_service.AuditLogRepository")
+async def test_update_blocks_batch_revision_success(mock_audit, mock_journal):
+    """Verify that batch block updates matching current version succeed and increment server revision."""
+    journal_repo = MagicMock()
+    journal_repo.find_by_id = AsyncMock(
+        return_value={
+            "id": "journal_999",
+            "studentId": "student_123",
+            "status": "draft",
+            "currentVersion": 3,
+        }
+    )
+    journal_repo.update_blocks_batch_with_revision = AsyncMock(
+        return_value={
+            "id": "journal_999",
+            "title": "Batch Saved Journal",
+            "currentVersion": 4,
+            "blocks": [],
+        }
+    )
+    mock_journal.return_value = journal_repo
+
+    audit_repo = MagicMock()
+    audit_repo.log_event = AsyncMock()
+    mock_audit.return_value = audit_repo
+
+    from app.schemas.journal import BatchBlockUpdateRequest
+
+    service = JournalService()
+    payload = BatchBlockUpdateRequest(
+        title="Batch Saved Journal",
+        blocks=[],
+        clientRevision=3,  # Matches server revision!
+    )
+
+    result = await service.update_blocks_batch(
+        "journal_999", "student_123", payload
+    )
+
+    assert result["currentVersion"] == 4
+    assert journal_repo.update_blocks_batch_with_revision.called
+    assert audit_repo.log_event.called
+
 
 

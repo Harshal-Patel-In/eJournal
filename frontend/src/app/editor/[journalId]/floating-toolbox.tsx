@@ -401,7 +401,7 @@ export default function FloatingToolbox() {
           onMouseEnter={handlePopoverMouseEnter}
           onMouseLeave={handlePopoverMouseLeave}
           style={{ top: popoverPos.top, left: popoverPos.left }}
-          className="fixed z-50 w-48 p-1.5 rounded-2xl bg-card/90 backdrop-blur-2xl border border-border/80 shadow-2xl flex flex-col gap-1 select-none transition-all duration-150 animate-in fade-in-0 zoom-in-95"
+          className="fixed z-50 w-48 p-1.5 rounded-2xl glass-tooltip flex flex-col gap-1 select-none transition-all duration-150 animate-in fade-in-0 zoom-in-95"
         >
           <div className="px-2.5 py-1 border-b border-border/40 mb-0.5">
             <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
@@ -460,7 +460,7 @@ export default function FloatingToolbox() {
       {collapsed && tooltipText && tooltipPos && (
         <div
           style={{ top: tooltipPos.top, left: tooltipPos.left }}
-          className="fixed z-50 px-2.5 py-1 rounded-xl bg-card/95 backdrop-blur-2xl border border-border/80 shadow-2xl text-xs font-semibold text-foreground flex items-center gap-1.5 select-none transition-all duration-150 ease-out pointer-events-none animate-in fade-in-0 zoom-in-95"
+          className="fixed z-50 px-3 py-1.5 rounded-full glass-tooltip text-xs font-semibold text-foreground flex items-center gap-1.5 select-none transition-all duration-150 ease-out pointer-events-none animate-in fade-in-0 zoom-in-95"
         >
           <div className="size-1.5 rounded-full bg-primary animate-pulse" />
           <span>{tooltipText}</span>

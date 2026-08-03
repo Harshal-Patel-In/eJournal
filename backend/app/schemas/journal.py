@@ -25,6 +25,37 @@ class JournalSaveRequest(BaseModel):
 
     title: str = Field(..., description="Title of the journal")
     blocks: List[JournalBlock] = Field(default_factory=list, description="Array of document blocks")
+    clientRevision: int = Field(default=1, description="Client document revision number for optimistic concurrency")
+
+
+class SingleBlockUpdateRequest(BaseModel):
+    """Payload for incremental single block update."""
+
+    content: Dict[str, Any] = Field(default_factory=dict, description="Updated block content attributes")
+    clientRevision: int = Field(..., description="Expected client revision before mutation")
+
+
+class BatchBlockUpdateRequest(BaseModel):
+    """Payload for batch block update with optional title update."""
+
+    title: str | None = Field(default=None, description="Updated journal title if changed")
+    blocks: List[JournalBlock] = Field(..., description="Complete array of blocks")
+    clientRevision: int = Field(..., description="Expected client revision before mutation")
+
+
+class BlockOrderUpdateRequest(BaseModel):
+    """Payload for updating block ordering."""
+
+    blockOrder: List[str] = Field(..., description="Ordered list of block IDs")
+    clientRevision: int = Field(..., description="Expected client revision before mutation")
+
+
+class BlockUpdateResponse(BaseModel):
+    """Response envelope after updating a block or document revision."""
+
+    journalId: str
+    serverRevision: int
+    savedAt: datetime
 
 
 class JournalResponse(BaseModel):
@@ -35,7 +66,8 @@ class JournalResponse(BaseModel):
     studentId: str
     title: str
     status: str
-    currentVersion: int
+    currentVersion: int = Field(default=1, description="Current server revision counter")
     blocks: List[JournalBlock]
     createdAt: datetime
     updatedAt: datetime
+

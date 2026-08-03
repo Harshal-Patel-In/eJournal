@@ -61,13 +61,18 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center p-6 bg-background">
-      <div className="w-full max-w-[400px] p-8 rounded-2xl border border-border bg-card shadow-sm flex flex-col gap-6">
+    <div className="flex min-h-screen flex-col items-center justify-center p-6 bg-background relative overflow-hidden">
+      {/* Subtle ambient light glow underneath floating glass card */}
+      <div className="absolute size-[450px] rounded-full bg-blue-500/10 blur-[100px] pointer-events-none" />
+
+      <div className="w-full max-w-[400px] p-8 rounded-3xl bg-gradient-to-b from-white/80 via-white/65 to-white/50 dark:from-zinc-900/85 dark:via-zinc-900/75 dark:to-zinc-950/70 backdrop-blur-2xl backdrop-saturate-180 border border-white/80 dark:border-white/15 ring-1 ring-black/5 dark:ring-white/10 shadow-[0_20px_50px_-10px_rgba(0,0,0,0.1),_inset_0_1px_1px_0_rgba(255,255,255,0.95),_inset_0_-1px_1px_0_rgba(0,0,0,0.05)] dark:shadow-[0_24px_60px_-15px_rgba(0,0,0,0.7),_inset_0_1px_1px_0_rgba(255,255,255,0.18),_inset_0_-1px_1px_0_rgba(0,0,0,0.5)] flex flex-col gap-6 relative transition-all duration-300">
         {/* Header */}
         <div className="flex flex-col items-center gap-1 text-center">
-          <div className="h-12 w-12 rounded-xl bg-primary flex items-center justify-center text-primary-foreground font-bold text-xl shadow-sm mb-2">
-            eJ
-          </div>
+          <img
+            src="/logo.png"
+            alt="eJournal Logo"
+            className="h-16 w-auto object-contain mb-2"
+          />
           <h2 className="text-2xl font-bold tracking-tight">Create Account</h2>
           <p className="text-sm text-muted-foreground">
             Get started with eJournal

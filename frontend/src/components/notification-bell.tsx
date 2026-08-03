@@ -64,11 +64,11 @@ export default function NotificationBell() {
       {/* Trigger Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="relative p-2 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-all cursor-pointer focus:outline-none"
+        className="relative size-8 rounded-full glass-btn-violet flex items-center justify-center hover:scale-105 active:scale-95 transition-all cursor-pointer focus:outline-none"
       >
-        <Bell className="size-5" />
+        <Bell className="size-4 text-violet-600 dark:text-violet-400" />
         {unreadCount > 0 && (
-          <span className="absolute top-1.5 right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold text-destructive-foreground animate-pulse">
+          <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-bold text-white shadow-[0_0_10px_rgba(244,63,94,0.6)] animate-pulse">
             {unreadCount}
           </span>
         )}
@@ -76,9 +76,9 @@ export default function NotificationBell() {
 
       {/* Floating Popover Dropdown */}
       {isOpen && (
-        <div className="absolute right-0 mt-2.5 w-80 rounded-2xl border border-border bg-card shadow-lg z-50 overflow-hidden transform origin-top-right transition-all">
+        <div className="absolute right-0 mt-2.5 w-80 rounded-3xl glass-card z-50 overflow-hidden transform origin-top-right transition-all">
           {/* Header */}
-          <div className="p-4 border-b border-border flex items-center justify-between bg-muted/20">
+          <div className="p-4 border-b border-white/20 dark:border-white/10 flex items-center justify-between bg-white/10 dark:bg-zinc-900/30">
             <span className="text-xs font-bold text-foreground">Notifications</span>
             {unreadCount > 0 && (
               <button

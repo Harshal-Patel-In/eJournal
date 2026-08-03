@@ -100,13 +100,18 @@ export default function ProfileSetupPage() {
   const isStudent = user.role === "student";
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center p-6 bg-background">
-      <div className="w-full max-w-[500px] p-8 rounded-2xl border border-border bg-card shadow-sm flex flex-col gap-6">
+    <div className="flex min-h-screen flex-col items-center justify-center p-6 bg-background relative overflow-hidden">
+      {/* Ambient glow */}
+      <div className="absolute size-[500px] rounded-full bg-blue-500/10 blur-[100px] pointer-events-none" />
+
+      <div className="w-full max-w-[500px] p-8 rounded-3xl glass-card flex flex-col gap-6 relative transition-all duration-300">
         {/* Header */}
         <div className="flex flex-col items-center gap-1 text-center">
-          <div className="h-12 w-12 rounded-xl bg-primary flex items-center justify-center text-primary-foreground font-bold text-xl shadow-sm mb-2">
-            eJ
-          </div>
+          <img
+            src="/logo.png"
+            alt="eJournal Logo"
+            className="h-16 w-auto object-contain mb-2"
+          />
           <h2 className="text-2xl font-bold tracking-tight">Setup Profile</h2>
           <p className="text-sm text-muted-foreground">
             Complete your academic information as a{" "}

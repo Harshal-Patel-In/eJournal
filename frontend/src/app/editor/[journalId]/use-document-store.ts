@@ -7,6 +7,8 @@ export interface JournalBlock {
   metadata: any;
 }
 
+export type SyncStatus = "synced" | "saving" | "unsaved" | "conflict" | "offline";
+
 interface DocumentState {
   journalId: string;
   title: string;
@@ -16,7 +18,20 @@ interface DocumentState {
   isSaving: boolean;
   previewMode: boolean;
 
-  init: (journalId: string, title: string, blocks: JournalBlock[], status: string) => void;
+  // Phase 5 Concurrency & Sync Extensions
+  clientRevision: number;
+  serverRevision: number;
+  lastSavedAt: string | null;
+  syncStatus: SyncStatus;
+  dirtyBlockIds: string[];
+
+  init: (
+    journalId: string,
+    title: string,
+    blocks: JournalBlock[],
+    status: string,
+    revision?: number
+  ) => void;
   setStatus: (status: string) => void;
   setTitle: (title: string) => void;
   addBlock: (index: number, type: string, content?: any) => void;
@@ -26,10 +41,54 @@ interface DocumentState {
   moveBlock: (fromIndex: number, toIndex: number) => void;
   setSaving: (status: boolean) => void;
   setDirty: (status: boolean) => void;
+  setSyncStatus: (syncStatus: SyncStatus) => void;
+  setRevision: (serverRevision: number, savedAt?: string) => void;
+  loadLocalRecovery: (title: string, blocks: JournalBlock[]) => void;
   togglePreview: () => void;
 }
 
-export const useDocumentStore = create<DocumentState>((set) => ({
+const saveLocalSnapshot = (
+  journalId: string,
+  title: string,
+  blocks: JournalBlock[],
+  revision: number
+) => {
+  if (typeof window === "undefined" || !journalId) return;
+  try {
+    const snapshot = {
+      journalId,
+      title,
+      blocks,
+      revision,
+      savedAt: new Date().toISOString(),
+    };
+    localStorage.setItem(`ejournal_recovery_${journalId}`, JSON.stringify(snapshot));
+  } catch (err) {
+    console.error("Failed to save local recovery snapshot", err);
+  }
+};
+
+export const clearLocalSnapshot = (journalId: string) => {
+  if (typeof window === "undefined" || !journalId) return;
+  try {
+    localStorage.removeItem(`ejournal_recovery_${journalId}`);
+  } catch (err) {
+    console.error("Failed to clear local snapshot", err);
+  }
+};
+
+export const getLocalSnapshot = (journalId: string) => {
+  if (typeof window === "undefined" || !journalId) return null;
+  try {
+    const raw = localStorage.getItem(`ejournal_recovery_${journalId}`);
+    return raw ? JSON.parse(raw) : null;
+  } catch (err) {
+    console.error("Failed to read local recovery snapshot", err);
+    return null;
+  }
+};
+
+export const useDocumentStore = create<DocumentState>((set, get) => ({
   journalId: "",
   title: "",
   blocks: [],
@@ -38,14 +97,24 @@ export const useDocumentStore = create<DocumentState>((set) => ({
   isSaving: false,
   previewMode: false,
 
-  init: (journalId, title, blocks, status) =>
+  clientRevision: 1,
+  serverRevision: 1,
+  lastSavedAt: null,
+  syncStatus: "synced",
+  dirtyBlockIds: [],
+
+  init: (journalId, title, blocks, status, revision = 1) =>
     set({
       journalId,
       title,
       blocks,
       status,
+      clientRevision: revision,
+      serverRevision: revision,
       isDirty: false,
       isSaving: false,
+      syncStatus: "synced",
+      dirtyBlockIds: [],
       previewMode: status !== "draft" && status !== "changes_requested",
     }),
 
@@ -56,10 +125,17 @@ export const useDocumentStore = create<DocumentState>((set) => ({
     }),
 
   setTitle: (title) =>
-    set((state) => ({
-      title,
-      isDirty: state.title !== title ? true : state.isDirty,
-    })),
+    set((state) => {
+      const isDirty = state.title !== title || state.isDirty;
+      if (isDirty) {
+        saveLocalSnapshot(state.journalId, title, state.blocks, state.clientRevision);
+      }
+      return {
+        title,
+        isDirty,
+        syncStatus: isDirty ? "unsaved" : state.syncStatus,
+      };
+    }),
 
   addBlock: (index, type, content = {}) =>
     set((state) => {
@@ -71,7 +147,13 @@ export const useDocumentStore = create<DocumentState>((set) => ({
       };
       const updated = [...state.blocks];
       updated.splice(index, 0, newBlock);
-      return { blocks: updated, isDirty: true };
+      saveLocalSnapshot(state.journalId, state.title, updated, state.clientRevision);
+      return {
+        blocks: updated,
+        isDirty: true,
+        syncStatus: "unsaved",
+        dirtyBlockIds: Array.from(new Set([...state.dirtyBlockIds, newBlock.id])),
+      };
     }),
 
   updateBlock: (id, content) =>
@@ -86,13 +168,25 @@ export const useDocumentStore = create<DocumentState>((set) => ({
         }
         return block;
       });
-      return { blocks: updated, isDirty: true };
+      saveLocalSnapshot(state.journalId, state.title, updated, state.clientRevision);
+      return {
+        blocks: updated,
+        isDirty: true,
+        syncStatus: "unsaved",
+        dirtyBlockIds: Array.from(new Set([...state.dirtyBlockIds, id])),
+      };
     }),
 
   deleteBlock: (id) =>
     set((state) => {
       const updated = state.blocks.filter((block) => block.id !== id);
-      return { blocks: updated, isDirty: true };
+      saveLocalSnapshot(state.journalId, state.title, updated, state.clientRevision);
+      return {
+        blocks: updated,
+        isDirty: true,
+        syncStatus: "unsaved",
+        dirtyBlockIds: Array.from(new Set([...state.dirtyBlockIds, id])),
+      };
     }),
 
   duplicateBlock: (id) =>
@@ -113,7 +207,13 @@ export const useDocumentStore = create<DocumentState>((set) => ({
 
       const updated = [...state.blocks];
       updated.splice(blockIndex + 1, 0, duplicatedBlock);
-      return { blocks: updated, isDirty: true };
+      saveLocalSnapshot(state.journalId, state.title, updated, state.clientRevision);
+      return {
+        blocks: updated,
+        isDirty: true,
+        syncStatus: "unsaved",
+        dirtyBlockIds: Array.from(new Set([...state.dirtyBlockIds, duplicatedBlock.id])),
+      };
     }),
 
   moveBlock: (fromIndex, toIndex) =>
@@ -129,10 +229,46 @@ export const useDocumentStore = create<DocumentState>((set) => ({
       const updated = [...state.blocks];
       const [movedBlock] = updated.splice(fromIndex, 1);
       updated.splice(toIndex, 0, movedBlock);
-      return { blocks: updated, isDirty: true };
+      saveLocalSnapshot(state.journalId, state.title, updated, state.clientRevision);
+      return {
+        blocks: updated,
+        isDirty: true,
+        syncStatus: "unsaved",
+      };
     }),
 
-  setSaving: (isSaving) => set({ isSaving }),
+  setSaving: (isSaving) =>
+    set((state) => ({
+      isSaving,
+      syncStatus: isSaving ? "saving" : state.isDirty ? "unsaved" : "synced",
+    })),
+
   setDirty: (isDirty) => set({ isDirty }),
+
+  setSyncStatus: (syncStatus) => set({ syncStatus }),
+
+  setRevision: (serverRevision, savedAt) =>
+    set((state) => {
+      clearLocalSnapshot(state.journalId);
+      return {
+        clientRevision: serverRevision,
+        serverRevision,
+        lastSavedAt: savedAt || new Date().toISOString(),
+        isDirty: false,
+        isSaving: false,
+        syncStatus: "synced",
+        dirtyBlockIds: [],
+      };
+    }),
+
+  loadLocalRecovery: (title, blocks) =>
+    set((state) => ({
+      title,
+      blocks,
+      isDirty: true,
+      syncStatus: "unsaved",
+    })),
+
   togglePreview: () => set((state) => ({ previewMode: !state.previewMode })),
 }));
+

@@ -6,11 +6,13 @@ export default function Home() {
     <div className="flex min-h-screen flex-col items-center justify-center p-6 sm:p-24 bg-background">
       <main className="flex flex-col items-center justify-center text-center max-w-2xl gap-8">
         {/* App Logo & Branding */}
-        <div className="flex flex-col items-center gap-2">
-          <div className="h-16 w-16 rounded-2xl bg-primary flex items-center justify-center text-primary-foreground font-bold text-2xl shadow-md">
-            eJ
-          </div>
-          <h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl mt-4">
+        <div className="flex flex-col items-center gap-3 select-none">
+          <img
+            src="/logo.png"
+            alt="eJournal Platform"
+            className="h-20 w-auto object-contain"
+          />
+          <h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl text-foreground">
             eJournal
           </h1>
           <p className="text-xl text-muted-foreground">

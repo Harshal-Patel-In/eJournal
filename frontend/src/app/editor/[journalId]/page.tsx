@@ -8,11 +8,13 @@ import { Loader2, Plus, Sparkles } from "lucide-react";
 
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import { useDocumentStore } from "./use-document-store";
+import { useDocumentStore, getLocalSnapshot, clearLocalSnapshot } from "./use-document-store";
 import EditorToolbar from "./editor-toolbar";
 import BlockWrapper from "./block-wrapper";
 import BlockRenderer from "./block-renderer";
 import FloatingToolbox from "./floating-toolbox";
+import ConflictDialog from "./conflict-dialog";
+import ReviewDrawer from "./review-drawer";
 
 interface PageProps {
   params: Promise<{ journalId: string }>;
@@ -21,8 +23,12 @@ interface PageProps {
 export default function EditorPage({ params }: PageProps) {
   const { journalId } = use(params);
   const router = useRouter();
-  
+
   const [mounted, setMounted] = useState(false);
+  const [showConflictDialog, setShowConflictDialog] = useState(false);
+  const [showReviewDrawer, setShowReviewDrawer] = useState(true);
+  const [localRecoverySnapshot, setLocalRecoverySnapshot] = useState<any>(null);
+
 
   const {
     blocks,
@@ -30,12 +36,17 @@ export default function EditorPage({ params }: PageProps) {
     status,
     isDirty,
     isSaving,
+    syncStatus,
+    clientRevision,
     previewMode,
     init,
     moveBlock,
     addBlock,
     setSaving,
     setDirty,
+    setSyncStatus,
+    setRevision,
+    loadLocalRecovery,
   } = useDocumentStore();
 
   // 1. Avoid Next.js hydration mismatches for browser-specific dnd engine
@@ -50,7 +61,7 @@ export default function EditorPage({ params }: PageProps) {
   });
 
   // 3. Fetch Journal Details
-  const { data: journal, isLoading: journalLoading, error: journalError } = useQuery<any>({
+  const { data: journal, isLoading: journalLoading, error: journalError, refetch: refetchJournal } = useQuery<any>({
     queryKey: ["journal", journalId],
     queryFn: () => api.get(`/journals/${journalId}`),
     retry: false,
@@ -63,29 +74,78 @@ export default function EditorPage({ params }: PageProps) {
     enabled: !!journal?.assignmentId,
   });
 
-  // 5. Initialize Zustand Store
+  // 5. Initialize Zustand Store & Check Local Offline Snapshot Recovery
   useEffect(() => {
     if (journal) {
-      init(journal.id, journal.title, journal.blocks, journal.status);
+      const serverRev = journal.currentVersion || 1;
+      init(journal.id, journal.title, journal.blocks, journal.status, serverRev);
+
+      // Check if local recovery snapshot exists and has newer changes
+      const snapshot = getLocalSnapshot(journal.id);
+      if (snapshot && snapshot.savedAt && new Date(snapshot.savedAt) > new Date(journal.updatedAt)) {
+        setLocalRecoverySnapshot(snapshot);
+      }
     }
   }, [journal, init]);
 
-  // 6. Save Mutation (HTTP PUT)
+  // 5.5 Monitor Online/Offline Status
+  useEffect(() => {
+    const handleOffline = () => setSyncStatus("offline");
+    const handleOnline = () => {
+      if (isDirty) setSyncStatus("unsaved");
+      else setSyncStatus("synced");
+    };
+
+    window.addEventListener("offline", handleOffline);
+    window.addEventListener("online", handleOnline);
+
+    return () => {
+      window.removeEventListener("offline", handleOffline);
+      window.removeEventListener("online", handleOnline);
+    };
+  }, [isDirty, setSyncStatus]);
+
+  // 6. Save Mutation (PATCH /journals/{id}/blocks with clientRevision)
   const saveMutation = useMutation({
-    mutationFn: (data: { title: string; blocks: any[] }) =>
-      api.put(`/journals/${journalId}`, data),
+    mutationFn: (data: { title: string; blocks: any[]; clientRevision: number }) =>
+      api.patch(`/journals/${journalId}/blocks`, data),
     onMutate: () => {
       setSaving(true);
     },
-    onSuccess: () => {
+    onSuccess: (data: any) => {
       setSaving(false);
-      setDirty(false);
+      setRevision(data.currentVersion || clientRevision + 1, data.updatedAt);
+      setShowConflictDialog(false);
     },
     onError: (err: any) => {
       setSaving(false);
-      alert(err.message || "Failed to auto-save updates.");
+      if (err.status === 409 || err.code === "REVISION_CONFLICT" || err.message?.includes("409")) {
+        setSyncStatus("conflict");
+        setShowConflictDialog(true);
+      } else {
+        setSyncStatus("unsaved");
+        console.error("Auto-save failed:", err);
+      }
     },
   });
+
+  // 6.2 Conflict Resolution Handlers
+  const handleReloadServerVersion = async () => {
+    clearLocalSnapshot(journalId);
+    await refetchJournal();
+    setShowConflictDialog(false);
+    setSyncStatus("synced");
+  };
+
+  const handleForceSaveLocal = () => {
+    if (journal?.currentVersion) {
+      saveMutation.mutate({
+        title,
+        blocks,
+        clientRevision: journal.currentVersion,
+      });
+    }
+  };
 
   // 6.5 Submit/Hand-in Mutation (HTTP POST)
   const submitMutation = useMutation({
@@ -111,16 +171,16 @@ export default function EditorPage({ params }: PageProps) {
     },
   });
 
-  // 7. Auto-Save Debounce (triggers after 3 seconds of inactivity)
+  // 7. Auto-Save Debounce (triggers after 2.5 seconds of inactivity)
   useEffect(() => {
-    if (!isDirty || isSaving || previewMode || !title) return;
+    if (!isDirty || isSaving || previewMode || !title || syncStatus === "conflict" || syncStatus === "offline") return;
 
     const timer = setTimeout(() => {
-      saveMutation.mutate({ title, blocks });
-    }, 3000);
+      saveMutation.mutate({ title, blocks, clientRevision });
+    }, 2500);
 
     return () => clearTimeout(timer);
-  }, [title, blocks, isDirty, isSaving, previewMode, saveMutation]);
+  }, [title, blocks, isDirty, isSaving, previewMode, clientRevision, syncStatus, saveMutation]);
 
   // 8. Handle Drag End
   const handleDragEnd = (result: DropResult) => {
@@ -138,6 +198,7 @@ export default function EditorPage({ params }: PageProps) {
   if (!mounted || userLoading || journalLoading) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-background">
+
         <Loader2 className="size-8 animate-spin text-primary mb-3" />
         <p className="text-sm text-muted-foreground animate-pulse">Loading Visual Document Workspace...</p>
       </div>
@@ -156,11 +217,19 @@ export default function EditorPage({ params }: PageProps) {
       {/* Editor Header Toolbar */}
       <EditorToolbar
         classroomId={classroomId}
-        onSave={() => saveMutation.mutate({ title, blocks })}
+        onSave={() => saveMutation.mutate({ title, blocks, clientRevision })}
         onSubmit={() => submitMutation.mutate()}
         isSubmitting={submitMutation.isPending}
         onUnsubmit={() => unsubmitMutation.mutate()}
         isUnsubmitting={unsubmitMutation.isPending}
+      />
+
+      {/* 409 Conflict Dialog Modal */}
+      <ConflictDialog
+        isOpen={showConflictDialog}
+        onReloadServer={handleReloadServerVersion}
+        onForceSaveLocal={handleForceSaveLocal}
+        isSaving={saveMutation.isPending}
       />
 
       {/* Persistent Left Floating Toolbox (Blocks & Sections Palette) */}
@@ -168,6 +237,51 @@ export default function EditorPage({ params }: PageProps) {
 
       {/* Editor Main Canvas Wrapper */}
       <main className="flex-1 w-full max-w-4xl mx-auto px-4 sm:px-6 lg:pl-20 xl:pl-24 pt-20 pb-16 flex flex-col gap-6 relative z-10">
+
+        {/* Local Recovery Offline Banner — shown when unsaved local recovery snapshot is newer */}
+        {localRecoverySnapshot && isEditable && (
+          <div className="p-4 rounded-xl border border-blue-500/30 bg-blue-500/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-in fade-in duration-200">
+            <div className="flex flex-col gap-1">
+              <span className="text-sm font-bold text-foreground flex items-center gap-2">
+                💾 Unsaved Offline Draft Recovered
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-500/30">
+                  Local Recovery
+                </span>
+              </span>
+              <p className="text-xs text-muted-foreground">
+                We found unsynced edits saved on your browser from {new Date(localRecoverySnapshot.savedAt).toLocaleTimeString()}.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  clearLocalSnapshot(journalId);
+                  setLocalRecoverySnapshot(null);
+                }}
+                className="text-xs font-semibold rounded-xl"
+              >
+                Discard
+              </Button>
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => {
+                  loadLocalRecovery(localRecoverySnapshot.title, localRecoverySnapshot.blocks);
+                  clearLocalSnapshot(journalId);
+                  setLocalRecoverySnapshot(null);
+                }}
+                className="text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white border-0 rounded-xl"
+              >
+                Restore Local Draft
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Locked Journal Banner — shown when journal is submitted/approved */}
+
 
         {/* Locked Journal Banner — shown when journal is submitted/approved */}
         {previewMode && (status === "submitted" || status === "approved") && (
@@ -294,6 +408,20 @@ export default function EditorPage({ params }: PageProps) {
           )}
         </div>
       </main>
+
+      {/* Teacher Review Panel Sidebar */}
+      {user?.role === "teacher" && showReviewDrawer && (
+        <ReviewDrawer
+          journalId={journalId}
+          classroomId={classroomId}
+          journalStatus={status}
+          maxMarks={assignment?.maxMarks || 10}
+          currentMarks={journal?.marks}
+          currentRemarks={journal?.teacherRemarks}
+          onClose={() => setShowReviewDrawer(false)}
+        />
+      )}
     </div>
+
   );
 }

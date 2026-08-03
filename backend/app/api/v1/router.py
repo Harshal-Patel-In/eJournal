@@ -13,6 +13,7 @@ from app.api.v1.assignment import router as assignment_router
 from app.api.v1.journal import router as journal_router
 from app.api.v1.upload import router as upload_router
 from app.api.v1.notification import router as notification_router
+from app.api.v1.comment import router as comment_router
 
 api_v1_router = APIRouter()
 
@@ -34,11 +35,15 @@ api_v1_router.include_router(assignment_router, tags=["Assignments"])
 # Visual Editor & Journals
 api_v1_router.include_router(journal_router, tags=["Journals"])
 
+# Comments & Annotations
+api_v1_router.include_router(comment_router, tags=["Comments"])
+
 # Local File Uploads
 api_v1_router.include_router(upload_router, tags=["Uploads"])
 
 # Notifications
 api_v1_router.include_router(notification_router, tags=["Notifications"])
+
 
 
 

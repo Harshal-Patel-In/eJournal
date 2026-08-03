@@ -29,6 +29,9 @@ export default function EditorToolbar({
     setTitle,
     isDirty,
     isSaving,
+    syncStatus,
+    clientRevision,
+    lastSavedAt,
     previewMode,
     togglePreview,
     status,
@@ -57,14 +60,14 @@ export default function EditorToolbar({
         <Link
           href={`/classrooms/${classroomId}`}
           title="Back to Classroom"
-          className="flex items-center justify-center size-9 rounded-full bg-gradient-to-b from-white/80 via-white/60 to-white/40 dark:from-zinc-900/90 dark:via-zinc-900/85 dark:to-zinc-950/80 backdrop-blur-2xl backdrop-saturate-180 border border-white/80 dark:border-zinc-700/60 ring-1 ring-black/5 dark:ring-white/10 shadow-[0_8px_32px_0_rgba(0,0,0,0.08)] dark:shadow-[0_8px_32px_0_rgba(0,0,0,0.5)] shadow-[inset_0_1px_1px_0_rgba(255,255,255,0.8)] dark:shadow-[inset_0_1px_1px_0_rgba(255,255,255,0.1)] text-muted-foreground hover:text-foreground hover:from-white/90 hover:to-white/60 dark:hover:from-zinc-800/95 dark:hover:to-zinc-900/90 hover:scale-105 active:scale-95 transition-all duration-200 cursor-pointer"
+          className="flex items-center justify-center size-9 rounded-full bg-gradient-to-b from-white/80 via-white/65 to-white/50 dark:from-zinc-900/85 dark:via-zinc-900/75 dark:to-zinc-950/70 backdrop-blur-2xl backdrop-saturate-180 border border-white/80 dark:border-white/15 ring-1 ring-black/5 dark:ring-white/10 shadow-[0_12px_32px_-6px_rgba(0,0,0,0.1),_inset_0_1px_1px_0_rgba(255,255,255,0.95),_inset_0_-1px_1px_0_rgba(0,0,0,0.05)] dark:shadow-[0_16px_40px_-8px_rgba(0,0,0,0.7),_inset_0_1px_1px_0_rgba(255,255,255,0.18),_inset_0_-1px_1px_0_rgba(0,0,0,0.5)] text-muted-foreground hover:text-foreground hover:from-white/90 hover:to-white/65 dark:hover:from-zinc-800/95 dark:hover:to-zinc-900/90 hover:scale-105 active:scale-95 transition-all duration-300 cursor-pointer"
         >
           <ArrowLeft className="size-4" />
         </Link>
       </div>
 
       {/* 2. Crystal Apple Liquid Glass Floating Header Bar */}
-      <header className="fixed top-4 left-60 right-60 z-40 flex items-center justify-between px-5 py-1.5 bg-gradient-to-b from-white/85 via-white/70 to-white/50 dark:from-zinc-900/95 dark:via-zinc-900/90 dark:to-zinc-950/85 backdrop-blur-2xl backdrop-saturate-180 border border-white/80 dark:border-zinc-700/60 ring-1 ring-black/5 dark:ring-white/10 shadow-[0_8px_32px_0_rgba(0,0,0,0.08)] dark:shadow-[0_8px_32px_0_rgba(0,0,0,0.5)] shadow-[inset_0_1px_1px_0_rgba(255,255,255,0.8)] dark:shadow-[inset_0_1px_1px_0_rgba(255,255,255,0.1)] rounded-2xl select-none transition-all duration-200">
+      <header className="fixed top-4 left-60 right-60 z-40 flex items-center justify-between px-5 py-1.5 bg-gradient-to-b from-white/80 via-white/65 to-white/50 dark:from-zinc-900/85 dark:via-zinc-900/75 dark:to-zinc-950/70 backdrop-blur-2xl backdrop-saturate-180 border border-white/80 dark:border-white/15 ring-1 ring-black/5 dark:ring-white/10 shadow-[0_16px_40px_-8px_rgba(0,0,0,0.1),_inset_0_1px_1px_0_rgba(255,255,255,0.95),_inset_0_-1px_1px_0_rgba(0,0,0,0.05)] dark:shadow-[0_20px_50px_-12px_rgba(0,0,0,0.7),_inset_0_1px_1px_0_rgba(255,255,255,0.18),_inset_0_-1px_1px_0_rgba(0,0,0,0.5)] rounded-2xl select-none transition-all duration-300">
         {/* Left: Journal Title */}
         <div className="flex items-center gap-3 flex-1 min-w-0 pr-4">
           <input
@@ -79,25 +82,40 @@ export default function EditorToolbar({
 
         {/* Right: Controls & Status Badges */}
         <div className="flex items-center gap-2.5 shrink-0">
-          {/* Saving Status Indicator */}
-          <div className="hidden sm:flex items-center gap-1.5 text-xs text-muted-foreground px-2.5 py-1 bg-muted/40 rounded-full border border-border/40">
-            {isSaving ? (
+          {/* Phase 5 Enhanced Saving Status Indicator */}
+          <div className="hidden sm:flex items-center gap-1.5 text-xs text-muted-foreground px-3 py-1 glass-pill rounded-full select-none">
+            {syncStatus === "saving" || isSaving ? (
               <>
                 <div className="size-2 rounded-full bg-blue-500 animate-pulse" />
-                <span className="text-[11px] font-medium">Saving...</span>
+                <span className="text-[11px] font-medium">Saving... (Rev #{clientRevision})</span>
               </>
-            ) : isDirty ? (
+            ) : syncStatus === "conflict" ? (
+              <>
+                <div className="size-2 rounded-full bg-rose-500 animate-bounce" />
+                <span className="text-[11px] font-semibold text-rose-600 dark:text-rose-400">
+                  Revision Conflict (409)
+                </span>
+              </>
+            ) : syncStatus === "offline" ? (
+              <>
+                <div className="size-2 rounded-full bg-slate-400" />
+                <span className="text-[11px] font-medium">Offline (Saved locally)</span>
+              </>
+            ) : isDirty || syncStatus === "unsaved" ? (
               <>
                 <div className="size-2 rounded-full bg-amber-500 animate-pulse" />
-                <span className="text-[11px] font-medium">Unsaved</span>
+                <span className="text-[11px] font-medium">Unsaved changes</span>
               </>
             ) : (
               <>
                 <div className="size-2 rounded-full bg-emerald-500" />
-                <span className="text-[11px] font-medium">Synced to cloud</span>
+                <span className="text-[11px] font-medium" title={lastSavedAt ? `Saved at ${new Date(lastSavedAt).toLocaleTimeString()}` : "Synced"}>
+                  Saved • Rev #{clientRevision} • Synced
+                </span>
               </>
             )}
           </div>
+
 
           {/* Live Preview Toggle */}
           {status === "approved" ? (
@@ -203,7 +221,7 @@ export default function EditorToolbar({
               size="sm"
               onClick={onSubmit}
               disabled={isDirty || isSaving || isSubmitting}
-              className="gap-1.5 text-xs font-semibold shadow-xs hover:shadow active:scale-95 bg-emerald-600 hover:bg-emerald-700 text-white border-0 transition-all duration-150 ease-out cursor-pointer disabled:pointer-events-none rounded-xl h-8"
+              className="gap-1.5 text-xs font-semibold shadow-xs hover:shadow active:scale-95 glass-btn-emerald transition-all duration-150 ease-out cursor-pointer disabled:pointer-events-none rounded-xl h-8"
               title={isDirty ? "Save draft changes before handing in" : "Submit journal for grading"}
             >
               {isSubmitting ? (
