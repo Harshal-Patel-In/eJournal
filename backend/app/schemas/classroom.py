@@ -12,6 +12,7 @@ class ClassroomCreateRequest(BaseModel):
     semester: str = Field(..., description="e.g. Semester V")
     division: str = Field(..., description="e.g. Division A")
     department: str = Field(..., description="e.g. Computer Engineering")
+    batches: list[str] = Field(default_factory=list, description="e.g. ['Batch A1', 'Batch A2']")
 
 
 class ClassroomResponse(BaseModel):
@@ -25,6 +26,7 @@ class ClassroomResponse(BaseModel):
     department: str
     teacherId: str
     joinCode: str
+    batches: list[str] = Field(default_factory=list)
     createdAt: datetime
 
 

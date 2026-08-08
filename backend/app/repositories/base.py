@@ -50,9 +50,17 @@ class BaseRepository:
         doc = self.collection.find_one({"_id": self._to_object_id(id_str)})
         return self._to_str_id(doc)
 
-    async def find_one(self, filter: dict, projection: dict | None = None) -> dict | None:
+    async def find_one(
+        self,
+        filter: dict,
+        projection: dict | None = None,
+        sort: list[tuple[str, int]] | None = None,
+    ) -> dict | None:
         """Find a single document matching the filter."""
-        doc = self.collection.find_one(filter, projection)
+        if sort:
+            doc = self.collection.find_one(filter, projection, sort=sort)
+        else:
+            doc = self.collection.find_one(filter, projection)
         return self._to_str_id(doc)
 
     async def find_many(
@@ -78,6 +86,13 @@ class BaseRepository:
         """Insert a document and return its string ID."""
         result = self.collection.insert_one(document)
         return str(result.inserted_id)
+
+    async def insert_many(self, documents: list[dict]) -> list[str]:
+        """Insert multiple documents and return list of string IDs."""
+        if not documents:
+            return []
+        result = self.collection.insert_many(documents)
+        return [str(inserted_id) for inserted_id in result.inserted_ids]
 
     async def update_one(
         self, filter: dict, update: dict, upsert: bool = False

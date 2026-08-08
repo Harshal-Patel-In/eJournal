@@ -19,6 +19,50 @@ class CommentService:
         self.journal_repo = JournalRepository()
         self.user_repo = UserRepository()
 
+    async def add_annotation(
+        self, journal_id: str, author_id: str, payload: CommentCreateRequest
+    ) -> dict:
+        """Add a block annotation supporting 6 types (Comment, Suggestion, Highlight, Warning, Approval, Question)."""
+        journal = await self.journal_repo.find_by_id(journal_id)
+        if not journal:
+            raise AppException(
+                code=ErrorCode.NOT_FOUND,
+                message="Journal not found",
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+
+        author = await self.user_repo.find_by_id(author_id)
+        author_name = author.get("profile", {}).get("name", "Teacher") if author else "Teacher"
+
+        # Determine review status badge mapping
+        ann_type = payload.type.capitalize()
+        if ann_type in ["Warning", "Suggestion"]:
+            review_status = "Changes Requested"
+        elif ann_type == "Approval":
+            review_status = "Approved"
+        else:
+            review_status = "Reviewed"
+
+        text_content = payload.content or payload.message or ""
+
+        comment_data = {
+            "journalId": journal_id,
+            "blockId": payload.blockId,
+            "authorId": author_id,
+            "authorName": author_name,
+            "authorRole": "teacher",
+            "type": ann_type,
+            "content": text_content,
+            "message": text_content,
+            "suggestedContent": payload.suggestedContent,
+            "reviewStatus": review_status,
+            "status": "open",
+            "parentCommentId": payload.parentCommentId,
+            "createdAt": datetime.now(timezone.utc),
+        }
+
+        return await self.comment_repo.create_comment(comment_data)
+
     async def add_comment(
         self, author_id: str, author_role: str, payload: CommentCreateRequest
     ) -> dict:

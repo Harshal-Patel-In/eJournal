@@ -4,9 +4,10 @@ RULE-API01: Follow RESTful conventions.
 RULE-AUTH07: RBAC controls classroom routes.
 """
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, BackgroundTasks, Depends, status
 
 from app.dependencies.auth import RoleChecker, get_active_user
+from app.schemas.announcement import AnnouncementCreateRequest
 from app.schemas.classroom import (
     ClassroomCreateRequest,
     ClassroomJoinRequest,
@@ -14,6 +15,7 @@ from app.schemas.classroom import (
     ClassroomResponse,
 )
 from app.schemas.response import ApiResponse, success_response
+from app.services.announcement_service import AnnouncementService
 from app.services.classroom_service import ClassroomService
 
 router = APIRouter(prefix="/classrooms")
@@ -79,3 +81,33 @@ async def list_members(
         classroomId, user["id"], user["role"]
     )
     return success_response(members)
+
+
+@router.post(
+    "/{classroomId}/announcements",
+    response_model=ApiResponse[dict],
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_announcement(
+    classroomId: str,
+    payload: AnnouncementCreateRequest,
+    background_tasks: BackgroundTasks,
+    user: dict = Depends(RoleChecker(["teacher"])),
+    announcement_service: AnnouncementService = Depends(),
+):
+    """Post a new classroom announcement (Teacher only)."""
+    announcement = await announcement_service.create_announcement(
+        classroomId, user["id"], payload, background_tasks
+    )
+    return success_response(announcement)
+
+
+@router.get("/{classroomId}/announcements", response_model=ApiResponse[list])
+async def list_announcements(
+    classroomId: str,
+    user: dict = Depends(get_active_user),
+    announcement_service: AnnouncementService = Depends(),
+):
+    """List announcements for a classroom."""
+    announcements = await announcement_service.list_announcements(classroomId, user)
+    return success_response(announcements)

@@ -69,8 +69,16 @@ async function request<T>(
       body.error?.code === "INVALID_TOKEN" ||
       body.error?.code === "USER_NOT_FOUND"
     ) {
+      // Do not dispatch session expired modal if on auth pages or explicit logout
+      if (
+        typeof window !== "undefined" &&
+        !endpoint.includes("/auth/logout") &&
+        !window.location.pathname.startsWith("/auth") &&
+        window.location.pathname !== "/"
+      ) {
+        window.dispatchEvent(new Event("unauthorized"));
+      }
       try {
-        // This is a direct POST to logout which deletes the cookie under path '/'
         await fetch(`${API_BASE_URL}/auth/logout`, {
           method: "POST",
           credentials: "include",

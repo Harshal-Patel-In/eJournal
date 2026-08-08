@@ -3,6 +3,8 @@
 RULE-BE04: All business logic MUST live inside service classes.
 """
 
+import hashlib
+import json
 from datetime import datetime, timezone
 from fastapi import status
 
@@ -12,6 +14,7 @@ from app.repositories.assignment_repository import AssignmentRepository
 from app.repositories.audit_log_repository import AuditLogRepository
 from app.repositories.classroom_membership_repository import ClassroomMembershipRepository
 from app.repositories.classroom_repository import ClassroomRepository
+from app.repositories.comment_repository import CommentRepository
 from app.repositories.journal_repository import JournalRepository
 from app.repositories.user_repository import UserRepository
 from app.repositories.version_repository import VersionRepository
@@ -36,6 +39,7 @@ class JournalService:
         self.user_repo = UserRepository()
         self.audit_repo = AuditLogRepository()
         self.version_repo = VersionRepository()
+        self.comment_repo = CommentRepository()
 
     async def _validate_journal_ownership_and_state(self, journal_id: str, student_id: str) -> dict:
         """Helper to validate existence, student ownership, and draft/editable state."""
@@ -166,6 +170,16 @@ class JournalService:
 
         journal_id = await self.journal_repo.insert_one(journal_doc)
 
+        await self.version_repo.create_snapshot(
+            journal_id=journal_id,
+            author_id=student_id,
+            status="draft",
+            blocks=blocks,
+            title=journal_doc["title"],
+            revision_number=1,
+            remarks="Initial draft created",
+        )
+
         await self.audit_repo.log_event(
             user_id=student_id,
             action="JOURNAL_CREATED",
@@ -221,11 +235,16 @@ class JournalService:
                     status_code=status.HTTP_403_FORBIDDEN,
                 )
 
+        counts = await self.comment_repo.get_annotation_counts(journal_id)
+        journal["annotationCounts"] = counts
         return journal
 
     async def list_student_journals(self, student_id: str) -> list[dict]:
         """List all visual journals owned by the student."""
-        return await self.journal_repo.find_many({"studentId": student_id})
+        journals = await self.journal_repo.find_many({"studentId": student_id})
+        for j in journals:
+            j["annotationCounts"] = await self.comment_repo.get_annotation_counts(j["id"])
+        return journals
 
     async def save_journal(
         self, journal_id: str, student_id: str, request: JournalSaveRequest, ip_address: str | None = None
@@ -393,20 +412,52 @@ class JournalService:
                 status_code=status.HTTP_403_FORBIDDEN,
             )
 
-        if journal["status"] not in ["draft", "changes_requested"]:
-            raise AppException(
-                code=ErrorCode.INVALID_WORKFLOW_STATE,
-                message=f"Cannot submit journal in '{journal['status']}' status",
-                status_code=status.HTTP_400_BAD_REQUEST,
-            )
+        if journal["status"] not in ["draft", "changes_requested"] and not journal.get("isRevoked", False):
+            # Self-healing check: if status is submitted/late_submitted but no snapshot exists yet, allow retrying submission
+            latest_rev = await self.version_repo.get_latest_revision_number(journal_id)
+            if latest_rev > 0:
+                raise AppException(
+                    code=ErrorCode.INVALID_WORKFLOW_STATE,
+                    message=f"Cannot submit journal in '{journal['status']}' status",
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                )
 
         now = datetime.now(timezone.utc)
+        
+        # Check deadline status
+        assignment = await self.assignment_repo.find_by_id(journal["assignmentId"])
+        is_late = False
+        delay_seconds = 0
+        target_status = "submitted"
+
+        if assignment and assignment.get("deadline"):
+            try:
+                deadline_raw = assignment["deadline"]
+                if isinstance(deadline_raw, datetime):
+                    deadline_dt = deadline_raw if deadline_raw.tzinfo is not None else deadline_raw.replace(tzinfo=timezone.utc)
+                elif isinstance(deadline_raw, str):
+                    deadline_dt = datetime.fromisoformat(deadline_raw.replace("Z", "+00:00"))
+                    if deadline_dt.tzinfo is None:
+                        deadline_dt = deadline_dt.replace(tzinfo=timezone.utc)
+                else:
+                    deadline_dt = None
+
+                if deadline_dt and now > deadline_dt:
+                    is_late = True
+                    target_status = "late_submitted"
+                    delay_seconds = int((now - deadline_dt).total_seconds())
+            except Exception:
+                pass
+
         success = await self.journal_repo.update_by_id(
             journal_id,
             {
                 "$set": {
-                    "status": "submitted",
+                    "status": target_status,
                     "submittedAt": now,
+                    "isLate": is_late,
+                    "delaySeconds": delay_seconds,
+                    "isRevoked": False,
                     "updatedAt": now,
                 }
             }
@@ -423,7 +474,7 @@ class JournalService:
         await self.version_repo.create_snapshot(
             journal_id=journal_id,
             author_id=student_id,
-            status="submitted",
+            status=target_status,
             blocks=journal.get("blocks", []),
             title=journal.get("title", "Untitled Journal"),
             revision_number=current_rev,
@@ -437,7 +488,6 @@ class JournalService:
         student = await self.user_repo.find_by_id(student_id)
         student_name = student.get("profile", {}).get("name", "A Student") if student else "A Student"
 
-        assignment = await self.assignment_repo.find_by_id(journal["assignmentId"])
         if assignment:
             classroom = await self.classroom_repo.find_by_id(assignment["classroomId"])
             if classroom:
@@ -445,7 +495,8 @@ class JournalService:
                 classroom_name = classroom["name"]
                 exp_num = assignment.get("experimentNumber", 1)
 
-                msg = f"{student_name} has handed in the journal for Experiment #{exp_num} in {classroom_name}."
+                late_str = " (LATE SUBMISSION)" if is_late else ""
+                msg = f"{student_name} has handed in the journal for Experiment #{exp_num} in {classroom_name}{late_str}."
                 await notification_repo.create_notification(
                     user_id=teacher_id,
                     title="Journal Submission",
@@ -456,7 +507,7 @@ class JournalService:
 
                 teacher = await self.user_repo.find_by_id(teacher_id)
                 if teacher and teacher.get("email"):
-                    email_subject = f"Journal Submitted: {student_name} (Exp #{exp_num})"
+                    email_subject = f"Journal Submitted: {student_name} (Exp #{exp_num}){late_str}"
                     email_body = f"""
                     <html>
                         <body style="font-family: sans-serif; padding: 20px; color: #171717;">
@@ -467,6 +518,7 @@ class JournalService:
                                 <p><strong>Student Name:</strong> {student_name}</p>
                                 <p><strong>Classroom:</strong> {classroom_name}</p>
                                 <p><strong>Experiment:</strong> #{exp_num} ({assignment['title']})</p>
+                                <p><strong>Status:</strong> {'LATE SUBMISSION' if is_late else 'ON TIME'}</p>
                             </div>
                             <p>Please log in to your dashboard to grade this submission.</p>
                         </body>
@@ -487,7 +539,7 @@ class JournalService:
     async def unsubmit_journal(
         self, journal_id: str, student_id: str, ip_address: str | None = None
     ) -> dict:
-        """Undo a student's journal submission, unlocking it back to draft state."""
+        """Undo a student's journal submission, unlocking it back to draft state if before deadline."""
         journal = await self.journal_repo.find_by_id(journal_id)
         if not journal:
             raise AppException(
@@ -503,16 +555,49 @@ class JournalService:
                 status_code=status.HTTP_403_FORBIDDEN,
             )
 
-        if journal["status"] != "submitted":
+        if journal["status"] not in ["submitted", "late_submitted"]:
             raise AppException(
                 code=ErrorCode.INVALID_WORKFLOW_STATE,
                 message="Only submitted journals can be unsubmitted",
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
 
-        success = await self.journal_repo.update_one(
-            {"_id": self.journal_repo._to_object_id(journal_id)},
-            {"$set": {"status": "draft", "updatedAt": datetime.now(timezone.utc)}},
+        # Check deadline for unsubmit permission
+        assignment = await self.assignment_repo.find_by_id(journal["assignmentId"])
+        if assignment and assignment.get("deadline"):
+            try:
+                deadline_raw = assignment["deadline"]
+                if isinstance(deadline_raw, datetime):
+                    deadline_dt = deadline_raw if deadline_raw.tzinfo is not None else deadline_raw.replace(tzinfo=timezone.utc)
+                elif isinstance(deadline_raw, str):
+                    deadline_dt = datetime.fromisoformat(deadline_raw.replace("Z", "+00:00"))
+                    if deadline_dt.tzinfo is None:
+                        deadline_dt = deadline_dt.replace(tzinfo=timezone.utc)
+                else:
+                    deadline_dt = None
+
+                if deadline_dt and datetime.now(timezone.utc) > deadline_dt:
+                    raise AppException(
+                        code=ErrorCode.INVALID_WORKFLOW_STATE,
+                        message="Deadline has expired. Submissions cannot be unsubmitted after the deadline.",
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                    )
+            except AppException:
+                raise
+            except Exception:
+                pass
+
+        now = datetime.now(timezone.utc)
+        success = await self.journal_repo.update_by_id(
+            journal_id,
+            {
+                "$set": {
+                    "status": "draft",
+                    "isRevoked": True,
+                    "updatedAt": now,
+                },
+                "$inc": {"unsubmitCount": 1},
+            },
         )
         if not success:
             raise AppException(
@@ -559,15 +644,29 @@ class JournalService:
             )
 
         now = datetime.now(timezone.utc)
+        latest_rev = await self.version_repo.get_latest_revision_number(journal_id)
+        new_revision = max(latest_rev + 1, journal.get("currentVersion", 1) + 1)
+
         await self.journal_repo.update_by_id(
             journal_id,
             {
                 "$set": {
                     "status": "changes_requested",
                     "teacherRemarks": payload.remarks,
+                    "currentVersion": new_revision,
                     "updatedAt": now,
                 }
             },
+        )
+
+        await self.version_repo.create_snapshot(
+            journal_id=journal_id,
+            author_id=teacher_id,
+            status="changes_requested",
+            blocks=journal.get("blocks", []),
+            title=journal.get("title", "Journal"),
+            revision_number=new_revision,
+            remarks=payload.remarks,
         )
 
         from app.repositories.notification_repository import NotificationRepository
@@ -606,11 +705,11 @@ class JournalService:
                 status_code=status.HTTP_404_NOT_FOUND,
             )
 
-        # Concurrency Check: If student unsubmitted into draft, reject with 400
-        if journal["status"] != "submitted":
+        # Concurrency Check: If student unsubmitted into draft or revoked, reject with 400
+        if journal["status"] not in ["submitted", "late_submitted"] or journal.get("isRevoked", False):
             raise AppException(
                 code=ErrorCode.INVALID_WORKFLOW_STATE,
-                message="Cannot grade or approve a journal that has been unsubmitted by the student.",
+                message="Cannot grade or approve a journal that is currently in draft or has been revoked by the student.",
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -626,6 +725,9 @@ class JournalService:
             )
 
         now = datetime.now(timezone.utc)
+        latest_rev = await self.version_repo.get_latest_revision_number(journal_id)
+        new_revision = max(latest_rev + 1, journal.get("currentVersion", 1) + 1)
+
         await self.journal_repo.update_by_id(
             journal_id,
             {
@@ -634,6 +736,7 @@ class JournalService:
                     "marks": payload.marks,
                     "teacherRemarks": payload.remarks,
                     "approvedAt": now,
+                    "currentVersion": new_revision,
                     "updatedAt": now,
                 }
             },
@@ -645,7 +748,7 @@ class JournalService:
             status="approved",
             blocks=journal.get("blocks", []),
             title=journal.get("title", "Approved Journal"),
-            revision_number=journal.get("currentVersion", 1),
+            revision_number=new_revision,
             remarks=payload.remarks,
         )
 
@@ -670,6 +773,121 @@ class JournalService:
         )
 
         return await self.journal_repo.find_by_id(journal_id)
+
+    async def get_journal_versions(
+        self, journal_id: str, user_id: str, user_role: str
+    ) -> list[dict]:
+        """Fetch all historical revision snapshots for a journal, ordered chronologically (latest first)."""
+        await self.get_journal_by_id(journal_id, user_id, user_role)
+        return await self.version_repo.find_many(
+            {"journalId": journal_id},
+            sort=[("revisionNumber", -1)],
+        )
+
+    async def restore_version_snapshot(
+        self, journal_id: str, revision_number: int, student_id: str, ip_address: str | None = None
+    ) -> dict:
+        """Restore a historical version snapshot to be the active journal state (Student only)."""
+        journal = await self._validate_journal_ownership_and_state(journal_id, student_id)
+        
+        target_version = await self.version_repo.find_one(
+            {"journalId": journal_id, "revisionNumber": revision_number}
+        )
+        if not target_version:
+            raise AppException(
+                code=ErrorCode.NOT_FOUND,
+                message=f"Revision #{revision_number} not found for this journal",
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+
+        restored_blocks = target_version.get("blocks", [])
+        current_blocks = journal.get("blocks", [])
+
+        # Deduplication Check: If target restored blocks match active journal blocks, skip creating duplicate snapshot
+        def _get_blocks_hash(b_list: list) -> str:
+            return hashlib.sha256(json.dumps(b_list, sort_keys=True, default=str).encode("utf-8")).hexdigest()
+
+        if _get_blocks_hash(restored_blocks) == _get_blocks_hash(current_blocks):
+            # Document is already in specified revision state - return active journal without creating duplicate snapshot
+            return journal
+
+        now = datetime.now(timezone.utc)
+        latest_rev = await self.version_repo.get_latest_revision_number(journal_id)
+        new_rev = latest_rev + 1
+
+        success = await self.journal_repo.update_by_id(
+            journal_id,
+            {
+                "$set": {
+                    "blocks": restored_blocks,
+                    "title": target_version.get("title", journal["title"]),
+                    "currentVersion": new_rev,
+                    "updatedAt": now,
+                }
+            }
+        )
+        if not success:
+            raise AppException(
+                code=ErrorCode.INTERNAL_ERROR,
+                message="Failed to restore version snapshot",
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        # Create new revision snapshot recording the restore operation (RULE-VER05)
+        await self.version_repo.create_snapshot(
+            journal_id=journal_id,
+            author_id=student_id,
+            status=journal["status"],
+            blocks=restored_blocks,
+            title=target_version.get("title", journal["title"]),
+            revision_number=new_rev,
+            remarks=f"Restored state from Revision #{revision_number}",
+        )
+
+        await self.audit_repo.log_event(
+            user_id=student_id,
+            action="JOURNAL_RESTORED",
+            entity="journals",
+            entity_id=journal_id,
+            ip_address=ip_address,
+        )
+
+        return await self.journal_repo.find_by_id(journal_id)
+
+    async def create_checkpoint(
+        self, journal_id: str, student_id: str, remarks: str | None = None, ip_address: str | None = None
+    ) -> dict:
+        """Manually create a revision snapshot milestone for current journal state (Student only)."""
+        journal = await self._validate_journal_ownership_and_state(journal_id, student_id)
+        
+        now = datetime.now(timezone.utc)
+        latest_rev = await self.version_repo.get_latest_revision_number(journal_id)
+        new_rev = latest_rev + 1
+
+        await self.journal_repo.update_by_id(
+            journal_id,
+            {"$set": {"currentVersion": new_rev, "updatedAt": now}}
+        )
+
+        snapshot = await self.version_repo.create_snapshot(
+            journal_id=journal_id,
+            author_id=student_id,
+            status=journal["status"],
+            blocks=journal.get("blocks", []),
+            title=journal.get("title", "Untitled Journal"),
+            revision_number=new_rev,
+            remarks=remarks or "Manual checkpoint snapshot",
+        )
+
+        await self.audit_repo.log_event(
+            user_id=student_id,
+            action="CHECKPOINT_CREATED",
+            entity="journals",
+            entity_id=journal_id,
+            ip_address=ip_address,
+        )
+
+        return snapshot
 
     async def get_classroom_submissions(
         self, classroom_id: str, teacher_id: str

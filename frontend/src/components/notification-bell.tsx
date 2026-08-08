@@ -30,7 +30,7 @@ export default function NotificationBell() {
     refetchInterval: 15000, // Poll notifications every 15s to feel instant
   });
 
-  const notifications = response?.data || [];
+  const notifications = Array.isArray(response) ? response : (response?.data || []);
   const unreadCount = notifications.filter((n: any) => !n.isRead).length;
 
   // 2. Mark single notification as read mutation
@@ -76,9 +76,9 @@ export default function NotificationBell() {
 
       {/* Floating Popover Dropdown */}
       {isOpen && (
-        <div className="absolute right-0 mt-2.5 w-80 rounded-3xl glass-card z-50 overflow-hidden transform origin-top-right transition-all">
+        <div className="absolute right-0 mt-2.5 w-80 rounded-3xl bg-background/95 dark:bg-zinc-900/95 border border-border/80 shadow-2xl backdrop-blur-2xl z-[100] overflow-hidden transform origin-top-right transition-all">
           {/* Header */}
-          <div className="p-4 border-b border-white/20 dark:border-white/10 flex items-center justify-between bg-white/10 dark:bg-zinc-900/30">
+          <div className="p-4 border-b border-border/60 flex items-center justify-between bg-muted/40">
             <span className="text-xs font-bold text-foreground">Notifications</span>
             {unreadCount > 0 && (
               <button

@@ -68,6 +68,14 @@ class JournalResponse(BaseModel):
     status: str
     currentVersion: int = Field(default=1, description="Current server revision counter")
     blocks: List[JournalBlock]
+    marks: float | None = Field(default=None, description="Evaluation score awarded by teacher")
+    teacherRemarks: str | None = Field(default=None, description="Teacher feedback remarks")
+    approvedAt: datetime | None = Field(default=None, description="Timestamp of approval")
+    submittedAt: datetime | None = Field(default=None, description="Timestamp of submission")
+    isLate: bool | None = Field(default=False, description="Flag indicating late submission")
+    delaySeconds: int | None = Field(default=0, description="Delay in seconds if submitted late")
+    annotationCounts: Dict[str, int] | None = Field(default=None, description="Breakdown of block annotation counts by type")
     createdAt: datetime
     updatedAt: datetime
+
 

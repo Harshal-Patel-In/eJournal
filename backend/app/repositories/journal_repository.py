@@ -57,7 +57,6 @@ class JournalRepository(BaseRepository):
                 "blocks.$.metadata.updatedAt": now.isoformat().replace("+00:00", "Z"),
                 "updatedAt": now,
             },
-            "$inc": {"currentVersion": 1},
         }
         result = self.collection.find_one_and_update(
             query, update, return_document=True
@@ -89,7 +88,6 @@ class JournalRepository(BaseRepository):
 
         update = {
             "$set": set_fields,
-            "$inc": {"currentVersion": 1},
         }
         result = self.collection.find_one_and_update(
             query, update, return_document=True

@@ -6,15 +6,16 @@ from pydantic import BaseModel, Field
 
 
 class CommentCreateRequest(BaseModel):
-    """Payload to create a block comment or suggestion."""
+    """Payload to create a block comment, suggestion, highlight, warning, approval, or question annotation."""
 
-    journalId: str = Field(..., description="ID of the journal document")
+    journalId: Optional[str] = Field(default=None, description="ID of the journal document")
     blockId: str = Field(..., description="ID of the document block to annotate")
     type: str = Field(
-        default="comment",
-        description="Comment type: comment, suggestion, highlight, warning, question",
+        default="Comment",
+        description="Annotation type: Comment, Suggestion, Highlight, Warning, Approval, Question",
     )
-    message: str = Field(..., description="Text content of the comment or suggestion")
+    content: Optional[str] = Field(default=None, description="Text content of annotation")
+    message: Optional[str] = Field(default=None, description="Alias for content")
     suggestedContent: Optional[Dict[str, Any]] = Field(
         default=None, description="Proposed replacement block content for suggestions"
     )

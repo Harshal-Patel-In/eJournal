@@ -59,6 +59,7 @@ class ClassroomService:
             "department": request.department.strip(),
             "teacherId": teacher_id,
             "joinCode": join_code,
+            "batches": [b.strip() for b in request.batches if b.strip()],
             "createdAt": datetime.now(timezone.utc),
         }
 

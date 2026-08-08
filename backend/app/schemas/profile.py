@@ -17,6 +17,7 @@ class ProfileUpdateRequest(BaseModel):
     department: str | None = Field(default=None, min_length=2)
     semester: str | None = Field(default=None)
     division: str | None = Field(default=None)
+    batch: str | None = Field(default=None)
     enrollmentNumber: str | None = Field(default=None)
     facultyId: str | None = Field(default=None)
     designation: str | None = Field(default=None)

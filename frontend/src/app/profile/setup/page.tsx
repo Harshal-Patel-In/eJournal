@@ -22,6 +22,7 @@ const profileSchema = zod.object({
   department: zod.string().min(2, "Department must be at least 2 characters"),
   semester: zod.string().optional(),
   division: zod.string().optional(),
+  batch: zod.string().optional(),
   enrollmentNumber: zod.string().optional(),
   facultyId: zod.string().optional(),
   designation: zod.string().optional(),
@@ -177,14 +178,25 @@ export default function ProfileSetupPage() {
           )}
 
           {isStudent && (
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-muted-foreground">Enrollment Number</label>
-              <input
-                type="text"
-                placeholder="e.g. EN100234"
-                className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                {...register("enrollmentNumber")}
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold text-muted-foreground">Enrollment Number</label>
+                <input
+                  type="text"
+                  placeholder="e.g. EN100234"
+                  className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  {...register("enrollmentNumber")}
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold text-muted-foreground">Academic Batch</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Batch A1"
+                  className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  {...register("batch")}
+                />
+              </div>
             </div>
           )}
 

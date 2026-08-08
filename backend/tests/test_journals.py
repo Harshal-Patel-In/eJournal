@@ -13,6 +13,7 @@ from app.services.journal_service import JournalService
 
 
 @pytest.mark.anyio
+@patch("app.services.journal_service.VersionRepository")
 @patch("app.services.journal_service.JournalRepository")
 @patch("app.services.journal_service.AssignmentRepository")
 @patch("app.services.journal_service.ClassroomRepository")
@@ -20,9 +21,12 @@ from app.services.journal_service import JournalService
 @patch("app.services.journal_service.UserRepository")
 @patch("app.services.journal_service.AuditLogRepository")
 async def test_create_journal_success(
-    mock_audit, mock_user, mock_membership, mock_classroom, mock_assignment, mock_journal
+    mock_audit, mock_user, mock_membership, mock_classroom, mock_assignment, mock_journal, mock_version
 ):
     """Test student successfully initializes a draft journal with generated template cover blocks."""
+    version_repo = MagicMock()
+    version_repo.create_snapshot = AsyncMock(return_value={"id": "ver_1"})
+    mock_version.return_value = version_repo
     # Instantiating mocks
     journal_repo = MagicMock()
     journal_repo.find_student_journal_for_assignment = AsyncMock(return_value=None)
@@ -337,8 +341,9 @@ async def test_approve_journal_unsubmitted_concurrency_rejection(
 
 
 @pytest.mark.anyio
+@patch("app.services.journal_service.VersionRepository")
 @patch("app.services.journal_service.JournalRepository")
-async def test_submit_journal_already_submitted(mock_journal):
+async def test_submit_journal_already_submitted(mock_journal, mock_version):
     """Verify that submitting an already submitted journal is rejected."""
     journal_repo = MagicMock()
     journal_repo.find_by_id = AsyncMock(
@@ -351,6 +356,10 @@ async def test_submit_journal_already_submitted(mock_journal):
     )
     mock_journal.return_value = journal_repo
 
+    version_repo = MagicMock()
+    version_repo.get_latest_revision_number = AsyncMock(return_value=1)
+    mock_version.return_value = version_repo
+
     service = JournalService()
 
     with pytest.raises(AppException) as excinfo:
@@ -360,19 +369,25 @@ async def test_submit_journal_already_submitted(mock_journal):
 
 @pytest.mark.anyio
 @patch("app.services.journal_service.JournalRepository")
+@patch("app.services.journal_service.AssignmentRepository")
 @patch("app.services.journal_service.AuditLogRepository")
-async def test_unsubmit_journal_success(mock_audit, mock_journal):
+async def test_unsubmit_journal_success(mock_audit, mock_assignment, mock_journal):
     """Verify that unsubmitting a submitted journal reverts status back to draft."""
     journal_repo = MagicMock()
     journal_repo.find_by_id = AsyncMock(
         return_value={
             "id": "journal_999",
             "studentId": "student_123",
+            "assignmentId": "asg_123",
             "status": "submitted",
         }
     )
-    journal_repo.update_one = AsyncMock(return_value=True)
+    journal_repo.update_by_id = AsyncMock(return_value=True)
     mock_journal.return_value = journal_repo
+
+    asg_repo = MagicMock()
+    asg_repo.find_by_id = AsyncMock(return_value={"id": "asg_123", "deadline": None})
+    mock_assignment.return_value = asg_repo
 
     audit_repo = MagicMock()
     audit_repo.log_event = AsyncMock()
@@ -382,7 +397,7 @@ async def test_unsubmit_journal_success(mock_audit, mock_journal):
     result = await service.unsubmit_journal("journal_999", "student_123")
 
     assert result["status"] == "submitted"  # Mock returns the mock doc, but verify update_one was called
-    assert journal_repo.update_one.called
+    assert journal_repo.update_by_id.called
     assert audit_repo.log_event.called
 
 

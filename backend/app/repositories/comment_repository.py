@@ -29,3 +29,12 @@ class CommentRepository(BaseRepository):
             comment_id,
             {"$set": {"status": "resolved", "resolvedAt": datetime.now(timezone.utc)}},
         )
+
+    async def get_annotation_counts(self, journal_id: str) -> dict[str, int]:
+        """Return counts of annotations by type for a journal."""
+        comments = await self.find_many({"journalId": journal_id})
+        counts: dict[str, int] = {}
+        for c in comments:
+            atype = c.get("type", "Comment")
+            counts[atype] = counts.get(atype, 0) + 1
+        return counts

@@ -53,6 +53,7 @@ export default function BlockWrapper({
 
   return (
     <div
+      id={`block-${id}`}
       ref={provided.innerRef}
       {...provided.draggableProps}
       className="group relative flex items-start gap-3 w-full pl-16 pr-4 py-3 border border-transparent hover:border-border/40 hover:bg-muted/10 rounded-xl transition-all"

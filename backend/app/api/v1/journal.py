@@ -19,7 +19,8 @@ from app.schemas.journal import (
 from app.schemas.response import ApiResponse, success_response
 from app.services.journal_service import JournalService
 
-from app.schemas.comment import RequestChangesRequest, ApproveJournalRequest
+from app.schemas.comment import RequestChangesRequest, ApproveJournalRequest, CommentCreateRequest
+from app.services.comment_service import CommentService
 
 router = APIRouter(prefix="/journals")
 
@@ -257,8 +258,13 @@ async def export_journal_pdf(
     # 3. Generate PDF content
     pdf_data = generate_pdf_bytes(journal, student_name, classroom_name)
 
-    # 4. Stream attachment
-    filename = f"Journal_{journalId}.pdf"
+    # 4. Stream attachment with clean academic filename
+    import re
+    clean_student = re.sub(r"[^\w\s-]", "", student_name).strip().replace(" ", "_")
+    asg_title = assignment.get("title", "Journal") if assignment else "Journal"
+    exp_num = assignment.get("experimentNumber", 1) if assignment else 1
+    clean_title = re.sub(r"[^\w\s-]", "", asg_title).strip().replace(" ", "_")
+    filename = f"{clean_student}_Exp{exp_num}_{clean_title}.pdf"
     return Response(
         content=pdf_data,
         media_type="application/pdf",
@@ -306,13 +312,84 @@ async def export_journal_docx(
     # 3. Generate Word DOCX content
     docx_data = generate_docx_bytes(journal, student_name, classroom_name)
 
-    # 4. Stream attachment
-    filename = f"Journal_{journalId}.docx"
+    # 4. Stream attachment with clean academic filename
+    import re
+    clean_student = re.sub(r"[^\w\s-]", "", student_name).strip().replace(" ", "_")
+    asg_title = assignment.get("title", "Journal") if assignment else "Journal"
+    exp_num = assignment.get("experimentNumber", 1) if assignment else 1
+    clean_title = re.sub(r"[^\w\s-]", "", asg_title).strip().replace(" ", "_")
+    filename = f"{clean_student}_Exp{exp_num}_{clean_title}.docx"
     return Response(
         content=docx_data,
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+@router.post("/{journalId}/annotations", response_model=ApiResponse[dict], status_code=status.HTTP_201_CREATED)
+async def create_annotation(
+    journalId: str,
+    payload: CommentCreateRequest,
+    user: dict = Depends(RoleChecker(["teacher"])),
+    comment_service: CommentService = Depends(),
+):
+    """Create a teacher block annotation (Comment, Suggestion, Highlight, Warning, Approval, Question)."""
+    annotation = await comment_service.add_annotation(journalId, user["id"], payload)
+    return success_response(annotation)
+
+
+@router.get("/{journalId}/annotations", response_model=ApiResponse[list])
+async def list_annotations(
+    journalId: str,
+    user: dict = Depends(get_active_user),
+    comment_service: CommentService = Depends(),
+):
+    """List all teacher review annotations for a journal document."""
+    comments = await comment_service.list_journal_comments(journalId)
+    return success_response(comments)
+
+
+@router.get("/{journalId}/versions", response_model=ApiResponse[list])
+async def list_journal_versions(
+    journalId: str,
+    user: dict = Depends(get_active_user),
+    journal_service: JournalService = Depends(),
+):
+    """Retrieve historical revision snapshots of a journal document."""
+    versions = await journal_service.get_journal_versions(journalId, user["id"], user["role"])
+    return success_response(versions)
+
+
+@router.post("/{journalId}/versions/{revisionNumber}/restore", response_model=ApiResponse[JournalResponse])
+async def restore_journal_version(
+    journalId: str,
+    revisionNumber: int,
+    request: Request,
+    user: dict = Depends(RoleChecker(["student"])),
+    journal_service: JournalService = Depends(),
+):
+    """Restore a historical version snapshot to be the active journal state (Student only)."""
+    ip_address = request.client.host if request.client else None
+    restored = await journal_service.restore_version_snapshot(
+        journalId, revisionNumber, user["id"], ip_address=ip_address
+    )
+    return success_response(restored)
+
+
+@router.post("/{journalId}/checkpoint", response_model=ApiResponse[dict], status_code=status.HTTP_201_CREATED)
+async def create_journal_checkpoint(
+    journalId: str,
+    request: Request,
+    remarks: str | None = None,
+    user: dict = Depends(RoleChecker(["student"])),
+    journal_service: JournalService = Depends(),
+):
+    """Manually create an immutable revision snapshot milestone for current journal state (Student only)."""
+    ip_address = request.client.host if request.client else None
+    snapshot = await journal_service.create_checkpoint(
+        journalId, user["id"], remarks=remarks, ip_address=ip_address
+    )
+    return success_response(snapshot)
 
 
 
