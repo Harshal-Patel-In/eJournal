@@ -179,7 +179,7 @@ export default function EditorPage({ params }: PageProps) {
 
   // Apply Teacher Suggestion Mutation
   const applySuggestionMutation = useMutation({
-    mutationFn: (commentId: string) => api.post(`/comments/${commentId}/apply`),
+    mutationFn: (commentId: string) => api.post(`/comments/${commentId}/apply-suggestion`),
     onSuccess: () => {
       refetchJournal();
       refetchAnnotations();
@@ -187,6 +187,38 @@ export default function EditorPage({ params }: PageProps) {
     },
     onError: (err: any) => {
       toast.error(err.message || "Failed to apply suggestion.");
+    },
+  });
+
+  // Reply to Question / Comment Thread Mutation
+  const replyQuestionMutation = useMutation({
+    mutationFn: (data: { blockId: string; parentCommentId: string; message: string }) =>
+      api.post(`/comments`, {
+        journalId,
+        blockId: data.blockId,
+        parentCommentId: data.parentCommentId,
+        message: data.message,
+        content: data.message,
+        type: "Comment",
+      }),
+    onSuccess: () => {
+      refetchAnnotations();
+      toast.success("Reply posted to thread.", { title: "💬 Replied" });
+    },
+    onError: (err: any) => {
+      toast.error(err.message || "Failed to post reply.");
+    },
+  });
+
+  // Resolve / Reject Annotation Mutation
+  const resolveAnnotationMutation = useMutation({
+    mutationFn: (commentId: string) => api.put(`/comments/${commentId}/resolve`, {}),
+    onSuccess: () => {
+      refetchAnnotations();
+      toast.success("Annotation thread resolved.");
+    },
+    onError: (err: any) => {
+      toast.error(err.message || "Failed to resolve annotation.");
     },
   });
 
@@ -523,7 +555,17 @@ export default function EditorPage({ params }: PageProps) {
                     <BlockAnnotations
                       annotations={blockAnns}
                       isTeacher={isTeacher}
+                      currentUser={user}
                       onApplySuggestion={(commentId) => applySuggestionMutation.mutate(commentId)}
+                      onReplyQuestion={(annotationId, replyText) =>
+                        replyQuestionMutation.mutate({
+                          blockId: block.id,
+                          parentCommentId: annotationId,
+                          message: replyText,
+                        })
+                      }
+                      onRejectSuggestion={(commentId) => resolveAnnotationMutation.mutate(commentId)}
+                      onResolveAnnotation={(commentId) => resolveAnnotationMutation.mutate(commentId)}
                     />
                   </div>
                 );

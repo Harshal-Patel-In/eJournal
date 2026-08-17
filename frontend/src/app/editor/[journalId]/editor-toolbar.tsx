@@ -313,21 +313,25 @@ export default function EditorToolbar({
                 </Button>
               )}
 
-              {/* Hand In Button */}
+              {/* Hand In / Resubmit Button */}
               {isEditable ? (
                 <Button
                   variant="default"
                   size="sm"
                   onClick={onSubmit}
                   disabled={isDirty || isSaving || isSubmitting}
-                  className="gap-1.5 text-xs font-semibold shadow-xs hover:shadow active:scale-95 glass-btn-emerald transition-all cursor-pointer disabled:pointer-events-none rounded-xl h-8"
+                  className={`gap-1.5 text-xs font-semibold shadow-xs hover:shadow active:scale-95 transition-all cursor-pointer disabled:pointer-events-none rounded-xl h-8 ${
+                    status === "changes_requested"
+                      ? "glass-btn-amber border-amber-500/40 text-amber-700 dark:text-amber-300"
+                      : "glass-btn-emerald"
+                  }`}
                 >
                   {isSubmitting ? (
                     <Loader2 className="size-3.5 animate-spin" />
                   ) : (
                     <Send className="size-3.5" />
                   )}
-                  <span>Hand In</span>
+                  <span>{status === "changes_requested" ? "Resubmit Changes" : "Hand In"}</span>
                 </Button>
               ) : (
                 <Button

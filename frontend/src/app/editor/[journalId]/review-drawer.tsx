@@ -89,7 +89,9 @@ export default function ReviewDrawer({
   };
 
   const isUnsubmittedDraft = journalStatus === "draft";
+  const isChangesRequested = journalStatus === "changes_requested";
   const isApproved = journalStatus === "approved";
+  const isGradingLocked = isUnsubmittedDraft || isChangesRequested;
   const [isEditingEvaluation, setIsEditingEvaluation] = useState(false);
 
   return (
@@ -125,6 +127,21 @@ export default function ReviewDrawer({
             </span>
             <p className="text-[11px] leading-relaxed text-amber-800/80 dark:text-amber-200/80 pl-[22px]">
               Student unsubmitted to draft. Grading locked until resubmitted.
+            </p>
+          </div>
+        ) : isChangesRequested ? (
+          <div className="p-3.5 rounded-xl border border-amber-400/30 bg-amber-50/80 dark:bg-amber-950/30 text-xs flex flex-col gap-1.5">
+            <div className="flex items-center justify-between">
+              <span className="flex items-center gap-1.5 font-bold text-amber-700 dark:text-amber-300">
+                <AlertCircle className="size-4 text-amber-500" />
+                <span>Changes Requested</span>
+              </span>
+              <span className="text-[10px] uppercase px-2 py-0.5 rounded-full bg-amber-500/20 font-black tracking-wider text-amber-700 dark:text-amber-300">
+                Revision Pending
+              </span>
+            </div>
+            <p className="text-[11px] text-amber-800/80 dark:text-amber-200/80 leading-relaxed font-medium">
+              Student is revising this document. Evaluation and grading will unlock once resubmitted.
             </p>
           </div>
         ) : isApproved ? (
@@ -209,7 +226,7 @@ export default function ReviewDrawer({
                     value={marks}
                     onChange={(e) => setMarks(e.target.value)}
                     placeholder={`0–${maxMarks}`}
-                    disabled={isUnsubmittedDraft}
+                    disabled={isGradingLocked}
                     className="w-20 px-2.5 py-1.5 text-sm font-bold text-center bg-background text-foreground border border-input rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-primary focus:outline-none disabled:opacity-40 transition-all"
                   />
                   <span className="text-xs text-muted-foreground font-bold">/ {maxMarks}</span>
@@ -224,7 +241,7 @@ export default function ReviewDrawer({
                   value={remarks}
                   onChange={(e) => setRemarks(e.target.value)}
                   placeholder="Add evaluation feedback..."
-                  disabled={isUnsubmittedDraft}
+                  disabled={isGradingLocked}
                   className="w-full p-2.5 text-xs bg-background border border-input rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-primary focus:outline-none resize-none font-medium text-foreground disabled:opacity-40 placeholder:text-muted-foreground/50 transition-all"
                 />
               </div>
@@ -237,7 +254,7 @@ export default function ReviewDrawer({
                     handleApprove();
                     setIsEditingEvaluation(false);
                   }}
-                  disabled={isUnsubmittedDraft || approveMutation.isPending}
+                  disabled={isGradingLocked || approveMutation.isPending}
                   className="w-full h-9 gap-2 text-xs font-semibold glass-btn glass-btn-emerald active:scale-[0.98] rounded-full cursor-pointer disabled:bg-muted disabled:text-muted-foreground disabled:border disabled:border-border disabled:opacity-50 disabled:shadow-none disabled:cursor-not-allowed transition-all"
                 >
                   {approveMutation.isPending ? (
@@ -268,9 +285,10 @@ export default function ReviewDrawer({
                   <Button
                     size="sm"
                     onClick={() => setShowRequestDialog(true)}
-                    disabled={isUnsubmittedDraft || requestChangesMutation.isPending}
-                    className="w-full h-9 gap-2 text-xs font-semibold glass-btn glass-btn-amber active:scale-[0.98] rounded-full cursor-pointer disabled:bg-muted disabled:text-muted-foreground disabled:border-border disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                    disabled={isGradingLocked || requestChangesMutation.isPending}
+                    className="w-full h-8 gap-1.5 text-xs font-semibold glass-btn-amber rounded-full cursor-pointer disabled:bg-muted disabled:text-muted-foreground disabled:border disabled:border-border disabled:opacity-50 disabled:shadow-none disabled:cursor-not-allowed transition-all"
                   >
+                    <Send className="size-3" />
                     <span>Request Changes</span>
                   </Button>
                 )}

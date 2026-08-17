@@ -23,14 +23,13 @@ async def connect_to_redis() -> None:
         decode_responses=True,
     )
 
-    # Verify connection
+    # Verify connection (graceful fallback if Redis is offline)
     try:
         await _redis_client.ping()
+        logger.info("redis_pool_created")
     except Exception as e:
-        logger.error("redis_connection_failed", error=str(e))
-        raise
-
-    logger.info("redis_pool_created")
+        logger.warning("redis_connection_offline_continuing", error=str(e))
+        _redis_client = None
 
 
 async def close_redis_connection() -> None:

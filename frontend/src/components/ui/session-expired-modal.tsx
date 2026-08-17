@@ -12,8 +12,13 @@ export function SessionExpiredModal() {
   const isAuthPage = pathname?.startsWith("/auth") || pathname === "/";
 
   useEffect(() => {
+    // Reset modal visibility on route changes
+    setIsOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
     function handleUnauthorized() {
-      if (!isAuthPage) {
+      if (!isAuthPage && typeof window !== "undefined" && !(window as any).__IS_LOGGING_OUT) {
         setIsOpen(true);
       }
     }

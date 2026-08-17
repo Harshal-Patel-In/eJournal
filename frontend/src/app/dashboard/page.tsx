@@ -92,16 +92,31 @@ export default function DashboardPage() {
 
   // 5. Logout mutation
   const logoutMutation = useMutation({
-    mutationFn: () => api.post("/auth/logout"),
+    mutationFn: () => {
+      if (typeof window !== "undefined") {
+        (window as any).__IS_LOGGING_OUT = true;
+      }
+      return api.post("/auth/logout");
+    },
     onSuccess: () => {
       queryClient.clear();
       router.push("/auth/login");
       router.refresh();
+      setTimeout(() => {
+        if (typeof window !== "undefined") {
+          (window as any).__IS_LOGGING_OUT = false;
+        }
+      }, 1000);
     },
     onError: () => {
       queryClient.clear();
       router.push("/auth/login");
       router.refresh();
+      setTimeout(() => {
+        if (typeof window !== "undefined") {
+          (window as any).__IS_LOGGING_OUT = false;
+        }
+      }, 1000);
     },
   });
 

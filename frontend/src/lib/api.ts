@@ -5,6 +5,12 @@
  * All data flows through authenticated backend APIs.
  */
 
+declare global {
+  interface Window {
+    __IS_LOGGING_OUT?: boolean;
+  }
+}
+
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
 
@@ -69,9 +75,10 @@ async function request<T>(
       body.error?.code === "INVALID_TOKEN" ||
       body.error?.code === "USER_NOT_FOUND"
     ) {
-      // Do not dispatch session expired modal if on auth pages or explicit logout
+      // Do not dispatch session expired modal if logging out, on auth pages, or root
       if (
         typeof window !== "undefined" &&
+        !(window as any).__IS_LOGGING_OUT &&
         !endpoint.includes("/auth/logout") &&
         !window.location.pathname.startsWith("/auth") &&
         window.location.pathname !== "/"

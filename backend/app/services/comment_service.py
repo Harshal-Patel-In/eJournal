@@ -44,6 +44,9 @@ class CommentService:
             review_status = "Reviewed"
 
         text_content = payload.content or payload.message or ""
+        suggested_content = payload.suggestedContent
+        if ann_type.lower() == "suggestion" and not suggested_content:
+            suggested_content = {"text": text_content}
 
         comment_data = {
             "journalId": journal_id,
@@ -54,7 +57,7 @@ class CommentService:
             "type": ann_type,
             "content": text_content,
             "message": text_content,
-            "suggestedContent": payload.suggestedContent,
+            "suggestedContent": suggested_content,
             "reviewStatus": review_status,
             "status": "open",
             "parentCommentId": payload.parentCommentId,
@@ -84,6 +87,11 @@ class CommentService:
             else "User"
         )
 
+        text_content = payload.message or payload.content or ""
+        suggested_content = payload.suggestedContent
+        if (payload.type or "").lower() == "suggestion" and not suggested_content:
+            suggested_content = {"text": text_content}
+
         # 3. Create comment record
         comment_data = {
             "journalId": payload.journalId,
@@ -92,8 +100,9 @@ class CommentService:
             "authorName": author_name,
             "authorRole": author_role,
             "type": payload.type,
-            "message": payload.message,
-            "suggestedContent": payload.suggestedContent,
+            "message": text_content,
+            "content": text_content,
+            "suggestedContent": suggested_content,
             "status": "open",
             "parentCommentId": payload.parentCommentId,
             "createdAt": datetime.now(timezone.utc),
@@ -121,7 +130,7 @@ class CommentService:
                 status_code=status.HTTP_404_NOT_FOUND,
             )
 
-        if comment["type"] != "suggestion" or not comment.get("suggestedContent"):
+        if (comment.get("type") or "").lower() != "suggestion" or not comment.get("suggestedContent"):
             raise AppException(
                 code=ErrorCode.VALIDATION_ERROR,
                 message="Comment is not an actionable suggestion",

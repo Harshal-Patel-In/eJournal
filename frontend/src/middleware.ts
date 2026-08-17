@@ -33,7 +33,6 @@ export function middleware(request: NextRequest) {
     pathname.startsWith("/_next") ||
     pathname.includes(".") ||
     pathname === "/favicon.ico";
-  const isPublicRoute = pathname === "/" || pathname === "/about";
 
   // Skip static files assets
   if (isStaticRoute) {
@@ -45,8 +44,7 @@ export function middleware(request: NextRequest) {
 
   // 1. Unauthenticated workflow
   if (!token) {
-    // If accessing protected routes, redirect to login
-    if (!isAuthRoute && !isPublicRoute) {
+    if (!isAuthRoute) {
       return NextResponse.redirect(new URL("/auth/login", request.url));
     }
     return NextResponse.next();
@@ -54,7 +52,7 @@ export function middleware(request: NextRequest) {
 
   // 2. Authenticated workflow
   const payload = parseJwt(token);
-  
+
   // If token is malformed or expired, clear cookie at root path and redirect to login
   if (!payload || (payload.exp && Date.now() >= payload.exp * 1000)) {
     const response = NextResponse.redirect(new URL("/auth/login", request.url));
@@ -63,6 +61,15 @@ export function middleware(request: NextRequest) {
   }
 
   const isProfileComplete = payload.is_profile_complete === true;
+
+  // Redirect root `/` to dashboard or setup when authenticated
+  if (pathname === "/") {
+    if (isProfileComplete) {
+      return NextResponse.redirect(new URL("/dashboard", request.url));
+    } else {
+      return NextResponse.redirect(new URL("/profile/setup", request.url));
+    }
+  }
 
   // If user tries to visit auth pages when already logged in
   if (isAuthRoute) {
@@ -74,7 +81,7 @@ export function middleware(request: NextRequest) {
   }
 
   // Profile setup lock verification (RULE-AUTH06)
-  if (!isProfileComplete && !isProfileSetupRoute && !isPublicRoute) {
+  if (!isProfileComplete && !isProfileSetupRoute) {
     return NextResponse.redirect(new URL("/profile/setup", request.url));
   }
 

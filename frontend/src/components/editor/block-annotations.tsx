@@ -10,6 +10,13 @@ import {
   HelpCircle,
   ChevronDown,
   ChevronRight,
+  Send,
+  Check,
+  X,
+  ShieldCheck,
+  ThumbsUp,
+  ThumbsDown,
+  CornerDownRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -20,27 +27,41 @@ interface Annotation {
   content?: string;
   message?: string;
   authorName: string;
+  authorRole?: string;
   reviewStatus?: string;
   status?: string;
+  parentCommentId?: string;
   suggestedContent?: any;
   createdAt?: string;
+}
+
+interface CommentNode {
+  comment: Annotation;
+  children: CommentNode[];
 }
 
 interface BlockAnnotationsProps {
   annotations: Annotation[];
   isTeacher: boolean;
+  currentUser?: any;
   onApplySuggestion?: (commentId: string) => void;
+  onReplyQuestion?: (annotationId: string, replyText: string) => void;
+  onRejectSuggestion?: (commentId: string) => void;
+  onResolveAnnotation?: (commentId: string) => void;
 }
 
-const TYPE_CONFIG: Record<string, {
-  icon: any;
-  label: string;
-  color: string;       // text color
-  bgColor: string;     // background tint
-  borderColor: string; // left border accent
-  badgeBg: string;     // badge background
-  emoji: string;
-}> = {
+const TYPE_CONFIG: Record<
+  string,
+  {
+    icon: any;
+    label: string;
+    color: string;
+    bgColor: string;
+    borderColor: string;
+    badgeBg: string;
+    emoji: string;
+  }
+> = {
   Comment: {
     icon: MessageSquare,
     label: "Comment",
@@ -72,9 +93,9 @@ const TYPE_CONFIG: Record<string, {
     icon: AlertTriangle,
     label: "Warning",
     color: "text-rose-600 dark:text-rose-400",
-    bgColor: "bg-rose-50/80 dark:bg-rose-950/20",
+    bgColor: "bg-rose-50/80 dark:bg-rose-950/20 border-rose-500/40",
     borderColor: "border-l-rose-500",
-    badgeBg: "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-400/30",
+    badgeBg: "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/40 font-extrabold",
     emoji: "⚠️",
   },
   Approval: {
@@ -103,7 +124,54 @@ function getConfig(type: string) {
   return TYPE_CONFIG[type] || DEFAULT_CONFIG;
 }
 
-/** Build a compact summary line like: 💬 2 · ⚠️ 1 · ✅ 1 */
+function formatRelativeTime(dateStr?: string): string {
+  if (!dateStr) return "";
+  try {
+    const d = new Date(dateStr);
+    const now = new Date();
+    const diffSec = Math.floor((now.getTime() - d.getTime()) / 1000);
+
+    if (diffSec < 60) return "Just now";
+    if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
+    if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
+    if (diffSec < 604800) return `${Math.floor(diffSec / 86400)}d ago`;
+    return d.toLocaleDateString();
+  } catch {
+    return "";
+  }
+}
+
+/** Transform flat array into a Recursive N-Tier Tree Structure */
+function buildCommentTree(annotations: Annotation[]): CommentNode[] {
+  const nodeMap = new Map<string, CommentNode>();
+  const roots: CommentNode[] = [];
+
+  annotations.forEach((ann) => {
+    nodeMap.set(ann.id, { comment: ann, children: [] });
+  });
+
+  annotations.forEach((ann) => {
+    const node = nodeMap.get(ann.id)!;
+    if (ann.parentCommentId && nodeMap.has(ann.parentCommentId)) {
+      nodeMap.get(ann.parentCommentId)!.children.push(node);
+    } else {
+      roots.push(node);
+    }
+  });
+
+  return roots;
+}
+
+/** Count total descendants under a node recursively */
+function countTotalDescendants(node: CommentNode): number {
+  let count = node.children.length;
+  for (const child of node.children) {
+    count += countTotalDescendants(child);
+  }
+  return count;
+}
+
+/** Build compact summary counts */
 function buildSummary(annotations: Annotation[]) {
   const counts: Record<string, number> = {};
   for (const ann of annotations) {
@@ -116,9 +184,7 @@ function buildSummary(annotations: Annotation[]) {
   });
 }
 
-/** Get the dominant annotation type for the block's left border accent */
 function getDominantBorderColor(annotations: Annotation[]): string {
-  // Priority: Warning > Question > Suggestion > Comment > Highlight > Approval
   const priority = ["Warning", "Question", "Suggestion", "Comment", "Highlight", "Approval"];
   for (const p of priority) {
     if (annotations.some((a) => a.type === p)) return getConfig(p).borderColor;
@@ -128,16 +194,554 @@ function getDominantBorderColor(annotations: Annotation[]): string {
 
 export { getDominantBorderColor, getConfig as getAnnotationConfig };
 
+/** YOUTUBE-STYLE INLINE REPLY COMPOSE BOX */
+function InlineReplyBox({
+  targetAuthorName,
+  userInitial,
+  replyText,
+  setReplyText,
+  onSend,
+  onCancel,
+}: {
+  targetAuthorName: string;
+  userInitial: string;
+  replyText: string;
+  setReplyText: (text: string) => void;
+  onSend: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div className="mt-2.5 flex items-start gap-2.5 animate-in fade-in slide-in-from-top-1 duration-150">
+      <div className="size-6 rounded-full bg-primary/10 border border-primary/20 text-[10px] font-bold text-primary flex items-center justify-center shrink-0 mt-0.5">
+        {userInitial}
+      </div>
+      <div className="flex-1 flex flex-col gap-2">
+        <input
+          type="text"
+          value={replyText}
+          onChange={(e) => setReplyText(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && onSend()}
+          placeholder={`Reply to @${targetAuthorName.replace(/\s+/g, "")}...`}
+          className="w-full bg-transparent border-b border-zinc-300 dark:border-zinc-700 focus:border-primary pb-1 text-xs outline-none text-foreground placeholder:text-muted-foreground/60 transition-colors font-medium"
+          autoFocus
+        />
+        <div className="flex items-center justify-end gap-2">
+          <button
+            onClick={onCancel}
+            className="px-3 py-1 text-xs font-medium text-muted-foreground hover:text-foreground rounded-full hover:bg-muted/60 transition-colors cursor-pointer"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onSend}
+            disabled={!replyText.trim()}
+            className="h-7 px-3.5 text-xs font-semibold rounded-full gap-1.5 flex items-center justify-center transition-all bg-blue-600 hover:bg-blue-700 text-white shadow-xs disabled:bg-zinc-200 dark:disabled:bg-zinc-800 disabled:text-zinc-400 dark:disabled:text-zinc-500 disabled:cursor-not-allowed disabled:shadow-none cursor-pointer"
+          >
+            <Send className="size-3" />
+            <span>Reply</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** RECURSIVE SUB-THREAD TREE (Self-contained segment lines with zero overhang across all levels) */
+function SubThreadTree({
+  children,
+  stemLeftPx,
+  curveWidthPx,
+  contentLeftPaddingClass,
+  isTeacher,
+  userInitial,
+  activeReplyTargetId,
+  setActiveReplyTargetId,
+  replyText,
+  setReplyText,
+  onReplyQuestion,
+  onApplySuggestion,
+  onRejectSuggestion,
+  onResolveAnnotation,
+}: {
+  children: CommentNode[];
+  stemLeftPx: number;
+  curveWidthPx: number;
+  contentLeftPaddingClass: string;
+  isTeacher: boolean;
+  userInitial: string;
+  activeReplyTargetId: string | null;
+  setActiveReplyTargetId: (id: string | null) => void;
+  replyText: string;
+  setReplyText: (text: string) => void;
+  onReplyQuestion?: (annotationId: string, replyText: string) => void;
+  onApplySuggestion?: (commentId: string) => void;
+  onRejectSuggestion?: (commentId: string) => void;
+  onResolveAnnotation?: (commentId: string) => void;
+}) {
+  return (
+    <div className="relative flex flex-col">
+      {children.map((childNode, idx) => {
+        const ann = childNode.comment;
+        const isLast = idx === children.length - 1;
+        const text = ann.content || ann.message || "";
+        const isReplyingToThis = activeReplyTargetId === ann.id;
+        const hasSubChildren = childNode.children.length > 0;
+
+        const handleInitiateReply = () => {
+          setActiveReplyTargetId(ann.id);
+          const authorHandle = `@${ann.authorName.replace(/\s+/g, "")} `;
+          setReplyText(authorHandle);
+        };
+
+        const handleSendReply = () => {
+          const trimmed = replyText.trim();
+          if (trimmed && onReplyQuestion) {
+            onReplyQuestion(ann.id, trimmed);
+            setReplyText("");
+            setActiveReplyTargetId(null);
+          }
+        };
+
+        return (
+          <div key={ann.id} className="relative flex flex-col pt-2.5">
+            {/* 1. Precise Segment-Based Vertical Stem Line for this level */}
+            <div
+              style={{ left: `${stemLeftPx}px` }}
+              className={`absolute top-0 w-[1.5px] bg-zinc-300 dark:bg-zinc-700 pointer-events-none ${
+                isLast ? "h-[18px]" : "bottom-0"
+              }`}
+            />
+
+            {/* 2. Seamless 90° Radial SVG Curved Branch Arc */}
+            <svg
+              style={{ left: `${stemLeftPx}px` }}
+              className="absolute top-0 pointer-events-none stroke-zinc-300 dark:stroke-zinc-700"
+              width={curveWidthPx}
+              height="24"
+              viewBox={`0 0 ${curveWidthPx} 24`}
+              fill="none"
+            >
+              <path
+                d={`M 1 0 V 6 A 12 12 0 0 0 13 18 H ${curveWidthPx}`}
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                fill="none"
+              />
+            </svg>
+
+            {/* 3. Reply Entry Body with Local Lead-in Stem bounded strictly to this entry */}
+            <div className="relative flex flex-col">
+              {/* Lead-in line dropping from this reply's avatar down to the start of its sub-tree */}
+              {hasSubChildren && (
+                <div
+                  style={{ left: `${stemLeftPx + curveWidthPx + 12}px` }}
+                  className="absolute top-[28px] bottom-0 w-[1.5px] bg-zinc-300 dark:bg-zinc-700 pointer-events-none"
+                />
+              )}
+
+              <div className={`${contentLeftPaddingClass} flex items-start gap-2.5`}>
+                <div className="size-6 rounded-full bg-primary/10 border border-primary/20 text-[10px] font-bold text-primary flex items-center justify-center shrink-0 mt-0.5 z-10">
+                  {ann.authorName.charAt(0)}
+                </div>
+                <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-bold text-foreground hover:underline cursor-pointer">
+                      @{ann.authorName.replace(/\s+/g, "_").toLowerCase()}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground font-normal">
+                      {formatRelativeTime(ann.createdAt)}
+                    </span>
+                  </div>
+
+                  <p className="text-xs text-foreground/90 leading-relaxed font-normal">
+                    {text.startsWith("@") ? (
+                      <>
+                        <span className="text-blue-600 dark:text-blue-400 font-semibold hover:underline mr-1">
+                          {text.split(" ")[0]}
+                        </span>
+                        {text.substring(text.indexOf(" ") + 1)}
+                      </>
+                    ) : (
+                      text
+                    )}
+                  </p>
+
+                  {/* YouTube Action Bar */}
+                  <div className="flex items-center gap-3.5 pt-0.5">
+                    <button className="flex items-center text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
+                      <ThumbsUp className="size-3" />
+                    </button>
+                    <button className="flex items-center text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
+                      <ThumbsDown className="size-3" />
+                    </button>
+                    <button
+                      onClick={handleInitiateReply}
+                      className="text-[11px] font-semibold text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                    >
+                      Reply
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Inline Compose Box */}
+              {isReplyingToThis && (
+                <div className={`${contentLeftPaddingClass} pl-8.5`}>
+                  <InlineReplyBox
+                    targetAuthorName={ann.authorName}
+                    userInitial={userInitial}
+                    replyText={replyText}
+                    setReplyText={setReplyText}
+                    onSend={handleSendReply}
+                    onCancel={() => setActiveReplyTargetId(null)}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* 4. Recursive Nested Sub-Tree (SubThreadTree renders its own bounded segment lines) */}
+            {hasSubChildren && (
+              <div
+                style={{ marginLeft: `${curveWidthPx + 12}px` }}
+                className="relative flex flex-col"
+              >
+                <SubThreadTree
+                  children={childNode.children}
+                  stemLeftPx={stemLeftPx}
+                  curveWidthPx={24}
+                  contentLeftPaddingClass="pl-9"
+                  isTeacher={isTeacher}
+                  userInitial={userInitial}
+                  activeReplyTargetId={activeReplyTargetId}
+                  setActiveReplyTargetId={setActiveReplyTargetId}
+                  replyText={replyText}
+                  setReplyText={setReplyText}
+                  onReplyQuestion={onReplyQuestion}
+                  onApplySuggestion={onApplySuggestion}
+                  onRejectSuggestion={onRejectSuggestion}
+                  onResolveAnnotation={onResolveAnnotation}
+                />
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/** ROOT ANNOTATION CARD & THREAD CONTAINER */
+function RootThreadNode({
+  node,
+  isTeacher,
+  userInitial,
+  activeReplyTargetId,
+  setActiveReplyTargetId,
+  replyText,
+  setReplyText,
+  expandedThreads,
+  setExpandedThreads,
+  onReplyQuestion,
+  onApplySuggestion,
+  onRejectSuggestion,
+  onResolveAnnotation,
+}: {
+  node: CommentNode;
+  isTeacher: boolean;
+  userInitial: string;
+  activeReplyTargetId: string | null;
+  setActiveReplyTargetId: (id: string | null) => void;
+  replyText: string;
+  setReplyText: (text: string) => void;
+  expandedThreads: Record<string, boolean>;
+  setExpandedThreads: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
+  onReplyQuestion?: (annotationId: string, replyText: string) => void;
+  onApplySuggestion?: (commentId: string) => void;
+  onRejectSuggestion?: (commentId: string) => void;
+  onResolveAnnotation?: (commentId: string) => void;
+}) {
+  const ann = node.comment;
+  const type = ann.type || "Comment";
+  const cfg = getConfig(type);
+  const text = ann.content || ann.message || "";
+  const totalDescendants = countTotalDescendants(node);
+  const isThreadExpanded = expandedThreads[ann.id] ?? true;
+  const isReplyingToRoot = activeReplyTargetId === ann.id;
+  const isCardType = type === "Suggestion" || type === "Warning" || type === "Approval";
+
+  const handleInitiateReply = () => {
+    setActiveReplyTargetId(ann.id);
+    const authorHandle = `@${ann.authorName.replace(/\s+/g, "")} `;
+    setReplyText(authorHandle);
+  };
+
+  const handleSendReply = () => {
+    const trimmed = replyText.trim();
+    if (trimmed && onReplyQuestion) {
+      onReplyQuestion(ann.id, trimmed);
+      setReplyText("");
+      setActiveReplyTargetId(null);
+    }
+  };
+
+  const toggleThread = () => {
+    setExpandedThreads((prev) => ({ ...prev, [ann.id]: !(prev[ann.id] ?? true) }));
+  };
+
+  return (
+    <div className="relative flex flex-col">
+      {/* 1. TOP ROOT ANNOTATION CARD / COMMENT */}
+      {type === "Approval" ? (
+        <div className="p-3.5 rounded-2xl border border-emerald-500/30 bg-emerald-50/80 dark:bg-emerald-950/20 flex items-center justify-between shadow-2xs">
+          <div className="flex items-center gap-2.5">
+            <div className="size-7 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center shrink-0">
+              <ShieldCheck className="size-4 text-emerald-600 dark:text-emerald-400" />
+            </div>
+            <div className="flex flex-col gap-0.5">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-extrabold text-emerald-800 dark:text-emerald-200">
+                  Section Approved & Verified
+                </span>
+                <span className="text-[10px] font-medium text-emerald-600/80">by {ann.authorName}</span>
+              </div>
+              {text && <p className="text-[11px] text-emerald-700/90 font-medium italic">"{text}"</p>}
+            </div>
+          </div>
+          <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/40">
+            APPROVED
+          </span>
+        </div>
+      ) : type === "Warning" ? (
+        <div className="p-3.5 rounded-2xl border-2 border-rose-500/50 bg-rose-50/80 dark:bg-rose-950/30 flex flex-col gap-2 shadow-[0_0_15px_rgba(244,63,94,0.1)]">
+          <div className="flex items-center justify-between">
+            <span className="flex items-center gap-2 text-xs font-black text-rose-700 dark:text-rose-300">
+              <AlertTriangle className="size-4 text-rose-500 shrink-0" />
+              <span>Warning from {ann.authorName}</span>
+            </span>
+            <div className="flex items-center gap-2">
+              <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/40">
+                ACTION REQUIRED
+              </span>
+              {onResolveAnnotation && (
+                <button
+                  onClick={() => onResolveAnnotation(ann.id)}
+                  className="text-[10px] font-bold text-rose-600 hover:underline cursor-pointer"
+                >
+                  Dismiss
+                </button>
+              )}
+            </div>
+          </div>
+          <p className="text-xs font-semibold text-rose-900/90 dark:text-rose-100/90 leading-relaxed pl-6">
+            {text}
+          </p>
+          <div className="pl-6 flex items-center gap-3 pt-1">
+            <button
+              onClick={handleInitiateReply}
+              className="px-2.5 py-1 rounded-full text-xs font-bold text-rose-700 dark:text-rose-300 hover:bg-rose-500/10 transition-colors flex items-center gap-1.5 cursor-pointer"
+            >
+              <CornerDownRight className="size-3.5" />
+              <span>Reply</span>
+            </button>
+          </div>
+        </div>
+      ) : type === "Suggestion" ? (
+        <div className="p-3.5 rounded-2xl border border-amber-500/40 bg-amber-50/80 dark:bg-amber-950/20 flex flex-col gap-2.5 shadow-2xs">
+          <div className="flex items-center justify-between">
+            <span className="flex items-center gap-2 text-xs font-extrabold text-amber-800 dark:text-amber-200">
+              <Sparkles className="size-4 text-amber-500 shrink-0" />
+              <span>Suggested Edit from {ann.authorName}</span>
+            </span>
+            <span className="px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30">
+              SUGGESTION
+            </span>
+          </div>
+
+          {text && <p className="text-xs text-muted-foreground font-medium pl-6">{text}</p>}
+
+          {ann.suggestedContent && (
+            <div className="ml-6 p-2.5 rounded-xl bg-amber-100/70 dark:bg-amber-900/30 border border-amber-300/40 text-xs font-mono flex flex-col gap-1 text-amber-900 dark:text-amber-100">
+              <span className="text-[10px] font-bold text-amber-700 dark:text-amber-300 uppercase tracking-wider">
+                Proposed Replacement:
+              </span>
+              <div className="p-1.5 rounded bg-background/80 font-semibold text-foreground">
+                {typeof ann.suggestedContent === "string"
+                  ? ann.suggestedContent
+                  : ann.suggestedContent.text || JSON.stringify(ann.suggestedContent)}
+              </div>
+            </div>
+          )}
+
+          {!isTeacher && ann.status !== "resolved" && (
+            <div className="ml-6 flex items-center gap-2 pt-1">
+              {onApplySuggestion && (
+                <Button
+                  size="sm"
+                  onClick={() => onApplySuggestion(ann.id)}
+                  className="h-7 text-xs font-bold rounded-xl gap-1.5 glass-btn-emerald active:scale-95 cursor-pointer"
+                >
+                  <Check className="size-3.5" />
+                  <span>Accept Suggestion</span>
+                </Button>
+              )}
+              {onRejectSuggestion && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => onRejectSuggestion(ann.id)}
+                  className="h-7 text-xs font-semibold rounded-xl text-muted-foreground hover:text-foreground cursor-pointer"
+                >
+                  <X className="size-3.5" />
+                  <span>Reject</span>
+                </Button>
+              )}
+            </div>
+          )}
+
+          <div className="pl-6 flex items-center gap-3 pt-1">
+            <button
+              onClick={handleInitiateReply}
+              className="px-2.5 py-1 rounded-full text-xs font-bold text-amber-800 dark:text-amber-200 hover:bg-amber-500/10 transition-colors flex items-center gap-1.5 cursor-pointer"
+            >
+              <CornerDownRight className="size-3.5" />
+              <span>Reply</span>
+            </button>
+          </div>
+        </div>
+      ) : (
+        /* YouTube-Style Root Comment / Question */
+        <div className="flex items-start gap-3 py-1">
+          <div className="size-8 rounded-full bg-primary/10 border border-primary/20 text-xs font-bold text-primary flex items-center justify-center shrink-0 mt-0.5">
+            {ann.authorName.charAt(0)}
+          </div>
+          <div className="flex-1 min-w-0 flex flex-col gap-1">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-foreground hover:underline cursor-pointer">
+                @{ann.authorName.replace(/\s+/g, "_").toLowerCase()}
+              </span>
+              <span className="text-[11px] text-muted-foreground font-normal">
+                {formatRelativeTime(ann.createdAt)}
+              </span>
+              <span className={`ml-auto px-2 py-0.5 rounded-full text-[8px] font-extrabold uppercase tracking-wider border ${cfg.badgeBg}`}>
+                {cfg.label}
+              </span>
+            </div>
+
+            <p className="text-xs text-foreground/90 leading-relaxed font-normal">
+              {text}
+            </p>
+
+            {/* Action Row */}
+            <div className="flex items-center gap-4 pt-1">
+              <button className="flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
+                <ThumbsUp className="size-3.5" />
+              </button>
+              <button className="flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
+                <ThumbsDown className="size-3.5" />
+              </button>
+              <button
+                onClick={handleInitiateReply}
+                className="text-xs font-bold text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+              >
+                Reply
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Inline Compose Box under Root */}
+      {isReplyingToRoot && (
+        <div className="ml-11">
+          <InlineReplyBox
+            targetAuthorName={ann.authorName}
+            userInitial={userInitial}
+            replyText={replyText}
+            setReplyText={setReplyText}
+            onSend={handleSendReply}
+            onCancel={() => setActiveReplyTargetId(null)}
+          />
+        </div>
+      )}
+
+      {/* 2. RECURSIVE REPLIES THREAD */}
+      {node.children.length > 0 && (
+        <div className="relative flex flex-col">
+          {/* Vertical lead-in stem connecting through the toggle into SubThreadTree */}
+          {!isCardType && isThreadExpanded && (
+            <div className="absolute left-[16px] top-[-8px] h-[36px] w-[1.5px] bg-zinc-300 dark:bg-zinc-700 pointer-events-none" />
+          )}
+          {isCardType && isThreadExpanded && (
+            <div className="absolute left-[16px] top-0 h-[28px] w-[1.5px] bg-zinc-300 dark:bg-zinc-700 pointer-events-none" />
+          )}
+
+          {/* Collapsible toggle (Indented at ml-11 with breathing room) */}
+          <div className="ml-11 py-1.5 flex items-center">
+            <button
+              onClick={toggleThread}
+              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-500/10 transition-colors cursor-pointer"
+            >
+              <ChevronDown
+                className={`size-3.5 transition-transform duration-200 ${
+                  isThreadExpanded ? "rotate-180" : ""
+                }`}
+              />
+              <span>
+                {isThreadExpanded
+                  ? "Hide replies"
+                  : `${totalDescendants} ${totalDescendants === 1 ? "reply" : "replies"}`}
+              </span>
+            </button>
+          </div>
+
+          {/* Connected Tree of Replies (Self-contained segment-based stem lines with zero bottom spillover) */}
+          {isThreadExpanded && (
+            <div className="relative flex flex-col">
+              <SubThreadTree
+                children={node.children}
+                stemLeftPx={16}
+                curveWidthPx={30}
+                contentLeftPaddingClass="pl-11"
+                isTeacher={isTeacher}
+                userInitial={userInitial}
+                activeReplyTargetId={activeReplyTargetId}
+                setActiveReplyTargetId={setActiveReplyTargetId}
+                replyText={replyText}
+                setReplyText={setReplyText}
+                onReplyQuestion={onReplyQuestion}
+                onApplySuggestion={onApplySuggestion}
+                onRejectSuggestion={onRejectSuggestion}
+                onResolveAnnotation={onResolveAnnotation}
+              />
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function BlockAnnotations({
   annotations,
   isTeacher,
+  currentUser,
   onApplySuggestion,
+  onReplyQuestion,
+  onRejectSuggestion,
+  onResolveAnnotation,
 }: BlockAnnotationsProps) {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(true);
+  const [activeReplyTargetId, setActiveReplyTargetId] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState("");
+  const [expandedThreads, setExpandedThreads] = useState<Record<string, boolean>>({});
 
   if (annotations.length === 0) return null;
 
+  const treeRoots = buildCommentTree(annotations);
   const summary = buildSummary(annotations);
+
+  const userName = currentUser?.profile?.name || currentUser?.name || "User";
+  const userInitial = userName.charAt(0).toUpperCase();
 
   return (
     <div className="mt-2 select-none">
@@ -156,89 +760,41 @@ export default function BlockAnnotations({
           {summary.map((s) => (
             <span key={s.type} className="flex items-center gap-1">
               <span>{s.emoji}</span>
-              <span className="tabular-nums">{s.count}</span>
-              <span className="text-muted-foreground/50 hidden sm:inline">{s.label}{s.count > 1 ? "s" : ""}</span>
+              <span className="tabular-nums font-bold text-foreground">{s.count}</span>
+              <span className="text-muted-foreground/60 hidden sm:inline">
+                {s.label}
+                {s.count > 1 ? "s" : ""}
+              </span>
             </span>
           ))}
         </div>
 
-        <span className="ml-auto text-[10px] text-muted-foreground/40 font-medium">
-          {expanded ? "collapse" : "view"}
+        <span className="ml-auto text-[10px] text-muted-foreground/50 font-semibold uppercase tracking-wider">
+          {expanded ? "collapse" : "view annotations"}
         </span>
       </button>
 
-      {/* Expanded Thread */}
+      {/* Expanded Annotation Threads Container */}
       {expanded && (
-        <div className="mt-1.5 flex flex-col gap-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
-          {annotations.map((ann) => {
-            const cfg = getConfig(ann.type || "Comment");
-            const Icon = cfg.icon;
-            const text = ann.content || ann.message || "";
-
-            return (
-              <div
-                key={ann.id}
-                className={`flex flex-col gap-1.5 p-3 rounded-xl border-l-[3px] ${cfg.borderColor} ${cfg.bgColor} border border-border/30 text-xs`}
-              >
-                {/* Header: Icon + Author + Type Badge */}
-                <div className="flex items-center gap-2">
-                  <Icon className={`size-3.5 shrink-0 ${cfg.color}`} />
-                  <span className="font-bold text-foreground text-[11px]">{ann.authorName}</span>
-                  <span className={`ml-auto text-[9px] font-black uppercase px-1.5 py-0.5 rounded-md border ${cfg.badgeBg}`}>
-                    {cfg.label}
-                  </span>
-                </div>
-
-                {/* Content */}
-                <p className="text-[11px] text-foreground/80 leading-relaxed pl-[22px]">{text}</p>
-
-                {/* Suggestion Preview */}
-                {ann.type === "Suggestion" && ann.suggestedContent && (
-                  <div className="ml-[22px] p-2 rounded-lg bg-amber-100/60 dark:bg-amber-900/20 border border-amber-300/30 dark:border-amber-700/30 text-[10px] font-mono text-amber-800 dark:text-amber-200">
-                    <span className="font-bold text-amber-600 dark:text-amber-400 text-[9px] uppercase tracking-wider">Suggested: </span>
-                    {JSON.stringify(ann.suggestedContent.text || ann.suggestedContent)}
-                  </div>
-                )}
-
-                {/* Student Actions */}
-                {!isTeacher && (
-                  <div className="pl-[22px] flex items-center gap-2 pt-0.5">
-                    {ann.type === "Suggestion" && ann.status !== "resolved" && onApplySuggestion && (
-                      <Button
-                        size="sm"
-                        onClick={() => onApplySuggestion(ann.id)}
-                        className="h-6 text-[10px] font-bold rounded-md gap-1 bg-emerald-600 hover:bg-emerald-500 text-white border-0 cursor-pointer"
-                      >
-                        <CheckCircle className="size-2.5" />
-                        Accept
-                      </Button>
-                    )}
-                    {ann.type === "Suggestion" && ann.status !== "resolved" && (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-6 text-[10px] font-medium rounded-md text-muted-foreground hover:text-foreground cursor-pointer"
-                      >
-                        Dismiss
-                      </Button>
-                    )}
-                    {ann.type === "Warning" && ann.status !== "resolved" && (
-                      <span className="text-[10px] font-semibold text-rose-500/80 flex items-center gap-1">
-                        <AlertTriangle className="size-2.5" />
-                        Action required
-                      </span>
-                    )}
-                    {ann.type === "Approval" && (
-                      <span className="text-[10px] font-semibold text-emerald-500/80 flex items-center gap-1">
-                        <CheckCircle className="size-2.5" />
-                        Approved by teacher
-                      </span>
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+        <div className="mt-2.5 flex flex-col gap-4 animate-in fade-in slide-in-from-top-1 duration-200">
+          {treeRoots.map((rootNode) => (
+            <RootThreadNode
+              key={rootNode.comment.id}
+              node={rootNode}
+              isTeacher={isTeacher}
+              userInitial={userInitial}
+              activeReplyTargetId={activeReplyTargetId}
+              setActiveReplyTargetId={setActiveReplyTargetId}
+              replyText={replyText}
+              setReplyText={setReplyText}
+              expandedThreads={expandedThreads}
+              setExpandedThreads={setExpandedThreads}
+              onReplyQuestion={onReplyQuestion}
+              onApplySuggestion={onApplySuggestion}
+              onRejectSuggestion={onRejectSuggestion}
+              onResolveAnnotation={onResolveAnnotation}
+            />
+          ))}
         </div>
       )}
     </div>
