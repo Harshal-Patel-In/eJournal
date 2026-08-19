@@ -170,6 +170,8 @@ export default function NotificationBell() {
   const router = useRouter();
   const queryClient = useQueryClient();
 
+  const [bellPulsing, setBellPulsing] = useState(false);
+
   // Close dropdown on outside click
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -181,11 +183,96 @@ export default function NotificationBell() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Real-Time WebSocket Notification Streaming
+  useEffect(() => {
+    let ws: WebSocket | null = null;
+    let reconnectTimer: any = null;
+    let isMounted = true;
+
+    function connect() {
+      if (typeof window === "undefined" || !isMounted) return;
+
+      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+      const host = process.env.NEXT_PUBLIC_WS_HOST || "localhost:8000";
+      const wsUrl = `${protocol}//${host}/api/v1/notifications/ws`;
+
+      try {
+        ws = new WebSocket(wsUrl);
+
+        ws.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            if (data.type === "NEW_NOTIFICATION") {
+              // 1. Immediately invalidate TanStack cache for zero-latency UI update
+              queryClient.invalidateQueries({ queryKey: ["notifications"] });
+
+              // 2. Trigger bell animation pulse
+              setBellPulsing(true);
+              setTimeout(() => setBellPulsing(false), 2500);
+
+              // 3. Play gentle harmonic chime
+              try {
+                const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+                if (AudioCtx) {
+                  const ctx = new AudioCtx();
+                  const osc = ctx.createOscillator();
+                  const gain = ctx.createGain();
+                  osc.type = "sine";
+                  osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
+                  osc.frequency.setValueAtTime(880, ctx.currentTime + 0.08); // A5
+                  gain.gain.setValueAtTime(0.06, ctx.currentTime);
+                  gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.35);
+                  osc.connect(gain);
+                  gain.connect(ctx.destination);
+                  osc.start();
+                  osc.stop(ctx.currentTime + 0.35);
+                }
+              } catch (audioErr) {
+                // Audio autoplay restriction ignored safely
+              }
+            }
+          } catch (e) {
+            // ignore non-json keepalive messages
+          }
+        };
+
+        ws.onclose = () => {
+          if (isMounted) {
+            reconnectTimer = setTimeout(connect, 3000);
+          }
+        };
+
+        ws.onerror = () => {
+          ws?.close();
+        };
+      } catch (err) {
+        if (isMounted) {
+          reconnectTimer = setTimeout(connect, 5000);
+        }
+      }
+    }
+
+    connect();
+
+    const pingTimer = setInterval(() => {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send("ping");
+      }
+    }, 25000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(pingTimer);
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      if (ws) ws.close();
+    };
+  }, [queryClient]);
+
   // 1. Fetch user notifications
   const { data: response, isLoading } = useQuery<any>({
     queryKey: ["notifications"],
     queryFn: () => api.get("/notifications"),
-    refetchInterval: 15000, // Poll notifications every 15s to feel instant
+    refetchOnWindowFocus: true,
   });
 
   const notifications = Array.isArray(response) ? response : (response?.data || []);
@@ -283,8 +370,9 @@ export default function NotificationBell() {
       readMutation.mutate(notif.id);
     }
     setIsOpen(false);
-    if (notif.link) {
-      router.push(notif.link);
+    const targetUrl = notif.metadata?.actionUrl || notif.link;
+    if (targetUrl) {
+      router.push(targetUrl);
     }
   };
 
@@ -336,9 +424,11 @@ export default function NotificationBell() {
       {/* Trigger Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="relative size-8 rounded-full glass-btn-violet flex items-center justify-center hover:scale-105 active:scale-95 transition-all cursor-pointer focus:outline-none"
+        className={`relative size-8 rounded-full glass-btn-violet flex items-center justify-center hover:scale-105 active:scale-95 transition-all cursor-pointer focus:outline-none ${
+          bellPulsing ? "ring-2 ring-violet-500 scale-110 shadow-[0_0_15px_rgba(139,92,246,0.6)]" : ""
+        }`}
       >
-        <Bell className="size-4 text-violet-600 dark:text-violet-400" />
+        <Bell className={`size-4 text-violet-600 dark:text-violet-400 ${bellPulsing ? "rotate-12 transition-transform" : ""}`} />
         {unreadCount > 0 && (
           <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-bold text-white shadow-[0_0_10px_rgba(244,63,94,0.6)] animate-pulse">
             {unreadCount}

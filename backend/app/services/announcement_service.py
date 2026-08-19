@@ -32,18 +32,36 @@ class AnnouncementService:
             return
 
         notif_docs = []
+        target_student_ids = []
         now = datetime.now(timezone.utc)
+        link = f"/classrooms/{classroom_id}?tab=announcements"
+        metadata = {
+            "entityType": "classrooms",
+            "entityId": classroom_id,
+            "targetBatch": target_batch,
+            "actionUrl": link,
+            "category": "announcement",
+        }
+
         for m in memberships:
             student_id = m.get("studentId")
+            student_batch = m.get("batch")
             if not student_id:
                 continue
+
+            # Batch filtering: If targeted to specific batch, skip other batches
+            if target_batch and target_batch.strip() and student_batch and student_batch.strip().upper() != target_batch.strip().upper():
+                continue
+
+            target_student_ids.append(student_id)
             notif_docs.append(
                 {
                     "userId": student_id,
                     "title": f"Announcement in {classroom_name}",
                     "message": announcement_title,
                     "type": "announcement",
-                    "link": f"/classrooms/{classroom_id}",
+                    "link": link,
+                    "metadata": metadata,
                     "isRead": False,
                     "createdAt": now,
                 }
@@ -51,6 +69,25 @@ class AnnouncementService:
 
         if notif_docs:
             await self.notification_repo.insert_many(notif_docs)
+            try:
+                from app.core.websocket_manager import websocket_manager
+                await websocket_manager.broadcast_to_users(
+                    target_student_ids,
+                    {
+                        "type": "NEW_NOTIFICATION",
+                        "notification": {
+                            "title": f"Announcement in {classroom_name}",
+                            "message": announcement_title,
+                            "type": "announcement",
+                            "isRead": False,
+                            "link": link,
+                            "metadata": metadata,
+                            "createdAt": now.isoformat(),
+                        },
+                    },
+                )
+            except Exception:
+                pass
 
     async def create_announcement(
         self,

@@ -19,6 +19,7 @@ import {
   FileEdit,
   FileText,
   GraduationCap,
+  Loader2,
   Plus,
   Sparkles,
   Users,
@@ -505,15 +506,22 @@ export default function ClassroomPage({ params }: PageProps) {
                           }
 
                           if (!relatedJournal) {
+                            const isStartingThis = startJournalMutation.isPending && startJournalMutation.variables === asg.id;
                             return (
                               <Button
-                                asChild
                                 size="sm"
+                                onClick={() => startJournalMutation.mutate(asg.id)}
+                                disabled={startJournalMutation.isPending}
                                 className="font-semibold rounded-xl h-9 px-4 text-xs active:scale-95 transition-all duration-150 cursor-pointer md:self-center shrink-0"
                               >
-                                <Link href={`/editor/new?assignmentId=${asg.id}`}>
+                                {isStartingThis ? (
+                                  <span className="flex items-center gap-1.5">
+                                    <Loader2 className="size-3.5 animate-spin" />
+                                    <span>Starting...</span>
+                                  </span>
+                                ) : (
                                   <span>Start Journal</span>
-                                </Link>
+                                )}
                               </Button>
                             );
                           }

@@ -64,6 +64,13 @@ export default function DashboardPage() {
     enabled: !!user,
   });
 
+  // 2b. Fetch student academic analytics if student
+  const { data: analytics } = useQuery<any>({
+    queryKey: ["student-analytics"],
+    queryFn: () => api.get("/analytics/student"),
+    enabled: !!user && user.role === "student",
+  });
+
   // 3. Join classroom mutation (Student only)
   const joinMutation = useMutation({
     mutationFn: (data: JoinClassroomFields) => api.post("/classrooms/join", data),
@@ -269,6 +276,63 @@ export default function DashboardPage() {
         {errorMsg && (
           <div className="p-4 rounded-xl bg-destructive/10 text-destructive text-sm font-medium border border-destructive/20 max-w-md">
             {errorMsg}
+          </div>
+        )}
+
+        {/* Student Academic Progress & Performance Summary Widget */}
+        {isStudent && analytics && analytics.totalAssigned > 0 && (
+          <div className="p-6 rounded-3xl glass-card border border-border/80 shadow-md flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+            <div className="flex flex-col gap-2 max-w-md w-full">
+              <div className="flex items-center gap-2">
+                <Sparkles className="size-4 text-indigo-500" />
+                <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                  Continuous Assessment Tracker
+                </span>
+              </div>
+              <h3 className="text-lg font-extrabold text-foreground tracking-tight">
+                {analytics.completedApproved} of {analytics.totalAssigned} Lab Practicals Completed
+              </h3>
+              {/* Visual Progress Bar */}
+              <div className="w-full bg-muted/60 h-2.5 rounded-full overflow-hidden border border-border/40">
+                <div
+                  className="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-500 transition-all duration-500"
+                  style={{
+                    width: `${Math.min(
+                      100,
+                      Math.round((analytics.completedApproved / analytics.totalAssigned) * 100)
+                    )}%`,
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Quick Metrics Grid */}
+            <div className="grid grid-cols-3 gap-3 w-full md:w-auto">
+              <div className="p-3 rounded-2xl bg-muted/30 border border-border/40 flex flex-col items-center justify-center text-center">
+                <span className="text-xl font-extrabold text-emerald-600 dark:text-emerald-400">
+                  {analytics.cumulativeAverageScore}%
+                </span>
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mt-0.5">
+                  Avg. Score
+                </span>
+              </div>
+              <div className="p-3 rounded-2xl bg-muted/30 border border-border/40 flex flex-col items-center justify-center text-center">
+                <span className="text-xl font-extrabold text-indigo-600 dark:text-indigo-400">
+                  {analytics.submittedPending}
+                </span>
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mt-0.5">
+                  In Review
+                </span>
+              </div>
+              <div className="p-3 rounded-2xl bg-muted/30 border border-border/40 flex flex-col items-center justify-center text-center">
+                <span className="text-xl font-extrabold text-amber-600 dark:text-amber-400">
+                  {analytics.notStarted}
+                </span>
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mt-0.5">
+                  Pending
+                </span>
+              </div>
+            </div>
           </div>
         )}
 

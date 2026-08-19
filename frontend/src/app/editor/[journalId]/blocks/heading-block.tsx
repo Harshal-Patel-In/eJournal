@@ -2,6 +2,7 @@
 
 import { useDocumentStore } from "../use-document-store";
 import { applyMathShortcuts } from "@/lib/math-shortcuts";
+import { InlineMathText } from "@/components/inline-math-text";
 
 interface HeadingBlockProps {
   id: string;
@@ -18,9 +19,9 @@ export default function HeadingBlock({ id, content, previewMode }: HeadingBlockP
   const level = content.level || 1;
 
   if (previewMode) {
-    if (level === 1) return <h1 className="text-3xl font-extrabold tracking-tight mt-6 mb-3">{text}</h1>;
-    if (level === 2) return <h2 className="text-2xl font-bold tracking-tight mt-5 mb-2.5">{text}</h2>;
-    return <h3 className="text-xl font-semibold tracking-tight mt-4 mb-2">{text}</h3>;
+    if (level === 1) return <h1 className="text-3xl font-extrabold tracking-tight mt-6 mb-3"><InlineMathText text={text} /></h1>;
+    if (level === 2) return <h2 className="text-2xl font-bold tracking-tight mt-5 mb-2.5"><InlineMathText text={text} /></h2>;
+    return <h3 className="text-xl font-semibold tracking-tight mt-4 mb-2"><InlineMathText text={text} /></h3>;
   }
 
   return (

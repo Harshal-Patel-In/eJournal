@@ -497,13 +497,46 @@ class JournalService:
 
                 late_str = " (LATE SUBMISSION)" if is_late else ""
                 msg = f"{student_name} has handed in the journal for Experiment #{exp_num} in {classroom_name}{late_str}."
-                await notification_repo.create_notification(
+                link = f"/classrooms/{classroom['id']}/grades?assignment={assignment['id']}"
+                metadata = {
+                    "entityType": "journals",
+                    "entityId": journal_id,
+                    "classroomId": classroom["id"],
+                    "assignmentId": assignment["id"],
+                    "experimentNumber": exp_num,
+                    "actionUrl": link,
+                    "category": "submission",
+                }
+                notif_doc = await notification_repo.create_notification(
                     user_id=teacher_id,
                     title="Journal Submission",
                     message=msg,
                     type_str="submission",
-                    link=f"/classrooms/{classroom['id']}"
+                    link=link,
+                    metadata=metadata,
                 )
+
+                try:
+                    from app.core.websocket_manager import websocket_manager
+                    await websocket_manager.send_personal_notification(
+                        teacher_id,
+                        {
+                            "type": "NEW_NOTIFICATION",
+                            "notification": {
+                                "id": notif_doc["id"],
+                                "userId": teacher_id,
+                                "title": "Journal Submission",
+                                "message": msg,
+                                "type": "submission",
+                                "isRead": False,
+                                "link": link,
+                                "metadata": metadata,
+                                "createdAt": notif_doc["createdAt"].isoformat(),
+                            },
+                        },
+                    )
+                except Exception as ws_err:
+                    pass
 
                 teacher = await self.user_repo.find_by_id(teacher_id)
                 if teacher and teacher.get("email"):
@@ -671,13 +704,48 @@ class JournalService:
 
         from app.repositories.notification_repository import NotificationRepository
         notification_repo = NotificationRepository()
-        await notification_repo.create_notification(
+        exp_num = assignment.get("experimentNumber", 1)
+        changes_msg = f"Your teacher requested changes on Experiment #{exp_num}: '{payload.remarks}'"
+        changes_link = f"/editor/{journal_id}"
+        changes_metadata = {
+            "entityType": "journals",
+            "entityId": journal_id,
+            "classroomId": assignment["classroomId"],
+            "assignmentId": assignment["id"],
+            "experimentNumber": exp_num,
+            "actionUrl": changes_link,
+            "category": "review",
+        }
+        notif_doc = await notification_repo.create_notification(
             user_id=journal["studentId"],
             title="Changes Requested",
-            message=f"Your teacher requested changes on Experiment #{assignment.get('experimentNumber', 1)}: '{payload.remarks}'",
+            message=changes_msg,
             type_str="review",
-            link=f"/editor/{journal_id}",
+            link=changes_link,
+            metadata=changes_metadata,
         )
+
+        try:
+            from app.core.websocket_manager import websocket_manager
+            await websocket_manager.send_personal_notification(
+                journal["studentId"],
+                {
+                    "type": "NEW_NOTIFICATION",
+                    "notification": {
+                        "id": notif_doc["id"],
+                        "userId": journal["studentId"],
+                        "title": "Changes Requested",
+                        "message": changes_msg,
+                        "type": "review",
+                        "isRead": False,
+                        "link": changes_link,
+                        "metadata": changes_metadata,
+                        "createdAt": notif_doc["createdAt"].isoformat(),
+                    },
+                },
+            )
+        except Exception:
+            pass
 
         await self.audit_repo.log_event(
             user_id=teacher_id,
@@ -756,13 +824,49 @@ class JournalService:
         notification_repo = NotificationRepository()
         exp_num = assignment.get("experimentNumber", 1)
         max_marks = assignment.get("maxMarks", 10)
-        await notification_repo.create_notification(
+        approve_msg = f"Experiment #{exp_num} approved! Marks awarded: {payload.marks}/{max_marks}."
+        approve_link = f"/editor/{journal_id}"
+        approve_metadata = {
+            "entityType": "journals",
+            "entityId": journal_id,
+            "classroomId": assignment["classroomId"],
+            "assignmentId": assignment["id"],
+            "experimentNumber": exp_num,
+            "marksAwarded": payload.marks,
+            "maxMarks": max_marks,
+            "actionUrl": approve_link,
+            "category": "approval",
+        }
+        notif_doc = await notification_repo.create_notification(
             user_id=journal["studentId"],
             title="Journal Approved",
-            message=f"Experiment #{exp_num} approved! Marks awarded: {payload.marks}/{max_marks}.",
+            message=approve_msg,
             type_str="approval",
-            link=f"/editor/{journal_id}",
+            link=approve_link,
+            metadata=approve_metadata,
         )
+
+        try:
+            from app.core.websocket_manager import websocket_manager
+            await websocket_manager.send_personal_notification(
+                journal["studentId"],
+                {
+                    "type": "NEW_NOTIFICATION",
+                    "notification": {
+                        "id": notif_doc["id"],
+                        "userId": journal["studentId"],
+                        "title": "Journal Approved",
+                        "message": approve_msg,
+                        "type": "approval",
+                        "isRead": False,
+                        "link": approve_link,
+                        "metadata": approve_metadata,
+                        "createdAt": notif_doc["createdAt"].isoformat(),
+                    },
+                },
+            )
+        except Exception:
+            pass
 
         await self.audit_repo.log_event(
             user_id=teacher_id,
@@ -907,7 +1011,8 @@ class JournalService:
             return []
 
         journals = await self.journal_repo.find_many(
-            {"assignmentId": {"$in": assignment_ids}}
+            {"assignmentId": {"$in": assignment_ids}},
+            limit=1000,
         )
 
         assignment_map = {a["id"]: a for a in assignments}
@@ -915,12 +1020,15 @@ class JournalService:
         for j in journals:
             student = await self.user_repo.find_by_id(j["studentId"])
             student_profile = student.get("profile", {}) if student else {}
-            student_name = student_profile.get("name") or (student["email"] if student else "Student")
+            student_name = student_profile.get("name") or (student["name"] if student and "name" in student else None) or (student["email"] if student else "Student")
             enrollment = student_profile.get("enrollmentNumber") or "N/A"
 
             asg = assignment_map.get(j["assignmentId"], {})
             j["studentName"] = student_name
+            j["studentEmail"] = student.get("email") if student else None
             j["enrollmentNumber"] = enrollment
+            j["studentEnrollment"] = enrollment
+            j["studentBatch"] = student_profile.get("batch") or "N/A"
             j["experimentNumber"] = asg.get("experimentNumber", 1)
             j["assignmentTitle"] = asg.get("title", "Practical")
             j["maxMarks"] = asg.get("maxMarks", 10)

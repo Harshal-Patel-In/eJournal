@@ -1,10 +1,10 @@
 "use client";
 
 import { use, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
-import { Loader2, Plus, MessageSquare, History, CheckCircle2, Sparkles } from "lucide-react";
+import { Loader2, Plus, MessageSquare, History, CheckCircle2, Sparkles, AlertTriangle } from "lucide-react";
 
 import { api } from "@/lib/api";
 import { toast } from "@/lib/toast";
@@ -28,6 +28,8 @@ interface PageProps {
 export default function EditorPage({ params }: PageProps) {
   const { journalId } = use(params);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const assignmentIdParam = searchParams.get("assignmentId");
   const queryClient = useQueryClient();
 
   const [mounted, setMounted] = useState(false);
@@ -37,6 +39,29 @@ export default function EditorPage({ params }: PageProps) {
   const [showVersionDrawer, setShowVersionDrawer] = useState(false);
   const [activeAnnotationBlockId, setActiveAnnotationBlockId] = useState<string | null>(null);
   const [localRecoverySnapshot, setLocalRecoverySnapshot] = useState<any>(null);
+
+  // Handle auto-initialization for /editor/new?assignmentId=...
+  const createJournalMutation = useMutation({
+    mutationFn: (asgId: string) => api.post<any>("/journals", { assignmentId: asgId }),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["student-journals"] });
+      router.replace(`/editor/${data.id}`);
+    },
+    onError: (err: any) => {
+      toast.error(err.message || "Failed to initialize journal workspace");
+    },
+  });
+
+  useEffect(() => {
+    if (
+      journalId === "new" &&
+      assignmentIdParam &&
+      !createJournalMutation.isPending &&
+      !createJournalMutation.isSuccess
+    ) {
+      createJournalMutation.mutate(assignmentIdParam);
+    }
+  }, [journalId, assignmentIdParam]);
 
   const {
     blocks,
@@ -68,10 +93,11 @@ export default function EditorPage({ params }: PageProps) {
     queryFn: () => api.get("/profile"),
   });
 
-  // 2. Fetch Journal Details
+  // 2. Fetch Journal Details (only if not 'new')
   const { data: journal, isLoading: journalLoading, error: journalError, refetch: refetchJournal } = useQuery<any>({
     queryKey: ["journal", journalId],
     queryFn: () => api.get(`/journals/${journalId}`),
+    enabled: journalId !== "new",
     retry: false,
   });
 
@@ -260,17 +286,42 @@ export default function EditorPage({ params }: PageProps) {
     moveBlock(result.source.index, result.destination.index);
   };
 
-  if (!mounted || userLoading || journalLoading) {
+  if (
+    !mounted ||
+    userLoading ||
+    (journalId !== "new" && journalLoading) ||
+    (journalId === "new" && createJournalMutation.isPending)
+  ) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-background">
         <Loader2 className="size-8 animate-spin text-primary mb-3" />
-        <p className="text-sm text-muted-foreground animate-pulse">Loading Visual Workspace...</p>
+        <p className="text-sm text-muted-foreground animate-pulse">
+          {journalId === "new" ? "Initializing Document Workspace..." : "Loading Visual Workspace..."}
+        </p>
       </div>
     );
   }
 
-  if (journalError || !journal) {
-    return null;
+  if (journalError || (!journal && journalId !== "new")) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-background p-6 text-center">
+        <div className="p-8 max-w-md w-full rounded-3xl glass-card border border-border/80 flex flex-col items-center gap-4">
+          <div className="size-12 rounded-2xl bg-destructive/10 text-destructive flex items-center justify-center">
+            <AlertTriangle className="size-6" />
+          </div>
+          <h2 className="text-lg font-bold text-foreground">Journal Not Found</h2>
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            This journal could not be found or you do not have permission to view it.
+          </p>
+          <Button
+            onClick={() => router.push("/dashboard")}
+            className="rounded-xl px-5 text-xs font-semibold cursor-pointer"
+          >
+            Return to Dashboard
+          </Button>
+        </div>
+      </div>
+    );
   }
 
   const classroomId = assignment?.classroomId || "";
@@ -490,87 +541,113 @@ export default function EditorPage({ params }: PageProps) {
             )}
 
             {/* Document Blocks List */}
-            <div className="flex flex-col gap-4 w-full select-text">
-              {blocks.map((block, idx) => {
-                const blockAnns = annotations?.filter((a) => a.blockId === block.id) || [];
-                const hasAnnotations = blockAnns.length > 0;
-                const borderAccent = hasAnnotations ? getDominantBorderColor(blockAnns) : "";
-
-                return (
+            <DragDropContext onDragEnd={handleDragEnd}>
+              <Droppable droppableId="journal-blocks">
+                {(providedDroppable) => (
                   <div
-                    key={block.id}
-                    className={`flex flex-col relative group/block rounded-lg transition-all ${
-                      hasAnnotations
-                        ? `border-l-[3px] ${borderAccent} pl-3`
-                        : ""
-                    }`}
+                    ref={providedDroppable.innerRef}
+                    {...providedDroppable.droppableProps}
+                    className="flex flex-col gap-4 w-full select-text"
                   >
-                    <BlockRenderer
-                      id={block.id}
-                      type={block.type}
-                      content={block.content}
-                      previewMode={previewMode || isTeacher}
-                    />
+                    {blocks.map((block, idx) => {
+                      const blockAnns = annotations?.filter((a) => a.blockId === block.id) || [];
+                      const hasAnnotations = blockAnns.length > 0;
+                      const borderAccent = hasAnnotations ? getDominantBorderColor(blockAnns) : "";
 
-                    {/* Teacher: Hover-Only Annotation Trigger */}
-                    {isTeacher && (
-                      <div className="mt-1">
-                        <button
-                          onClick={() =>
-                            setActiveAnnotationBlockId(
-                              activeAnnotationBlockId === block.id ? null : block.id
-                            )
-                          }
-                          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all cursor-pointer ${
-                            activeAnnotationBlockId === block.id
-                              ? "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400"
-                              : "text-muted-foreground/0 group-hover/block:text-muted-foreground/60 hover:!text-indigo-500 hover:!bg-indigo-500/5"
-                          }`}
+                      return (
+                        <Draggable
+                          key={block.id}
+                          draggableId={block.id}
+                          index={idx}
+                          isDragDisabled={previewMode || isTeacher || !isEditable}
                         >
-                          <MessageSquare className="size-3" />
-                          <span>Annotate</span>
-                          {hasAnnotations && (
-                            <span className="ml-1 size-4 rounded-full bg-indigo-500/15 text-indigo-500 text-[9px] font-black flex items-center justify-center">
-                              {blockAnns.length}
-                            </span>
+                          {(providedDraggable) => (
+                            <div
+                              className={`flex flex-col relative group/block rounded-lg transition-all ${
+                                hasAnnotations
+                                  ? `border-l-[3px] ${borderAccent} pl-3`
+                                  : ""
+                              }`}
+                            >
+                              <BlockWrapper
+                                id={block.id}
+                                index={idx}
+                                provided={providedDraggable}
+                                previewMode={previewMode || isTeacher || !isEditable}
+                              >
+                                <BlockRenderer
+                                  id={block.id}
+                                  type={block.type}
+                                  content={block.content}
+                                  previewMode={previewMode || isTeacher}
+                                />
+                              </BlockWrapper>
+
+                              {/* Teacher: Hover-Only Annotation Trigger */}
+                              {isTeacher && (
+                                <div className="mt-1">
+                                  <button
+                                    onClick={() =>
+                                      setActiveAnnotationBlockId(
+                                        activeAnnotationBlockId === block.id ? null : block.id
+                                      )
+                                    }
+                                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all cursor-pointer ${
+                                      activeAnnotationBlockId === block.id
+                                        ? "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400"
+                                        : "text-muted-foreground/0 group-hover/block:text-muted-foreground/60 hover:!text-indigo-500 hover:!bg-indigo-500/5"
+                                    }`}
+                                  >
+                                    <MessageSquare className="size-3" />
+                                    <span>Annotate</span>
+                                    {hasAnnotations && (
+                                      <span className="ml-1 size-4 rounded-full bg-indigo-500/15 text-indigo-500 text-[9px] font-black flex items-center justify-center">
+                                        {blockAnns.length}
+                                      </span>
+                                    )}
+                                  </button>
+
+                                  {activeAnnotationBlockId === block.id && (
+                                    <div className="mt-1.5">
+                                      <AnnotationToolbar
+                                        blockId={block.id}
+                                        onAddAnnotation={(type, content) =>
+                                          addAnnotationMutation.mutate({ blockId: block.id, type, content })
+                                        }
+                                        isSubmitting={addAnnotationMutation.isPending}
+                                        onClose={() => setActiveAnnotationBlockId(null)}
+                                      />
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* Collapsible Annotation Thread */}
+                              <BlockAnnotations
+                                annotations={blockAnns}
+                                isTeacher={isTeacher}
+                                currentUser={user}
+                                onApplySuggestion={(commentId) => applySuggestionMutation.mutate(commentId)}
+                                onReplyQuestion={(annotationId, replyText) =>
+                                  replyQuestionMutation.mutate({
+                                    blockId: block.id,
+                                    parentCommentId: annotationId,
+                                    message: replyText,
+                                  })
+                                }
+                                onRejectSuggestion={(commentId) => resolveAnnotationMutation.mutate(commentId)}
+                                onResolveAnnotation={(commentId) => resolveAnnotationMutation.mutate(commentId)}
+                              />
+                            </div>
                           )}
-                        </button>
-
-                        {activeAnnotationBlockId === block.id && (
-                          <div className="mt-1.5">
-                            <AnnotationToolbar
-                              blockId={block.id}
-                              onAddAnnotation={(type, content) =>
-                                addAnnotationMutation.mutate({ blockId: block.id, type, content })
-                              }
-                              isSubmitting={addAnnotationMutation.isPending}
-                              onClose={() => setActiveAnnotationBlockId(null)}
-                            />
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Collapsible Annotation Thread */}
-                    <BlockAnnotations
-                      annotations={blockAnns}
-                      isTeacher={isTeacher}
-                      currentUser={user}
-                      onApplySuggestion={(commentId) => applySuggestionMutation.mutate(commentId)}
-                      onReplyQuestion={(annotationId, replyText) =>
-                        replyQuestionMutation.mutate({
-                          blockId: block.id,
-                          parentCommentId: annotationId,
-                          message: replyText,
-                        })
-                      }
-                      onRejectSuggestion={(commentId) => resolveAnnotationMutation.mutate(commentId)}
-                      onResolveAnnotation={(commentId) => resolveAnnotationMutation.mutate(commentId)}
-                    />
+                        </Draggable>
+                      );
+                    })}
+                    {providedDroppable.placeholder}
                   </div>
-                );
-              })}
-            </div>
+                )}
+              </Droppable>
+            </DragDropContext>
 
             {!previewMode && isEditable && (
               <div className="pt-6 border-t border-border/40 flex justify-center">

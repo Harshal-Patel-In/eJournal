@@ -43,11 +43,15 @@ class BaseRepository:
     @staticmethod
     def _to_object_id(id_str: str) -> ObjectId:
         """Convert string ID to ObjectId for queries."""
+        if not id_str or not ObjectId.is_valid(id_str):
+            raise ValueError(f"Invalid ObjectId string: {id_str}")
         return ObjectId(id_str)
 
     async def find_by_id(self, id_str: str) -> dict | None:
         """Find a document by its ID."""
-        doc = self.collection.find_one({"_id": self._to_object_id(id_str)})
+        if not id_str or not ObjectId.is_valid(id_str):
+            return None
+        doc = self.collection.find_one({"_id": ObjectId(id_str)})
         return self._to_str_id(doc)
 
     async def find_one(

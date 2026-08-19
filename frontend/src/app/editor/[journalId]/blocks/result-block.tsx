@@ -2,6 +2,8 @@
 
 import { Award } from "lucide-react";
 import { useDocumentStore } from "../use-document-store";
+import { applyMathShortcuts } from "@/lib/math-shortcuts";
+import { InlineMathText } from "@/components/inline-math-text";
 
 interface ResultBlockProps {
   id: string;
@@ -22,7 +24,7 @@ export default function ResultBlock({ id, content, previewMode }: ResultBlockPro
           <Award className="size-3.5" /> Experiment Result
         </span>
         <p className="text-sm font-semibold leading-relaxed text-emerald-950/90 dark:text-emerald-100/90 whitespace-pre-wrap">
-          {text || <span className="text-emerald-400/50 italic">No result statement logged</span>}
+          {text ? <InlineMathText text={text} /> : <span className="text-emerald-400/50 italic">No result statement logged</span>}
         </p>
       </div>
     );
@@ -35,7 +37,10 @@ export default function ResultBlock({ id, content, previewMode }: ResultBlockPro
       </span>
       <textarea
         value={text}
-        onChange={(e) => updateBlock(id, { text: e.target.value })}
+        onChange={(e) => {
+          const val = applyMathShortcuts(e.target.value);
+          updateBlock(id, { text: val });
+        }}
         placeholder="Enter final calculation results, validation outcomes, or deductions..."
         rows={3}
         className="w-full bg-transparent border-0 border-b border-emerald-200/30 dark:border-emerald-900/10 focus:border-emerald-500/50 focus:ring-0 focus:outline-none text-sm py-1 transition-all resize-none font-semibold text-emerald-900 dark:text-emerald-200"

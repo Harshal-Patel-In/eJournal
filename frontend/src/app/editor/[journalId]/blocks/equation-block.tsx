@@ -158,11 +158,13 @@ export default function EquationBlock({ id, content, previewMode }: EquationBloc
           <span className="text-[10px] font-bold text-muted-foreground uppercase select-none flex items-center gap-1">
             <Sparkles className="size-3 text-primary" /> Live Math Preview
           </span>
-          <div className="flex items-start justify-center min-h-[120px] max-h-[500px] px-4 py-3 rounded-md border border-border bg-muted/20 text-center font-serif select-all overflow-auto custom-scrollbar">
+          <div className="flex items-start justify-start min-h-[120px] max-h-[500px] px-4 py-3 rounded-md border border-border bg-muted/20 text-left font-serif select-all overflow-x-auto custom-scrollbar">
             {latex ? (
-              <KatexRenderer latex={latex} displayMode={true} />
+              <div className="w-full flex justify-center min-w-max">
+                <KatexRenderer latex={latex} displayMode={true} />
+              </div>
             ) : (
-              <span className="text-xs text-muted-foreground/60 italic font-sans select-none self-center">
+              <span className="text-xs text-muted-foreground/60 italic font-sans select-none self-center mx-auto">
                 Preview mathematical output...
               </span>
             )}

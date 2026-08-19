@@ -16,6 +16,7 @@ class NotificationResponse(BaseModel):
     type: str = Field(..., description="Notification category (e.g. assignment, submission)")
     isRead: bool = Field(..., description="Has student/teacher read this notification")
     link: str | None = Field(None, description="Optional relative UI path to route user click action")
+    metadata: dict | None = Field(None, description="Structured event metadata for deep-linking, filtering and categorizing")
     createdAt: datetime = Field(..., description="Time notification was dispatched")
 
     model_config = {

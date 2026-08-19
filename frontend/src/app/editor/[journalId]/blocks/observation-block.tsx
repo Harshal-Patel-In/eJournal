@@ -2,6 +2,8 @@
 
 import { Info } from "lucide-react";
 import { useDocumentStore } from "../use-document-store";
+import { applyMathShortcuts } from "@/lib/math-shortcuts";
+import { InlineMathText } from "@/components/inline-math-text";
 
 interface ObservationBlockProps {
   id: string;
@@ -22,7 +24,7 @@ export default function ObservationBlock({ id, content, previewMode }: Observati
           <Info className="size-3.5" /> Experimental Observation
         </span>
         <p className="text-sm leading-relaxed text-blue-950/80 dark:text-blue-100/80 whitespace-pre-wrap">
-          {text || <span className="text-blue-400/50 italic">No observation logged</span>}
+          {text ? <InlineMathText text={text} /> : <span className="text-blue-400/50 italic">No observation logged</span>}
         </p>
       </div>
     );
@@ -35,7 +37,10 @@ export default function ObservationBlock({ id, content, previewMode }: Observati
       </span>
       <textarea
         value={text}
-        onChange={(e) => updateBlock(id, { text: e.target.value })}
+        onChange={(e) => {
+          const val = applyMathShortcuts(e.target.value);
+          updateBlock(id, { text: val });
+        }}
         placeholder="Enter experimental variables, sensor readings, or data notes observed..."
         rows={3}
         className="w-full bg-transparent border-0 border-b border-blue-200/30 dark:border-blue-900/10 focus:border-blue-500/50 focus:ring-0 focus:outline-none text-sm py-1 transition-all resize-none"

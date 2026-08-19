@@ -92,15 +92,47 @@ class AssignmentService:
             if not student:
                 continue
 
-            # 1. Dispatch In-App Notification
-            msg = f"Experiment {request.experimentNumber}: {request.title} has been published in {classroom['name']}."
-            await notification_repo.create_notification(
+            # 1. Dispatch In-App Notification & WebSocket
+            msg = f"Experiment #{request.experimentNumber}: {request.title} has been published in {classroom['name']}."
+            link = f"/classrooms/{classroom_id}"
+            metadata = {
+                "entityType": "classrooms",
+                "entityId": classroom_id,
+                "assignmentId": assignment_id,
+                "experimentNumber": request.experimentNumber,
+                "actionUrl": link,
+                "category": "assignment",
+            }
+            notif_doc = await notification_repo.create_notification(
                 user_id=student_id,
                 title="New Assignment Published",
                 message=msg,
                 type_str="assignment",
-                link=f"/classrooms/{classroom_id}"
+                link=link,
+                metadata=metadata,
             )
+
+            try:
+                from app.core.websocket_manager import websocket_manager
+                await websocket_manager.send_personal_notification(
+                    student_id,
+                    {
+                        "type": "NEW_NOTIFICATION",
+                        "notification": {
+                            "id": notif_doc["id"],
+                            "userId": student_id,
+                            "title": "New Assignment Published",
+                            "message": msg,
+                            "type": "assignment",
+                            "isRead": False,
+                            "link": link,
+                            "metadata": metadata,
+                            "createdAt": notif_doc["createdAt"].isoformat(),
+                        },
+                    },
+                )
+            except Exception:
+                pass
 
             # 2. Dispatch Email Notification
             email_subject = f"New Lab Assignment: {request.title} (Exp #{request.experimentNumber})"

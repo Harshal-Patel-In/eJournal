@@ -14,9 +14,16 @@ class NotificationRepository(BaseRepository):
     collection_name = "notifications"
 
     async def create_notification(
-        self, user_id: str, title: str, message: str, type_str: str, link: str | None = None
-    ) -> str:
-        """Create a new user notification."""
+        self,
+        user_id: str,
+        title: str,
+        message: str,
+        type_str: str,
+        link: str | None = None,
+        metadata: dict | None = None,
+    ) -> dict:
+        """Create a new user notification and return the created record."""
+        now = datetime.now(timezone.utc)
         doc = {
             "userId": user_id,
             "title": title,
@@ -24,9 +31,43 @@ class NotificationRepository(BaseRepository):
             "type": type_str,
             "isRead": False,
             "link": link,
-            "createdAt": datetime.now(timezone.utc),
+            "metadata": metadata or {},
+            "createdAt": now,
         }
-        return await self.insert_one(doc)
+        notif_id = await self.insert_one(doc)
+        doc["id"] = notif_id
+        return doc
+
+    async def create_many_notifications(
+        self,
+        user_ids: list[str],
+        title: str,
+        message: str,
+        type_str: str,
+        link: str | None = None,
+        metadata: dict | None = None,
+    ) -> list[dict]:
+        """Create notifications for multiple users efficiently."""
+        if not user_ids:
+            return []
+        now = datetime.now(timezone.utc)
+        docs = [
+            {
+                "userId": uid,
+                "title": title,
+                "message": message,
+                "type": type_str,
+                "isRead": False,
+                "link": link,
+                "metadata": metadata or {},
+                "createdAt": now,
+            }
+            for uid in user_ids
+        ]
+        result = self.collection.insert_many(docs)
+        for i, doc in enumerate(docs):
+            doc["id"] = str(result.inserted_ids[i])
+        return docs
 
     async def find_by_user_id(self, user_id: str, limit: int = 50) -> list[dict]:
         """Fetch notifications for a user, sorted by most recent first."""

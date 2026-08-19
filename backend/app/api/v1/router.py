@@ -14,6 +14,7 @@ from app.api.v1.journal import router as journal_router
 from app.api.v1.upload import router as upload_router
 from app.api.v1.notification import router as notification_router
 from app.api.v1.comment import router as comment_router
+from app.api.v1.gradebook import router as gradebook_router
 
 api_v1_router = APIRouter()
 
@@ -43,6 +44,9 @@ api_v1_router.include_router(upload_router, tags=["Uploads"])
 
 # Notifications
 api_v1_router.include_router(notification_router, tags=["Notifications"])
+
+# Gradebook & Analytics
+api_v1_router.include_router(gradebook_router, tags=["Gradebook"])
 
 
 
