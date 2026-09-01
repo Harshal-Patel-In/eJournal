@@ -19,10 +19,12 @@ import {
   FileEdit,
   FileText,
   GraduationCap,
+  LayoutGrid,
   Loader2,
   Plus,
   Sparkles,
   Users,
+  User,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -229,6 +231,11 @@ export default function ClassroomPage({ params }: PageProps) {
         <div className="flex items-center gap-3">
           <ThemeToggle />
           <NotificationBell />
+          <Link href="/profile" title="View & Edit Academic Profile">
+            <div className="size-7 rounded-full bg-primary/15 text-primary border border-primary/25 hover:border-primary/50 flex items-center justify-center font-bold text-xs cursor-pointer transition-all hover:scale-105 active:scale-95 shadow-2xs">
+              <User className="size-3.5" />
+            </div>
+          </Link>
           <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-muted/80 text-foreground border border-border uppercase">
             {classroom.subject}
           </span>
@@ -276,78 +283,138 @@ export default function ClassroomPage({ params }: PageProps) {
 
         {/* Tab switcher & Action bar */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-b border-border/80 pb-3">
-          <div className="flex items-center p-1.5 glass-pill rounded-2xl max-w-fit gap-1">
+          {/* Segmented Control Pill (Locked Height, Zero-Jitter, No Scrollbar) */}
+          <div className="flex items-center p-1 glass-pill rounded-2xl max-w-fit gap-1 shrink-0">
             <button
               onClick={() => setActiveTab("assignments")}
-              className={`flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold rounded-xl transition-all cursor-pointer ${
+              className={`flex items-center gap-1.5 h-8 px-3 text-xs font-semibold rounded-xl transition-all cursor-pointer whitespace-nowrap ${
                 activeTab === "assignments"
                   ? "bg-background text-foreground shadow-xs font-bold"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              <FileText className="size-3.5" />
-              <span>Practicals ({assignments?.length || 0})</span>
+              <FileText className={`size-3.5 ${activeTab === "assignments" ? "text-primary" : "text-muted-foreground"}`} />
+              <span>Practicals</span>
+              <span className={`px-1.5 py-0.2 rounded-full font-mono text-[10px] font-bold ${
+                activeTab === "assignments" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
+              }`}>
+                {assignments?.length || 0}
+              </span>
             </button>
 
             <button
               onClick={() => setActiveTab("announcements")}
-              className={`flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold rounded-xl transition-all cursor-pointer ${
+              className={`flex items-center gap-1.5 h-8 px-3 text-xs font-semibold rounded-xl transition-all cursor-pointer whitespace-nowrap ${
                 activeTab === "announcements"
                   ? "bg-background text-foreground shadow-xs font-bold"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              <Sparkles className="size-3.5 text-amber-500" />
-              <span>Announcements ({announcements?.length || 0})</span>
+              <Sparkles className={`size-3.5 ${activeTab === "announcements" ? "text-amber-500" : "text-muted-foreground"}`} />
+              <span>Announcements</span>
+              <span className={`px-1.5 py-0.2 rounded-full font-mono text-[10px] font-bold ${
+                activeTab === "announcements" ? "bg-amber-500/10 text-amber-500" : "bg-muted text-muted-foreground"
+              }`}>
+                {announcements?.length || 0}
+              </span>
             </button>
 
             {isTeacher && (
               <button
                 onClick={() => setActiveTab("submissions")}
-                className={`flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold rounded-xl transition-all cursor-pointer ${
+                className={`flex items-center gap-1.5 h-8 px-3 text-xs font-semibold rounded-xl transition-all cursor-pointer whitespace-nowrap ${
                   activeTab === "submissions"
                     ? "bg-background text-foreground shadow-xs font-bold"
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
-                <GraduationCap className="size-3.5 text-indigo-500" />
-                <span>Submissions & Grading</span>
+                <GraduationCap className={`size-3.5 ${activeTab === "submissions" ? "text-indigo-500" : "text-muted-foreground"}`} />
+                <span>Gradebook</span>
               </button>
             )}
+
             <button
               onClick={() => setActiveTab("roster")}
-              className={`flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold rounded-xl transition-all cursor-pointer ${
+              className={`flex items-center gap-1.5 h-8 px-3 text-xs font-semibold rounded-xl transition-all cursor-pointer whitespace-nowrap ${
                 activeTab === "roster"
                   ? "bg-background text-foreground shadow-xs font-bold"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              <Users className="size-3.5" />
-              <span>Roster Members</span>
+              <Users className={`size-3.5 ${activeTab === "roster" ? "text-primary" : "text-muted-foreground"}`} />
+              <span>Members</span>
             </button>
           </div>
 
-          {isTeacher && activeTab === "assignments" && (
-            <Button
-              onClick={() => setShowPublishModal(true)}
-              size="sm"
-              className="gap-1.5 text-xs font-semibold rounded-xl h-9 px-4 active:scale-95 transition-all duration-150 cursor-pointer"
-            >
-              <Plus className="size-3.5" />
-              <span>Publish Experiment</span>
-            </Button>
-          )}
+          {/* Contextual Action Group (Visually Stable on Every Tab) */}
+          <div className="flex items-center gap-2 shrink-0 flex-wrap">
+            {/* When on Practicals: Download Journal & Publish Experiment */}
+            {activeTab === "assignments" && (
+              <>
+                <Link href={`/classrooms/${classroomId}/compile-journal`}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2 text-xs font-bold rounded-xl h-9 px-3.5 active:scale-95 transition-all cursor-pointer bg-primary/5 hover:bg-primary/10 text-primary border-primary/25 shadow-2xs whitespace-nowrap"
+                    title="Compile all practical experiments into an official master lab manual"
+                  >
+                    <BookOpen className="size-3.5" />
+                    <span>Download Complete Journal</span>
+                  </Button>
+                </Link>
 
-          {isTeacher && activeTab === "announcements" && (
-            <Button
-              onClick={() => setShowAnnouncementModal(true)}
-              size="sm"
-              className="gap-1.5 text-xs font-semibold rounded-xl h-9 px-4 active:scale-95 transition-all duration-150 cursor-pointer glass-btn-amber"
-            >
-              <Plus className="size-3.5" />
-              <span>Post Announcement</span>
-            </Button>
-          )}
+                {isTeacher && (
+                  <Button
+                    onClick={() => setShowPublishModal(true)}
+                    size="sm"
+                    className="gap-1.5 text-xs font-semibold rounded-xl h-9 px-4 active:scale-95 transition-all duration-150 cursor-pointer whitespace-nowrap"
+                  >
+                    <Plus className="size-3.5" />
+                    <span>Publish Experiment</span>
+                  </Button>
+                )}
+              </>
+            )}
+
+            {/* When on Announcements: Post Announcement */}
+            {activeTab === "announcements" && isTeacher && (
+              <Button
+                onClick={() => setShowAnnouncementModal(true)}
+                size="sm"
+                className="gap-1.5 text-xs font-semibold rounded-xl h-9 px-4 active:scale-95 transition-all duration-150 cursor-pointer glass-btn-amber whitespace-nowrap"
+              >
+                <Plus className="size-3.5" />
+                <span>Post Announcement</span>
+              </Button>
+            )}
+
+            {/* When on Gradebook (Submissions): Full Gradebook Matrix link */}
+            {activeTab === "submissions" && isTeacher && (
+              <Link href={`/classrooms/${classroomId}/grades`}>
+                <Button
+                  size="sm"
+                  className="gap-1.5 text-xs font-semibold rounded-xl h-9 px-3.5 active:scale-95 transition-all cursor-pointer whitespace-nowrap"
+                >
+                  <LayoutGrid className="size-3.5" />
+                  <span>Full Gradebook Matrix</span>
+                </Button>
+              </Link>
+            )}
+
+            {/* When on Members (Roster): Copy Join Code quick action */}
+            {activeTab === "roster" && (
+              <Button
+                onClick={handleCopyCode}
+                variant="outline"
+                size="sm"
+                className="gap-1.5 text-xs font-semibold rounded-xl h-9 px-3.5 active:scale-95 transition-all cursor-pointer whitespace-nowrap border-border/80"
+                title="Copy student join code"
+              >
+                {copiedCode ? <Check className="size-3.5 text-emerald-500" /> : <Copy className="size-3.5 text-muted-foreground" />}
+                <span>{copiedCode ? "Code Copied!" : `Copy Code: ${classroom?.joinCode || ""}`}</span>
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* Error Messaging */}

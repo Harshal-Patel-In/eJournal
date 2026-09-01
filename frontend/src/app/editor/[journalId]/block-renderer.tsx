@@ -9,15 +9,17 @@ import ObservationBlock from "./blocks/observation-block";
 import ResultBlock from "./blocks/result-block";
 import ReferenceBlock from "./blocks/reference-block";
 import EquationBlock from "./blocks/equation-block";
+import GraphBlock from "./blocks/graph-block";
 
 interface BlockRendererProps {
   id: string;
   type: string;
   content: any;
   previewMode: boolean;
+  allBlocks?: any[];
 }
 
-export default function BlockRenderer({ id, type, content, previewMode }: BlockRendererProps) {
+export default function BlockRenderer({ id, type, content, previewMode, allBlocks }: BlockRendererProps) {
   switch (type) {
     case "heading":
       return <HeadingBlock id={id} content={content} previewMode={previewMode} />;
@@ -25,6 +27,8 @@ export default function BlockRenderer({ id, type, content, previewMode }: BlockR
       return <ParagraphBlock id={id} content={content} previewMode={previewMode} />;
     case "table":
       return <TableBlock id={id} content={content} previewMode={previewMode} />;
+    case "graph":
+      return <GraphBlock id={id} content={content} previewMode={previewMode} allBlocks={allBlocks} />;
     case "image":
       return <ImageBlock id={id} content={content} previewMode={previewMode} />;
     case "code":

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, Check, Eye, EyeOff, Save, Loader2, Send, Download, ChevronDown, RefreshCw, History, MessageSquare, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Check, Eye, EyeOff, Save, Loader2, Send, Download, ChevronDown, RefreshCw, History, MessageSquare, ShieldCheck, Printer } from "lucide-react";
 import { useDocumentStore } from "./use-document-store";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -46,20 +46,7 @@ export default function EditorToolbar({
     journalId,
   } = useDocumentStore();
 
-  const [showExportMenu, setShowExportMenu] = useState(false);
   const isEditable = status === "draft" || status === "changes_requested";
-
-  const handleExportClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
-    if (typeof window !== "undefined" && !navigator.onLine) {
-      e.preventDefault();
-      alert(
-        "⚠️ Internet Connection Offline\n\nPlease check your network connection before exporting your journal to ensure high-quality mathematical rendering."
-      );
-      setShowExportMenu(false);
-      return;
-    }
-    setShowExportMenu(false);
-  };
 
   return (
     <header className="fixed top-3 left-4 right-4 sm:left-16 sm:right-16 z-40 flex items-center justify-between px-4 py-2 bg-gradient-to-b from-white/90 via-white/80 to-white/70 dark:from-zinc-900/90 dark:via-zinc-900/85 dark:to-zinc-950/80 backdrop-blur-2xl backdrop-saturate-180 border border-white/80 dark:border-white/15 ring-1 ring-black/5 dark:ring-white/10 shadow-xl rounded-2xl select-none transition-all duration-300">
@@ -155,40 +142,18 @@ export default function EditorToolbar({
                 </Button>
               )}
 
-              {/* Export Dropdown */}
-              <div className="relative">
+              {/* 1-Click High-Fidelity PDF Export */}
+              <Link href={`/classrooms/${classroomId}/compile-journal?journalId=${journalId}`}>
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setShowExportMenu(!showExportMenu)}
-                  className="gap-1 text-xs font-semibold transition-all active:scale-95 cursor-pointer text-muted-foreground hover:text-foreground rounded-xl h-8"
+                  className="gap-1.5 text-xs font-bold transition-all active:scale-95 cursor-pointer text-foreground hover:bg-muted rounded-xl h-8 shadow-2xs"
+                  title="Preview and Export this journal as PDF"
                 >
-                  <Download className="size-3.5" />
-                  <span>Export</span>
-                  <ChevronDown className="size-3" />
+                  <Download className="size-3.5 text-primary" />
+                  <span>Export PDF</span>
                 </Button>
-
-                {showExportMenu && (
-                  <div className="absolute right-0 mt-2 w-48 rounded-2xl border border-border bg-background backdrop-blur-2xl shadow-2xl z-50 p-1.5 flex flex-col gap-1 select-none">
-                    <a
-                      href={`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1"}/journals/${journalId}/export/pdf`}
-                      download
-                      onClick={handleExportClick}
-                      className="w-full text-left px-3 py-2 text-xs font-semibold hover:bg-muted rounded-xl flex items-center gap-2 text-foreground transition-all cursor-pointer"
-                    >
-                      <span>📄</span> Export to PDF
-                    </a>
-                    <a
-                      href={`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1"}/journals/${journalId}/export/docx`}
-                      download
-                      onClick={handleExportClick}
-                      className="w-full text-left px-3 py-2 text-xs font-semibold hover:bg-muted rounded-xl flex items-center gap-2 text-foreground transition-all cursor-pointer"
-                    >
-                      <span>📝</span> Export to Word (.docx)
-                    </a>
-                  </div>
-                )}
-              </div>
+              </Link>
 
               <ThemeToggle />
 
@@ -263,40 +228,18 @@ export default function EditorToolbar({
                 </Button>
               )}
 
-              {/* Export Dropdown Menu */}
-              <div className="relative">
+              {/* 1-Click High-Fidelity PDF Export */}
+              <Link href={`/classrooms/${classroomId}/compile-journal?journalId=${journalId}`}>
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setShowExportMenu(!showExportMenu)}
-                  className="gap-1 text-xs font-semibold transition-all active:scale-95 cursor-pointer text-muted-foreground hover:text-foreground rounded-xl h-8"
+                  className="gap-1.5 text-xs font-bold transition-all active:scale-95 cursor-pointer text-foreground hover:bg-muted rounded-xl h-8 shadow-2xs"
+                  title="Preview and Export this journal as PDF"
                 >
-                  <Download className="size-3.5" />
-                  <span>Export</span>
-                  <ChevronDown className="size-3" />
+                  <Download className="size-3.5 text-primary" />
+                  <span>Export PDF</span>
                 </Button>
-
-                {showExportMenu && (
-                  <div className="absolute right-0 mt-2 w-48 rounded-2xl border border-border bg-background backdrop-blur-2xl shadow-2xl z-50 p-1.5 flex flex-col gap-1 select-none">
-                    <a
-                      href={`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1"}/journals/${journalId}/export/pdf`}
-                      download
-                      onClick={handleExportClick}
-                      className="w-full text-left px-3 py-2 text-xs font-semibold hover:bg-muted rounded-xl flex items-center gap-2 text-foreground transition-all cursor-pointer"
-                    >
-                      <span>📄</span> Export to PDF
-                    </a>
-                    <a
-                      href={`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1"}/journals/${journalId}/export/docx`}
-                      download
-                      onClick={handleExportClick}
-                      className="w-full text-left px-3 py-2 text-xs font-semibold hover:bg-muted rounded-xl flex items-center gap-2 text-foreground transition-all cursor-pointer"
-                    >
-                      <span>📝</span> Export to Word (.docx)
-                    </a>
-                  </div>
-                )}
-              </div>
+              </Link>
 
               <ThemeToggle />
 

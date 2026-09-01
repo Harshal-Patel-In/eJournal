@@ -14,9 +14,12 @@ interface KatexRendererProps {
  * - Auto-aligns multi-line derivations along '=' (Column 1 = variable, Column 2 = &= expression)
  * - 1:1 Natural Spacing Engine (every space typed is visible)
  * - Auto-scales parentheses \left( ... \right) around fractions
- * - Auto-converts Greek words (omega -> \omega, pi -> \pi, theta -> \theta)
- * - Protects physical units (15 m/s, 9.8 m/s^2, 4.098 V, 30 deg, 100 kHz)
- * - Auto-groups subscripts (V_out -> V_{out}, R_1 -> R_{1})
+ * - Auto-converts Greek words (omega -> \omega, pi -> \pi, theta -> \theta, Omega -> \Omega, Delta -> \Delta)
+ * - Normalizes Unicode Greek & Subscripts (Δ -> \Delta, Ω -> \Omega, Vᵢₙ -> V_{in})
+ * - Protects physical units (15 m/s, 9.8 m/s^2, 4.098 V, 30 deg, 100 kHz, (mA), (mW), (\Omega))
+ * - Auto-groups subscripts (V_out -> V_{out}, R_1 -> R_{1}, R_eq -> R_{eq})
+ * - Trigonometric & math functions (cos(\theta), sin(\omega t), sqrt(...))
+ * - Normalizes temperature degree notations ((^\circ C) -> (^{\circ}\text{C}))
  */
 export function formatLatexForKatex(input: string): string {
   if (!input) return "";
@@ -27,7 +30,47 @@ export function formatLatexForKatex(input: string): string {
     return processed;
   }
 
-  // 1. Greek letter shortcut conversion (e.g. "omega" -> "\omega", "mu" -> "\mu", "pi" -> "\pi")
+  // 0a. Clean corrupted backslashes before Unicode chars (e.g. "\Δ" -> "\Delta", "\Ω" -> "\Omega", "\θ" -> "\theta")
+  processed = processed.replace(/\\Δ/g, "\\Delta ");
+  processed = processed.replace(/\\Ω/g, "\\Omega ");
+  processed = processed.replace(/\\θ/g, "\\theta ");
+  processed = processed.replace(/\\μ/g, "\\mu ");
+  processed = processed.replace(/\\π/g, "\\pi ");
+  processed = processed.replace(/\\α/g, "\\alpha ");
+  processed = processed.replace(/\\β/g, "\\beta ");
+  processed = processed.replace(/\\γ/g, "\\gamma ");
+
+  // 0b. Convert standalone Unicode Greek & math characters to LaTeX
+  processed = processed.replace(/Δ/g, "\\Delta ");
+  processed = processed.replace(/Ω/g, "\\Omega ");
+  processed = processed.replace(/θ/g, "\\theta ");
+  processed = processed.replace(/μ/g, "\\mu ");
+  processed = processed.replace(/π/g, "\\pi ");
+  processed = processed.replace(/α/g, "\\alpha ");
+  processed = processed.replace(/β/g, "\\beta ");
+  processed = processed.replace(/γ/g, "\\gamma ");
+  processed = processed.replace(/°C|^\circ\s*C/g, "^{\\circ}\\text{C}");
+  processed = processed.replace(/°|^\circ/g, "^{\\circ}");
+
+  // 0c. Normalize Unicode subscripts back to LaTeX (e.g. Vᵢₙ -> V_{in}, V₂ -> V_{2}, Rₑq -> R_{eq})
+  const UNICODE_SUB_MAP: Record<string, string> = {
+    "₀": "0", "₁": "1", "₂": "2", "₃": "3", "₄": "4", "₅": "5", "₆": "6", "₇": "7", "₈": "8", "₉": "9",
+    "₊": "+", "₋": "-", "₌": "=", "₍": "(", "₎": ")",
+    "ₐ": "a", "ₑ": "e", "ₕ": "h", "ᵢ": "i", "ⱼ": "j", "ₖ": "k", "ₗ": "l", "ₘ": "m", "ₙ": "n", "ₒ": "o", "ₚ": "p", "ᵣ": "r", "ₛ": "s", "ₜ": "t", "ᵤ": "u", "ᵥ": "v", "ₓ": "x", "ᵧ": "y"
+  };
+  processed = processed.replace(/([a-zA-Z0-9\\]+)([₀₁₂₃₄₅₆₇₈₉₊₋₌₍₎ₐₑₕᵢⱼₖₗₘₙₒₚᵣₛₜᵤᵥₓᵧ]+)/g, (_, base, subs) => {
+    const converted = subs.split("").map((c: string) => UNICODE_SUB_MAP[c] || c).join("");
+    return `${base}_{${converted}}`;
+  });
+
+  // 0d. Escape standalone '#' to '\#'
+  processed = processed.replace(/#/g, "\\#");
+
+  // 0e. Pre-normalize degree notations (e.g. "(^\circ C)", "^\circ C", "deg C")
+  processed = processed.replace(/\(\s*\^\\circ\s*C\s*\)/gi, "(^{\\circ}\\text{C})");
+  processed = processed.replace(/\^\\circ\s*C\b/gi, "^{\\circ}\\text{C}");
+
+  // 1. Greek letter shortcut conversion
   const GREEK_WORDS = [
     "alpha", "beta", "gamma", "delta", "epsilon", "zeta", "eta", "theta",
     "iota", "kappa", "lambda", "mu", "nu", "xi", "pi", "rho", "sigma",
@@ -39,7 +82,14 @@ export function formatLatexForKatex(input: string): string {
     processed = processed.replace(greekRegex, `$1\\${g}`);
   }
 
-  // 2. Math functions & comparison shortcuts
+  // 2. Trigonometric & mathematical functions (e.g. cos(\theta), sin(\omega t))
+  const MATH_FUNCS = ["cos", "sin", "tan", "sec", "csc", "cot", "arccos", "arcsin", "arctan", "exp", "ln", "log"];
+  for (const fn of MATH_FUNCS) {
+    const fnRegex = new RegExp(`(^|[^a-zA-Z\\\\])(${fn})(?=\\s*\\(|\\s*[a-zA-Z0-9])`, "g");
+    processed = processed.replace(fnRegex, `$1\\${fn}`);
+  }
+
+  // 3. Math shortcuts
   processed = processed.replace(/sqrt\(([^()]+)\)/g, "\\sqrt{$1}");
   processed = processed.replace(/<=\s*/g, "\\le ");
   processed = processed.replace(/>=\s*/g, "\\ge ");
@@ -47,14 +97,23 @@ export function formatLatexForKatex(input: string): string {
   processed = processed.replace(/!=\s*/g, "\\neq ");
   processed = processed.replace(/\s*\*\s*/g, " \\cdot ");
 
-  // 3. Shield Text & Physical Units
+  // 4. Shield Physical Units ONLY (never math symbols like \theta or \phi)
   const textBlocks: string[] = [];
   function saveTextBlock(content: string): string {
     textBlocks.push(content);
     return `__TXTB_${textBlocks.length - 1}__`;
   }
 
-  // Multi-character and standard units (only after numbers, or multi-char like m/s, deg, kHz)
+  // Units in parentheses (e.g. "(V)", "(mA)", "(mW)", "(Hz)", "(deg)", "(s)")
+  const KNOWN_UNITS_IN_PARENS = /^\s*(\bV\b|\bmV\b|\bkV\b|\bA\b|\bmA\b|\buA\b|\bW\b|\bmW\b|\bkW\b|\bHz\b|\bkHz\b|\bMHz\b|\bJ\b|\bkJ\b|\bN\b|\bPa\b|\bkPa\b|\bMPa\b|\bF\b|\buF\b|\bnF\b|\bpF\b|\bH\b|\bmH\b|\buH\b|\bs\b|\bms\b|\bus\b|\bns\b|\bkg\b|\bg\b|\bmg\b|\bm\b|\bcm\b|\bmm\b|\bdeg\b|\brad\b|\bohm\b|\bohms\b|m\/s\^2|m\/s|km\/h|rad\/s)\s*$/;
+  processed = processed.replace(/\(\s*([a-zA-Z0-9^/]+)\s*\)/g, (m, u) => {
+    if (KNOWN_UNITS_IN_PARENS.test(u)) {
+      return saveTextBlock(`\\text{(${u})}`);
+    }
+    return m;
+  });
+
+  // Multi-character and standard units (after numbers)
   const UNIT_PATTERN = /(\d+(?:\.\d+)?)\s*(m\/s\^2|m\/s|km\/h|rad\/s|cm\^2|mm\^2|m\^2|cm\^3|mm\^3|m\^3|kHz|MHz|GHz|THz|Hz|mV|kV|MV|V|mA|uA|kA|A|mW|kW|MW|GW|W|mJ|kJ|MJ|J|kPa|MPa|GPa|Pa|bar|pF|nF|uF|µF|mF|F|uH|µH|mH|H|k\\Omega|M\\Omega|\\Omega|ohm|ohms|deg|rad|sec|min|hrs|hr|s|ms|us|µs|ns|kg|mg|ug|µg|g|K|cal|kcal|dB|rpm)\b/g;
   processed = processed.replace(UNIT_PATTERN, (_, num, unit) => {
     const cleanNum = num ? `${num}\\ ` : "";
@@ -76,7 +135,7 @@ export function formatLatexForKatex(input: string): string {
     });
   }
 
-  // 4. Helper function to format an individual mathematical expression
+  // 5. Helper function to format an individual mathematical expression
   function formatExpression(str: string): string {
     let s = str;
 
@@ -95,9 +154,9 @@ export function formatLatexForKatex(input: string): string {
     // B. Auto-scaling parentheses: ( \frac{...}{...} ) -> \left( \frac{...}{...} \right)
     s = s.replace(/\(\s*(\\frac\{[^{}]*\}\{[^{}]*\})\s*\)/g, "\\left( $1 \\right)");
 
-    // C. Subscript grouping: V_out -> V_{out}
+    // C. Subscript grouping: V_out -> V_{out}, R_eq -> R_{eq}
     s = s.replace(/([a-zA-Z0-9\\]+)_([a-zA-Z0-9]+)/g, (m, base, sub) => {
-      if (base.endsWith("}") || base.includes("TXTB")) return m;
+      if (base.endsWith("}") || base.includes("TXTB") || base.startsWith("\\text")) return m;
       return `${base}_{${sub}}`;
     });
 
@@ -107,10 +166,10 @@ export function formatLatexForKatex(input: string): string {
     return s;
   }
 
-  // 5. Multi-line derivation splitting & alignment
+  // 6. Line processing and auto-alignment
   const isMultiLine = processed.includes("\n") || processed.includes("\\\\");
   const rawLines = isMultiLine ? processed.split(/\n|\\\\/) : [processed];
-  const formattedLines: string[] = [];
+  const formattedLines = [];
   let hasEqualsAlignment = false;
 
   for (let rawLine of rawLines) {
@@ -119,12 +178,10 @@ export function formatLatexForKatex(input: string): string {
 
     if (isMultiLine) {
       if (rawTrimmed.startsWith("=")) {
-        // Line starts with '=' (e.g. "= (10 / 12.2) * 5")
         hasEqualsAlignment = true;
         const rightPart = rawTrimmed.substring(1).trim();
         formattedLines.push(`&= ${formatExpression(rightPart)}`);
       } else if (rawTrimmed.includes("=") && !rawTrimmed.includes("\\le") && !rawTrimmed.includes("\\ge") && !rawTrimmed.includes("\\neq")) {
-        // Line has variable and '=' (e.g. "V_out = (R_2 / (R_1 + R_2)) * V_in")
         hasEqualsAlignment = true;
         const equalsIdx = rawTrimmed.indexOf("=");
         const leftPart = rawTrimmed.substring(0, equalsIdx).trim();

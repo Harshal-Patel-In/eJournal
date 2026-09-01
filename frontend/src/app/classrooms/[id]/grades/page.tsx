@@ -34,10 +34,13 @@ import {
   ChevronRight,
   Maximize2,
   Minimize2,
+  RotateCcw,
+  User,
 } from "lucide-react";
 
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { GlassDropdown, DropdownOption } from "@/components/ui/glass-dropdown";
 
 interface PageProps {
@@ -328,6 +331,12 @@ export default function ClassroomGradesPage({ params }: PageProps) {
           </div>
 
           <div className="flex items-center gap-2.5">
+            <ThemeToggle />
+            <Link href="/profile" title="View & Edit Academic Profile">
+              <div className="size-7 rounded-full bg-primary/15 text-primary border border-primary/25 hover:border-primary/50 flex items-center justify-center font-bold text-xs cursor-pointer transition-all hover:scale-105 active:scale-95 shadow-2xs">
+                <User className="size-3.5" />
+              </div>
+            </Link>
             <Button
               onClick={handleExportCsv}
               disabled={isExportingCsv}
@@ -466,30 +475,30 @@ export default function ClassroomGradesPage({ params }: PageProps) {
           </div>
         )}
 
-        {/* Single Unified Toolbar (Clean, minimal, 1-container) */}
-        <div className="p-3 rounded-2xl glass-card flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 border border-border/70 shadow-2xs">
-          {/* Left: Search Box */}
-          <div className="relative flex-1 max-w-md">
-            <Search className="size-3.5 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="Search student, enrollment, or email..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full h-8.5 pl-8.5 pr-7 rounded-xl bg-muted/40 border border-border/70 text-xs font-medium text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery("")}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              >
-                <X className="size-3" />
-              </button>
-            )}
-          </div>
+        {/* Single Unified Horizontal Toolbar (All in 1 Row) */}
+        <div className="p-2.5 rounded-2xl glass-card flex flex-wrap items-center justify-between gap-2.5 border border-border/70 shadow-2xs">
+          {/* Left Controls: Search Box + Status Filter Pills */}
+          <div className="flex flex-wrap items-center gap-2 flex-1 min-w-[280px]">
+            {/* Search Input */}
+            <div className="relative min-w-[180px] flex-1 max-w-xs">
+              <Search className="size-3.5 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Search student, enrollment, email..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full h-8.5 pl-8.5 pr-7 rounded-xl bg-muted/40 border border-border/70 text-xs font-medium text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
+                >
+                  <X className="size-3" />
+                </button>
+              )}
+            </div>
 
-          {/* Right: Controls Strip */}
-          <div className="flex flex-wrap items-center gap-2">
             {/* Status Segmented Control */}
             <div className="flex items-center p-0.5 bg-muted/50 rounded-xl border border-border/50 text-xs font-bold shrink-0">
               <button
@@ -543,34 +552,57 @@ export default function ClassroomGradesPage({ params }: PageProps) {
                 Draft
               </button>
             </div>
+          </div>
 
+          {/* Right Controls: Practical, Batch, Sort, Reset & Density */}
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
             {/* Practical Selector (In Submissions Mode) */}
             {activeTab === "submissions" && assignments && assignments.length > 0 && (
-              <GlassDropdown
-                value={selectedAssignment}
-                options={practicalOptions}
-                onChange={(val) => setSelectedAssignment(val)}
-                placeholder="Select Practical"
-              />
+              <div className="w-auto min-w-[160px] max-w-[220px]">
+                <GlassDropdown
+                  value={selectedAssignment}
+                  options={practicalOptions}
+                  onChange={(val) => setSelectedAssignment(val)}
+                  placeholder="Select Practical"
+                />
+              </div>
             )}
 
             {/* Batch Selector */}
             {((classroom?.batches && classroom.batches.length > 0) || (gradebookData?.summary?.availableBatches?.length > 0)) && (
-              <GlassDropdown
-                value={selectedBatch}
-                options={batchOptions}
-                onChange={(val) => setSelectedBatch(val)}
-                placeholder="Select Batch"
-              />
+              <div className="w-auto min-w-[110px] max-w-[150px]">
+                <GlassDropdown
+                  value={selectedBatch}
+                  options={batchOptions}
+                  onChange={(val) => setSelectedBatch(val)}
+                  placeholder="Select Batch"
+                />
+              </div>
             )}
 
             {/* Sorting Dropdown */}
-            <GlassDropdown
-              value={sortOption}
-              options={sortOptions}
-              onChange={(val) => setSortOption(val as SortOptionType)}
-              placeholder="Sort By"
-            />
+            <div className="w-auto min-w-[140px] max-w-[180px]">
+              <GlassDropdown
+                value={sortOption}
+                options={sortOptions}
+                onChange={(val) => setSortOption(val as SortOptionType)}
+                placeholder="Sort By"
+              />
+            </div>
+
+            {/* Reset Filters Pill */}
+            {isFiltersActive && (
+              <Button
+                onClick={handleResetFilters}
+                variant="ghost"
+                size="sm"
+                className="h-8.5 px-2.5 text-xs font-semibold text-muted-foreground hover:text-foreground gap-1.5 rounded-xl border border-border/50 cursor-pointer"
+                title="Reset active filters"
+              >
+                <RotateCcw className="size-3" />
+                <span>Reset</span>
+              </Button>
+            )}
 
             {/* Density Switcher (Matrix Mode) */}
             {activeTab === "matrix" && (
@@ -578,22 +610,12 @@ export default function ClassroomGradesPage({ params }: PageProps) {
                 onClick={() => setIsCompactDensity(!isCompactDensity)}
                 variant="ghost"
                 size="sm"
-                className="h-8.5 px-2 rounded-xl text-xs font-bold text-muted-foreground border border-border/60 hover:text-foreground"
+                className="h-8.5 px-2.5 rounded-xl text-xs font-bold text-muted-foreground border border-border/60 hover:text-foreground cursor-pointer shrink-0"
                 title={isCompactDensity ? "Switch to Comfortable spacing" : "Switch to Compact density"}
               >
                 {isCompactDensity ? <Maximize2 className="size-3.5" /> : <Minimize2 className="size-3.5" />}
-                <span className="ml-1 text-[11px] hidden sm:inline">{isCompactDensity ? "Spacious" : "Compact"}</span>
+                <span className="ml-1 text-xs">{isCompactDensity ? "Spacious" : "Compact"}</span>
               </Button>
-            )}
-
-            {/* Reset Filters */}
-            {isFiltersActive && (
-              <button
-                onClick={handleResetFilters}
-                className="text-xs font-bold text-primary hover:underline px-2 cursor-pointer shrink-0"
-              >
-                Reset
-              </button>
             )}
           </div>
         </div>
@@ -827,65 +849,73 @@ export default function ClassroomGradesPage({ params }: PageProps) {
                 )}
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {filteredSubmissions.map((sub: any) => {
                   const isApproved = sub.status === "approved";
                   const isChangesReq = sub.status === "changes_requested";
                   const isSubmitted = sub.status === "submitted" || sub.status === "late_submitted";
                   const isDraft = sub.status === "draft";
                   const isLate = sub.isLate;
+                  const initials = sub.studentName
+                    ? sub.studentName
+                        .split(" ")
+                        .map((n: string) => n[0])
+                        .join("")
+                        .toUpperCase()
+                        .slice(0, 2)
+                    : "ST";
 
                   return (
                     <div
                       key={sub.id}
-                      className="p-5 rounded-3xl glass-card flex flex-col justify-between gap-4 border border-border/80 hover:border-primary/40 transition-all shadow-sm group"
+                      className="p-5 rounded-3xl glass-card flex flex-col justify-between gap-4 border border-border/80 hover:border-primary/40 transition-all shadow-sm group hover:shadow-md"
                     >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex flex-col gap-0.5">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-bold text-foreground">{sub.studentName}</span>
-                            {sub.studentBatch && sub.studentBatch !== "N/A" && (
-                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-muted text-muted-foreground border border-border">
-                                {sub.studentBatch}
-                              </span>
-                            )}
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <div className="size-10 rounded-2xl bg-gradient-to-br from-primary/20 via-primary/10 to-primary/5 border border-primary/25 flex items-center justify-center font-bold text-xs text-primary shrink-0 shadow-inner">
+                            {initials}
                           </div>
-                          {sub.studentEmail && (
-                            <span className="text-[10px] font-mono text-muted-foreground/70">
-                              {sub.studentEmail}
+                          <div className="flex flex-col gap-0.5 min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="text-sm font-bold text-foreground truncate">{sub.studentName}</span>
+                              {sub.studentBatch && sub.studentBatch !== "N/A" && (
+                                <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-md bg-muted text-muted-foreground border border-border">
+                                  {sub.studentBatch}
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-xs text-muted-foreground font-mono font-medium">
+                              {sub.enrollmentNumber || sub.studentEnrollment || "24CS065"}
                             </span>
-                          )}
-                          <span className="text-xs text-muted-foreground font-medium">
-                            Enrollment: <span className="font-semibold text-foreground font-mono">{sub.enrollmentNumber || sub.studentEnrollment || "N/A"}</span>
-                          </span>
+                          </div>
                         </div>
 
                         {/* Status Badges */}
-                        <div className="flex flex-col items-end gap-1">
+                        <div className="flex flex-col items-end gap-1 shrink-0">
                           {isApproved ? (
-                            <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
-                              <CheckCircle2 className="size-3.5" />
-                              <span>Approved ({sub.marks || 0}/{sub.maxMarks || 10})</span>
+                            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
+                              <CheckCircle2 className="size-3" />
+                              <span>{sub.marks || 0}/{sub.maxMarks || 10}</span>
                             </span>
                           ) : isChangesReq ? (
-                            <span className="inline-flex items-center gap-1 text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2.5 py-1 rounded-full border border-amber-500/20">
-                              <FileEdit className="size-3.5" />
-                              <span>Changes Requested</span>
+                            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
+                              <FileEdit className="size-3" />
+                              <span>Revision</span>
                             </span>
                           ) : isSubmitted ? (
-                            <span className="inline-flex items-center gap-1 text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-500/10 px-2.5 py-1 rounded-full border border-indigo-500/20">
-                              <Clock className="size-3.5" />
+                            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded-full border border-indigo-500/20">
+                              <Clock className="size-3" />
                               <span>Submitted</span>
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 text-xs font-medium text-slate-600 dark:text-slate-400 bg-slate-500/10 px-2.5 py-1 rounded-full border border-slate-500/20">
-                              <span>In Progress (Draft)</span>
+                            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-600 dark:text-slate-400 bg-slate-500/10 px-2 py-0.5 rounded-full border border-slate-500/20">
+                              <span>Draft</span>
                             </span>
                           )}
                           {isLate && (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-rose-600 dark:text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded-full border border-rose-500/20">
-                              <AlertTriangle className="size-3" />
-                              <span>Late Submission</span>
+                            <span className="inline-flex items-center gap-1 text-[9px] font-extrabold text-rose-600 dark:text-rose-400 bg-rose-500/10 px-1.5 py-0.2 rounded-full border border-rose-500/20">
+                              <AlertTriangle className="size-2.5" />
+                              <span>Late</span>
                             </span>
                           )}
                         </div>
@@ -893,7 +923,7 @@ export default function ClassroomGradesPage({ params }: PageProps) {
 
                       {/* Assignment metadata */}
                       <div className="p-3 rounded-2xl bg-muted/40 flex flex-col gap-1 border border-border/50">
-                        <span className="text-xs font-bold text-foreground">
+                        <span className="text-xs font-bold text-foreground truncate">
                           Exp #{sub.experimentNumber}: {sub.assignmentTitle || sub.experimentTitle || "Practical"}
                         </span>
                         <div className="flex items-center justify-between text-[10px] text-muted-foreground">
@@ -905,8 +935,8 @@ export default function ClassroomGradesPage({ params }: PageProps) {
                       </div>
 
                       {/* Action Button */}
-                      <div className="flex items-center justify-end gap-2 pt-2 border-t border-border/40">
-                        <Button asChild size="sm" className="rounded-xl font-bold cursor-pointer">
+                      <div className="flex items-center justify-end gap-2 pt-1">
+                        <Button asChild size="sm" className="w-full rounded-xl font-bold cursor-pointer h-8 text-xs shadow-2xs">
                           <Link href={`/editor/${sub.id}`}>
                             {isApproved ? "View Evaluation" : isSubmitted ? "Grade Submission" : "View Journal"}
                           </Link>

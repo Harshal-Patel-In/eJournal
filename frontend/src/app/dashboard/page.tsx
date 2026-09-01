@@ -22,6 +22,7 @@ import {
   Plus,
   Sparkles,
   UserPlus,
+  User,
 } from "lucide-react";
 
 import { api } from "@/lib/api";
@@ -168,9 +169,20 @@ export default function DashboardPage() {
         <div className="flex items-center gap-3">
           <ThemeToggle />
           <NotificationBell />
-          <span className="hidden sm:inline text-xs font-medium text-muted-foreground">
-            Hello, <span className="font-semibold text-foreground">{userDisplayName}</span>
-          </span>
+
+          <Link href="/profile" title="View & Edit Academic Profile">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-2 text-xs font-semibold rounded-xl h-8 px-2.5 hover:bg-muted/80 text-foreground cursor-pointer transition-all hover:scale-105 active:scale-95 border border-border/50"
+            >
+              <div className="size-5 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold text-[10px]">
+                <User className="size-3" />
+              </div>
+              <span className="hidden sm:inline font-semibold">{userDisplayName}</span>
+            </Button>
+          </Link>
+
           <Button
             variant="destructive"
             size="sm"

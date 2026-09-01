@@ -326,3 +326,104 @@
   border: 1px solid rgba(167, 139, 250, 0.35);
   color: #a78bfa;
 }
+
+/* ==========================================================================
+   ACADEMIC PRINT & EXPORT ENGINE (@media print)
+   Standard ISO A4 Pagination (210mm x 297mm)
+   ========================================================================== */
+
+@page {
+  size: A4 portrait;
+  margin: 14mm 14mm 14mm 14mm;
+}
+
+@media print {
+  html, body {
+    background: #ffffff !important;
+    color: #18181b !important;
+    font-size: 11pt;
+    line-height: 1.5;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Completely suppress scrollbars in print */
+  * {
+    -ms-overflow-style: none !important;
+    scrollbar-width: none !important;
+  }
+  ::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+  }
+
+  /* Force table wrappers to never scroll or clip */
+  .overflow-x-auto,
+  div[class*="overflow-x-auto"],
+  div[class*="custom-scrollbar"] {
+    overflow: visible !important;
+    scrollbar-width: none !important;
+  }
+
+  /* Table strict proportional A4 auto-fit */
+  table {
+    width: 100% !important;
+    max-width: 100% !important;
+    table-layout: auto !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  th, td {
+    min-width: 0 !important;
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+  }
+
+  /* Hide UI chrome, toolbars, sidebars, floating popups */
+  .print\:hidden,
+  nav,
+  header,
+  aside,
+  button,
+  .floating-toolbox,
+  .conflict-dialog,
+  .toast-container {
+    display: none !important;
+  }
+
+  /* Page break controls */
+  .page-break-before {
+    page-break-before: always !important;
+    break-before: page !important;
+  }
+
+  .page-break-after {
+    page-break-after: always !important;
+    break-after: page !important;
+  }
+
+  .page-break-avoid,
+  table,
+  figure,
+  svg,
+  .graph-container,
+  .katex-display {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* Ensure card borders and shadows print cleanly */
+  .border, .border-border {
+    border-color: #d1d5db !important;
+  }
+
+  .bg-card, .bg-background, .bg-muted\/20, .bg-muted\/40 {
+    background-color: #ffffff !important;
+  }
+
+  .shadow-xs, .shadow-sm, .shadow-md, .shadow-xl, .shadow-2xl {
+    box-shadow: none !important;
+  }
+}

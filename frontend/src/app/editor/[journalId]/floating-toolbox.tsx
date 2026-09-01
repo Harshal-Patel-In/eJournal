@@ -16,6 +16,7 @@ import {
   FileDown,
   FileSymlink,
   Sigma,
+  LineChart,
   ChevronLeft,
   ChevronRight,
   Layers,
@@ -233,6 +234,31 @@ export default function FloatingToolbox() {
                 {!collapsed && (
                   <span className="text-xs font-semibold text-foreground group-hover:text-primary truncate">
                     Data Table
+                  </span>
+                )}
+              </button>
+
+              <button
+                onClick={() =>
+                  handleAdd("graph", {
+                    title: "Experimental Graph Plot",
+                    chartType: "scatter",
+                    showTrendline: true,
+                    showGrid: true,
+                  })
+                }
+                onMouseEnter={(e) => handleIconMouseEnter(e, "Graph Plot")}
+                onMouseLeave={handleIconMouseLeave}
+                className={`group flex items-center gap-2 px-2 py-1 rounded-lg text-left transition-all hover:bg-primary/10 border border-transparent hover:border-primary/20 cursor-pointer ${
+                  collapsed ? "justify-center" : ""
+                }`}
+              >
+                <div className="p-1 rounded-md bg-muted group-hover:bg-primary group-hover:text-primary-foreground text-foreground transition-all shrink-0">
+                  <LineChart className="size-3.5" />
+                </div>
+                {!collapsed && (
+                  <span className="text-xs font-semibold text-foreground group-hover:text-primary truncate">
+                    Graph Plot
                   </span>
                 )}
               </button>

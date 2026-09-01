@@ -384,12 +384,44 @@ export default function EditorPage({ params }: PageProps) {
         journalStatus={status}
       />
 
-      <div className="flex-1 flex w-full relative pt-16">
+      <div className="flex-1 flex w-full relative pt-16 print:pt-0">
         {/* Floating Toolbox (Students Only) */}
         {!isTeacher && !previewMode && <FloatingToolbox />}
 
         {/* Editor Main Canvas Wrapper */}
-        <main className="flex-1 w-full max-w-4xl mx-auto px-4 sm:px-6 lg:pl-20 xl:pl-24 py-8 flex flex-col gap-6 relative z-10">
+        <main className="flex-1 w-full max-w-4xl mx-auto px-4 sm:px-6 lg:pl-20 xl:pl-24 py-8 flex flex-col gap-6 relative z-10 print:p-0 print:m-0 print:max-w-none print:w-full">
+          {/* Academic Print-Only Single Journal Header */}
+          <div className="hidden print:flex flex-col border-b-2 border-black pb-4 mb-4 select-none">
+            <div className="flex justify-between items-start">
+              <div>
+                <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-zinc-500">
+                  LABORATORY EXPERIMENT RECORD
+                </span>
+                <h1 className="text-xl font-black text-black mt-0.5">{assignment?.title || title}</h1>
+                {assignment?.aim && (
+                  <p className="text-xs text-zinc-700 mt-1">
+                    <span className="font-bold">Aim: </span>{assignment.aim}
+                  </p>
+                )}
+              </div>
+              {journal?.marks !== undefined && journal?.marks !== null && (
+                <div className="text-right border-2 border-black px-3 py-1.5 rounded-sm">
+                  <div className="text-[10px] font-bold uppercase text-zinc-600">Grade Awarded</div>
+                  <div className="text-sm font-mono font-black text-black">
+                    {journal.marks} / {assignment?.maxMarks || 10}
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="flex items-center gap-4 text-[10px] font-mono text-zinc-600 border-t border-zinc-200 mt-3 pt-2">
+              <span>Student: <strong>{user?.fullName || "Student"}</strong></span>
+              <span>•</span>
+              <span>Roll No: <strong>{user?.rollNumber || "—"}</strong></span>
+              <span>•</span>
+              <span>Date: <strong>{new Date().toLocaleDateString()}</strong></span>
+            </div>
+          </div>
+
           {/* Local Recovery Banner */}
           {localRecoverySnapshot && isEditable && (
             <div className="p-4 rounded-xl border border-blue-500/30 bg-blue-500/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">

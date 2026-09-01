@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Check, ChevronDown } from "lucide-react";
+import { InlineMathText } from "@/components/inline-math-text";
 
 export interface DropdownOption {
   value: string;
-  label: string;
+  label: React.ReactNode | string;
   badge?: string;
   count?: number;
   icon?: React.ReactNode;
@@ -19,6 +20,7 @@ interface GlassDropdownProps {
   icon?: React.ReactNode;
   className?: string;
   align?: "left" | "right";
+  renderMath?: boolean;
 }
 
 export function GlassDropdown({
@@ -29,6 +31,7 @@ export function GlassDropdown({
   icon,
   className = "",
   align = "left",
+  renderMath = true,
 }: GlassDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -45,22 +48,29 @@ export function GlassDropdown({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  const renderLabel = (label: React.ReactNode | string) => {
+    if (typeof label === "string" && renderMath) {
+      return <InlineMathText text={label} />;
+    }
+    return label;
+  };
+
   return (
-    <div ref={dropdownRef} className={`relative inline-block ${className}`}>
+    <div ref={dropdownRef} className={`relative inline-block ${className || "w-auto min-w-[140px]"}`}>
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="h-8.5 px-3 rounded-xl bg-muted/40 hover:bg-muted/70 border border-border/70 text-xs font-semibold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 flex items-center justify-between gap-2.5 transition-all cursor-pointer select-none shadow-2xs"
+        className="w-full h-9 px-3 rounded-xl bg-background hover:bg-muted/40 border border-border text-xs font-semibold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 flex items-center justify-between gap-2.5 transition-all cursor-pointer select-none shadow-2xs whitespace-nowrap"
       >
-        <div className="flex items-center gap-2 truncate">
+        <div className="flex items-center gap-2 truncate text-left">
           {icon || selectedOption?.icon}
           {selectedOption?.badge && (
             <span className="px-1.5 py-0.5 rounded-md bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-mono font-bold text-[10px] shrink-0 border border-indigo-500/20">
               {selectedOption.badge}
             </span>
           )}
-          <span className="truncate font-bold text-foreground">
-            {selectedOption ? selectedOption.label : placeholder}
+          <span className="truncate font-semibold text-foreground">
+            {selectedOption ? renderLabel(selectedOption.label) : placeholder}
           </span>
           {selectedOption?.count !== undefined && (
             <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-black/10 dark:bg-white/10 font-mono font-bold">
@@ -73,7 +83,7 @@ export function GlassDropdown({
 
       {isOpen && (
         <div
-          className={`absolute top-full mt-1.5 z-50 min-w-[240px] max-w-sm p-1.5 rounded-2xl bg-popover/95 text-popover-foreground backdrop-blur-2xl border border-border/80 shadow-2xl ring-1 ring-black/5 animate-in fade-in-50 zoom-in-95 duration-150 ${
+          className={`absolute top-full mt-1.5 z-50 min-w-[220px] w-full max-w-md p-1.5 rounded-2xl bg-popover text-popover-foreground backdrop-blur-2xl border border-border shadow-2xl ring-1 ring-black/5 animate-in fade-in-50 zoom-in-95 duration-150 ${
             align === "right" ? "right-0" : "left-0"
           }`}
         >
@@ -107,7 +117,7 @@ export function GlassDropdown({
                         {opt.badge}
                       </span>
                     )}
-                    <span className="truncate">{opt.label}</span>
+                    <span className="truncate">{renderLabel(opt.label)}</span>
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">
                     {opt.count !== undefined && (

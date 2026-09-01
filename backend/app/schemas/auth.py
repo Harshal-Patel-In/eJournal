@@ -47,6 +47,7 @@ class UserProfileSchema(BaseModel):
     department: str | None = None
     semester: str | None = None
     division: str | None = None
+    batch: str | None = None
     enrollmentNumber: str | None = None
     facultyId: str | None = None
     designation: str | None = None
