@@ -105,6 +105,13 @@ class BaseRepository:
         result = self.collection.update_one(filter, update, upsert=upsert)
         return result.matched_count > 0
 
+    async def update_many(
+        self, filter: dict, update: dict, upsert: bool = False
+    ) -> int:
+        """Update multiple documents. Returns modified count."""
+        result = self.collection.update_many(filter, update, upsert=upsert)
+        return result.modified_count
+
     async def update_by_id(self, id_str: str, update: dict) -> bool:
         """Update a document by its ID."""
         return await self.update_one(

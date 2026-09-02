@@ -23,6 +23,11 @@ import {
   Sparkles,
   UserPlus,
   User,
+  TrendingUp,
+  Clock,
+  AlertCircle,
+  CheckCircle2,
+  Award,
 } from "lucide-react";
 
 import { api } from "@/lib/api";
@@ -293,55 +298,145 @@ export default function DashboardPage() {
 
         {/* Student Academic Progress & Performance Summary Widget */}
         {isStudent && analytics && analytics.totalAssigned > 0 && (
-          <div className="p-6 rounded-3xl glass-card border border-border/80 shadow-md flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-            <div className="flex flex-col gap-2 max-w-md w-full">
-              <div className="flex items-center gap-2">
-                <Sparkles className="size-4 text-indigo-500" />
-                <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                  Continuous Assessment Tracker
-                </span>
+          <div className="p-6 sm:p-7 rounded-3xl glass-card border border-border/80 shadow-md flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 relative overflow-hidden group">
+            {/* Ambient Background Glow */}
+            <div className="absolute top-0 right-1/4 w-96 h-32 bg-gradient-to-r from-primary/5 via-accent/5 to-emerald-500/5 blur-3xl pointer-events-none -z-10" />
+
+            <div className="flex flex-col gap-3 max-w-lg w-full">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <div className="size-6 rounded-lg bg-indigo-500/10 text-indigo-500 flex items-center justify-center">
+                    <Sparkles className="size-3.5" />
+                  </div>
+                  <span className="text-[11px] font-extrabold uppercase tracking-widest text-muted-foreground">
+                    Continuous Assessment Tracker
+                  </span>
+                </div>
+
+                {/* Dynamic Academic Standing Badge */}
+                {analytics.cumulativeAverageScore >= 80 ? (
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold tracking-wide uppercase bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
+                    <Award className="size-3" /> Distinction Standing
+                  </span>
+                ) : analytics.cumulativeAverageScore >= 60 ? (
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold tracking-wide uppercase bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 flex items-center gap-1">
+                    <CheckCircle2 className="size-3" /> First Class Standing
+                  </span>
+                ) : (
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold tracking-wide uppercase bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 flex items-center gap-1">
+                    <Clock className="size-3" /> Assessment Active
+                  </span>
+                )}
               </div>
-              <h3 className="text-lg font-extrabold text-foreground tracking-tight">
-                {analytics.completedApproved} of {analytics.totalAssigned} Lab Practicals Completed
-              </h3>
-              {/* Visual Progress Bar */}
-              <div className="w-full bg-muted/60 h-2.5 rounded-full overflow-hidden border border-border/40">
-                <div
-                  className="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-500 transition-all duration-500"
-                  style={{
-                    width: `${Math.min(
-                      100,
-                      Math.round((analytics.completedApproved / analytics.totalAssigned) * 100)
-                    )}%`,
-                  }}
-                />
+
+              <div>
+                <h3 className="text-xl font-extrabold text-foreground tracking-tight">
+                  {analytics.completedApproved} of {analytics.totalAssigned} Practicals Completed
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5 font-medium">
+                  {analytics.completedApproved === analytics.totalAssigned
+                    ? "All laboratory coursework evaluated and completed for this term!"
+                    : `${analytics.totalAssigned - analytics.completedApproved} experiment${analytics.totalAssigned - analytics.completedApproved === 1 ? "" : "s"} remaining across your active classroom workspaces.`}
+                </p>
+              </div>
+
+              {/* Multi-Segmented Trajectory Progress Bar */}
+              <div className="flex flex-col gap-1.5 pt-1">
+                <div className="w-full bg-muted/70 h-3 rounded-full overflow-hidden border border-border/50 p-0.5 flex items-center gap-0.5 shadow-inner">
+                  {analytics.completedApproved > 0 && (
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 transition-all duration-700 shadow-xs"
+                      style={{
+                        width: `${Math.round((analytics.completedApproved / analytics.totalAssigned) * 100)}%`,
+                      }}
+                      title={`Approved & Graded: ${analytics.completedApproved}`}
+                    />
+                  )}
+                  {analytics.submittedPending > 0 && (
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-blue-500 transition-all duration-700 shadow-xs"
+                      style={{
+                        width: `${Math.round((analytics.submittedPending / analytics.totalAssigned) * 100)}%`,
+                      }}
+                      title={`Under Review: ${analytics.submittedPending}`}
+                    />
+                  )}
+                  {(analytics.totalAssigned - analytics.completedApproved - analytics.submittedPending) > 0 && (
+                    <div
+                      className="h-full rounded-full bg-amber-500 transition-all duration-700 shadow-xs"
+                      style={{
+                        width: `${Math.round(((analytics.totalAssigned - analytics.completedApproved - analytics.submittedPending) / analytics.totalAssigned) * 100)}%`,
+                      }}
+                      title={`To Complete / In Progress: ${analytics.totalAssigned - analytics.completedApproved - analytics.submittedPending}`}
+                    />
+                  )}
+                </div>
+
+                {/* Progress Bar Legend */}
+                <div className="flex items-center gap-3.5 text-[11px] font-bold text-muted-foreground pt-0.5 flex-wrap">
+                  {analytics.completedApproved > 0 && (
+                    <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
+                      <span className="size-2 rounded-full bg-emerald-500 shadow-xs" />
+                      {analytics.completedApproved} Approved
+                    </span>
+                  )}
+                  {analytics.submittedPending > 0 && (
+                    <span className="flex items-center gap-1.5 text-indigo-600 dark:text-indigo-400">
+                      <span className="size-2 rounded-full bg-indigo-500 shadow-xs" />
+                      {analytics.submittedPending} In Review
+                    </span>
+                  )}
+                  {(analytics.totalAssigned - analytics.completedApproved - analytics.submittedPending) > 0 && (
+                    <span className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400">
+                      <span className="size-2 rounded-full bg-amber-500 shadow-xs" />
+                      {analytics.totalAssigned - analytics.completedApproved - analytics.submittedPending} To Complete
+                      {analytics.inProgress > 0 ? ` (${analytics.inProgress} in progress)` : ""}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
 
             {/* Quick Metrics Grid */}
-            <div className="grid grid-cols-3 gap-3 w-full md:w-auto">
-              <div className="p-3 rounded-2xl bg-muted/30 border border-border/40 flex flex-col items-center justify-center text-center">
-                <span className="text-xl font-extrabold text-emerald-600 dark:text-emerald-400">
+            <div className="grid grid-cols-3 gap-3 w-full lg:w-auto shrink-0">
+              <div className="p-4 rounded-2xl glass-card border border-border/70 hover:border-emerald-500/30 hover:scale-[1.02] transition-all duration-200 flex flex-col items-center justify-center text-center group/card">
+                <div className="flex items-center gap-1.5 mb-1 text-emerald-600 dark:text-emerald-400">
+                  <TrendingUp className="size-3.5" />
+                  <span className="text-[10px] font-bold uppercase tracking-wider">Avg. Score</span>
+                </div>
+                <span className="text-2xl font-black text-foreground tracking-tight">
                   {analytics.cumulativeAverageScore}%
                 </span>
-                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mt-0.5">
-                  Avg. Score
+                <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 mt-0.5">
+                  Continuous Scale
                 </span>
               </div>
-              <div className="p-3 rounded-2xl bg-muted/30 border border-border/40 flex flex-col items-center justify-center text-center">
-                <span className="text-xl font-extrabold text-indigo-600 dark:text-indigo-400">
+
+              <div className="p-4 rounded-2xl glass-card border border-border/70 hover:border-indigo-500/30 hover:scale-[1.02] transition-all duration-200 flex flex-col items-center justify-center text-center group/card">
+                <div className="flex items-center gap-1.5 mb-1 text-indigo-600 dark:text-indigo-400">
+                  <Clock className="size-3.5" />
+                  <span className="text-[10px] font-bold uppercase tracking-wider">In Review</span>
+                </div>
+                <span className="text-2xl font-black text-foreground tracking-tight">
                   {analytics.submittedPending}
                 </span>
-                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mt-0.5">
-                  In Review
+                <span className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 mt-0.5">
+                  With Teacher
                 </span>
               </div>
-              <div className="p-3 rounded-2xl bg-muted/30 border border-border/40 flex flex-col items-center justify-center text-center">
-                <span className="text-xl font-extrabold text-amber-600 dark:text-amber-400">
-                  {analytics.notStarted}
+
+              <div className="p-4 rounded-2xl glass-card border border-border/70 hover:border-amber-500/30 hover:scale-[1.02] transition-all duration-200 flex flex-col items-center justify-center text-center group/card">
+                <div className="flex items-center gap-1.5 mb-1 text-amber-600 dark:text-amber-400">
+                  <AlertCircle className="size-3.5" />
+                  <span className="text-[10px] font-bold uppercase tracking-wider">
+                    {analytics.inProgress > 0 ? "In Progress" : "Pending"}
+                  </span>
+                </div>
+                <span className="text-2xl font-black text-foreground tracking-tight">
+                  {analytics.totalAssigned - analytics.completedApproved - analytics.submittedPending}
                 </span>
-                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mt-0.5">
-                  Pending
+                <span className="text-[10px] font-semibold text-amber-600 dark:text-amber-400 mt-0.5">
+                  {analytics.inProgress > 0 ? `${analytics.inProgress} In Progress` : "To Complete"}
                 </span>
               </div>
             </div>

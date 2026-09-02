@@ -52,15 +52,15 @@ export function formatLatexForKatex(input: string): string {
   processed = processed.replace(/°C|^\circ\s*C/g, "^{\\circ}\\text{C}");
   processed = processed.replace(/°|^\circ/g, "^{\\circ}");
 
-  // 0c. Normalize Unicode subscripts back to LaTeX (e.g. Vᵢₙ -> V_{in}, V₂ -> V_{2}, Rₑq -> R_{eq})
+  // 0c. Normalize Unicode subscripts back to LaTeX (e.g. Vᵢₙ -> V_{in}, Vᵢn -> V_{in}, Rₑq -> R_{eq})
   const UNICODE_SUB_MAP: Record<string, string> = {
     "₀": "0", "₁": "1", "₂": "2", "₃": "3", "₄": "4", "₅": "5", "₆": "6", "₇": "7", "₈": "8", "₉": "9",
     "₊": "+", "₋": "-", "₌": "=", "₍": "(", "₎": ")",
     "ₐ": "a", "ₑ": "e", "ₕ": "h", "ᵢ": "i", "ⱼ": "j", "ₖ": "k", "ₗ": "l", "ₘ": "m", "ₙ": "n", "ₒ": "o", "ₚ": "p", "ᵣ": "r", "ₛ": "s", "ₜ": "t", "ᵤ": "u", "ᵥ": "v", "ₓ": "x", "ᵧ": "y"
   };
-  processed = processed.replace(/([a-zA-Z0-9\\]+)([₀₁₂₃₄₅₆₇₈₉₊₋₌₍₎ₐₑₕᵢⱼₖₗₘₙₒₚᵣₛₜᵤᵥₓᵧ]+)/g, (_, base, subs) => {
+  processed = processed.replace(/([a-zA-Z0-9\\]+)([₀₁₂₃₄₅₆₇₈₉₊₋₌₍₎ₐₑₕᵢⱼₖₗₘₙₒₚᵣₛₜᵤᵥₓᵧ]+)([a-zA-Z0-9]*)/g, (_, base, subs, rest) => {
     const converted = subs.split("").map((c: string) => UNICODE_SUB_MAP[c] || c).join("");
-    return `${base}_{${converted}}`;
+    return `${base}_{${converted}${rest || ""}}`;
   });
 
   // 0d. Escape standalone '#' to '\#'
@@ -139,26 +139,36 @@ export function formatLatexForKatex(input: string): string {
   function formatExpression(str: string): string {
     let s = str;
 
-    // A. Recursive balanced fraction parser
+    // A. Subscript grouping: V_out -> V_{out}, R_eq -> R_{eq} FIRST
+    s = s.replace(/([a-zA-Z0-9\\]+)_([a-zA-Z0-9]+)/g, (m, base, sub) => {
+      if (base.endsWith("}") || base.includes("TXTB") || base.startsWith("\\text")) return m;
+      return `${base}_{${sub}}`;
+    });
+
+    // B. Recursive balanced fraction parser (bracket- and Greek-aware)
+    const GREEK_PREFIX = "(?:\\\\(?:Delta|delta|partial|nabla)\\s+)?";
+    const TERM =
+      "(?:__TXTB_\\d+__|\\\\sqrt\\{[^}]+\\}|" +
+      GREEK_PREFIX +
+      "[a-zA-Z0-9]+(?:\\{[^}]*\\}|\\^[a-zA-Z0-9]+|_\\{[^}]*\\}|_[a-zA-Z0-9]+)*|\\\\[a-zA-Z]+(?:\\{[^}]*\\})*)";
+
     let prev = "";
     let iter = 0;
     while (s !== prev && iter < 10) {
       prev = s;
       iter++;
+      // (A) / (B)
       s = s.replace(/\(([^()]+)\)\s*\/\s*\(([^()]+)\)/g, "\\frac{$1}{$2}");
-      s = s.replace(/\(([^()]+)\)\s*\/\s*([a-zA-Z0-9._]+|__TXTB_\d+__|\\sqrt\{[^}]+\}|\\?[a-zA-Z]+)/g, "\\frac{$1}{$2}");
-      s = s.replace(/([a-zA-Z0-9._]+|__TXTB_\d+__|\\sqrt\{[^}]+\}|\\?[a-zA-Z]+)\s*\/\s*\(([^()]+)\)/g, "\\frac{$1}{$2}");
-      s = s.replace(/(^|[^a-zA-Z0-9._\\])([a-zA-Z0-9._]+|\\sqrt\{[^}]+\}|\\?[a-zA-Z]+)\s*\/\s*([a-zA-Z0-9._]+|\\sqrt\{[^}]+\}|\\?[a-zA-Z]+)($|[^a-zA-Z0-9._])/g, "$1\\frac{$2}{$3}$4");
+      // (A) / B
+      s = s.replace(new RegExp('\\(([^()]+)\\)\\s*\\/\\s*(' + TERM + ')', 'g'), "\\frac{$1}{$2}");
+      // A / (B)
+      s = s.replace(new RegExp('(' + TERM + ')\\s*\\/\\s*\\(([^()]+)\\)', 'g'), "\\frac{$1}{$2}");
+      // A / B
+      s = s.replace(new RegExp('(^|[^a-zA-Z0-9_\\\\}])(' + TERM + ')\\s*\\/\\s*(' + TERM + ')(?=[^a-zA-Z0-9_\\\\{]|$)', 'g'), "$1\\frac{$2}{$3}");
     }
 
-    // B. Auto-scaling parentheses: ( \frac{...}{...} ) -> \left( \frac{...}{...} \right)
+    // C. Auto-scaling parentheses: ( \frac{...}{...} ) -> \left( \frac{...}{...} \right)
     s = s.replace(/\(\s*(\\frac\{[^{}]*\}\{[^{}]*\})\s*\)/g, "\\left( $1 \\right)");
-
-    // C. Subscript grouping: V_out -> V_{out}, R_eq -> R_{eq}
-    s = s.replace(/([a-zA-Z0-9\\]+)_([a-zA-Z0-9]+)/g, (m, base, sub) => {
-      if (base.endsWith("}") || base.includes("TXTB") || base.startsWith("\\text")) return m;
-      return `${base}_{${sub}}`;
-    });
 
     // D. 1:1 Natural Spacing
     s = s.replace(/ +/g, (spaces) => Array(spaces.length).fill("\\ ").join(""));

@@ -6,7 +6,7 @@
 
 "use client";
 
-import { use, useState } from "react";
+import { use, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -14,15 +14,26 @@ import {
   Calendar,
   Check,
   CheckCircle2,
+  CheckSquare,
+  ChevronDown,
+  ChevronRight,
   Clock,
   Copy,
+  Edit2,
   FileEdit,
   FileText,
+  Folder,
+  FolderPlus,
+  FolderX,
   GraduationCap,
+  Layers,
   LayoutGrid,
   Loader2,
+  MoreVertical,
   Plus,
   Sparkles,
+  Square,
+  Trash2,
   Users,
   User,
 } from "lucide-react";
@@ -45,6 +56,7 @@ const publishAssignmentSchema = zod.object({
   instructions: zod.string().min(2, "Instructions are required"),
   maxMarks: zod.number().min(1, "Marks must be positive").max(100, "Max 100 marks"),
   deadline: zod.string().min(1, "Deadline is required"),
+  clusterName: zod.string().optional(),
 });
 
 type PublishAssignmentFields = zod.infer<typeof publishAssignmentSchema>;
@@ -59,8 +71,13 @@ export default function ClassroomPage({ params }: PageProps) {
   const queryClient = useQueryClient();
 
   const [activeTab, setActiveTab] = useState<"assignments" | "announcements" | "submissions" | "roster">("assignments");
+  const [selectedDivision, setSelectedDivision] = useState<string>("ALL");
   const [selectedBatch, setSelectedBatch] = useState<string>("ALL");
+  const [selectedAssignmentIds, setSelectedAssignmentIds] = useState<string[]>([]);
   const [showPublishModal, setShowPublishModal] = useState(false);
+  const [showClusterModal, setShowClusterModal] = useState(false);
+  const [newClusterName, setNewClusterName] = useState("");
+  const [openCardMenuId, setOpenCardMenuId] = useState<string | null>(null);
   const [showAnnouncementModal, setShowAnnouncementModal] = useState(false);
   const [announcementTitle, setAnnouncementTitle] = useState("");
   const [announcementContent, setAnnouncementContent] = useState("");
@@ -139,6 +156,8 @@ export default function ClassroomPage({ params }: PageProps) {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["assignments", classroomId] });
+      queryClient.invalidateQueries({ queryKey: ["gradebook", classroomId] });
+      queryClient.invalidateQueries({ queryKey: ["submissions", classroomId] });
       setShowPublishModal(false);
       publishForm.reset();
     },
@@ -159,6 +178,97 @@ export default function ClassroomPage({ params }: PageProps) {
     },
   });
 
+  // 7. Cluster Mutations
+  const updateClusterMutation = useMutation({
+    mutationFn: ({ assignmentId, clusterName }: { assignmentId: string; clusterName: string | null }) =>
+      api.patch(`/classrooms/${classroomId}/assignments/${assignmentId}/cluster`, { clusterName }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["assignments", classroomId] });
+      queryClient.invalidateQueries({ queryKey: ["gradebook", classroomId] });
+      queryClient.invalidateQueries({ queryKey: ["submissions", classroomId] });
+      toast.success("Practical cluster updated");
+      setOpenCardMenuId(null);
+    },
+    onError: (err: any) => {
+      toast.error(err.message || "Failed to update cluster");
+    },
+  });
+
+  const bulkAssignMutation = useMutation({
+    mutationFn: ({ assignmentIds, clusterName }: { assignmentIds: string[]; clusterName: string | null }) =>
+      api.post(`/classrooms/${classroomId}/clusters/bulk-assign`, { assignmentIds, clusterName }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["assignments", classroomId] });
+      queryClient.invalidateQueries({ queryKey: ["gradebook", classroomId] });
+      queryClient.invalidateQueries({ queryKey: ["submissions", classroomId] });
+      setSelectedAssignmentIds([]);
+      toast.success("Batch updated practical clusters");
+    },
+    onError: (err: any) => {
+      toast.error(err.message || "Failed to bulk assign cluster");
+    },
+  });
+
+  const disbandClusterMutation = useMutation({
+    mutationFn: (clusterName: string) =>
+      api.post(`/classrooms/${classroomId}/clusters/disband`, { clusterName }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["assignments", classroomId] });
+      queryClient.invalidateQueries({ queryKey: ["gradebook", classroomId] });
+      queryClient.invalidateQueries({ queryKey: ["submissions", classroomId] });
+      toast.success("Cluster disbanded. Experiments returned to Unclustered.");
+    },
+    onError: (err: any) => {
+      toast.error(err.message || "Failed to disband cluster");
+    },
+  });
+
+  // Calculate unique divisions
+  const availableDivisions = useMemo(() => {
+    const divs = new Set<string>();
+    if (classroom?.division) divs.add(classroom.division);
+    if (classroom?.divisions && Array.isArray(classroom.divisions)) {
+      classroom.divisions.forEach((d: string) => divs.add(d));
+    }
+    if (members && Array.isArray(members)) {
+      members.forEach((m: any) => {
+        if (m.division) divs.add(m.division);
+      });
+    }
+    if (submissions && Array.isArray(submissions)) {
+      submissions.forEach((s: any) => {
+        if (s.studentDivision) divs.add(s.studentDivision);
+      });
+    }
+    return Array.from(divs).sort();
+  }, [classroom, members, submissions]);
+
+  // Group assignments by cluster
+  const clusterGroups = useMemo(() => {
+    if (!assignments) return { clusters: {} as Record<string, any[]>, unclustered: [] as any[] };
+    const clusters: Record<string, any[]> = {};
+    const unclustered: any[] = [];
+
+    for (const asg of assignments) {
+      const c = asg.clusterName?.trim();
+      if (c) {
+        if (!clusters[c]) clusters[c] = [];
+        clusters[c].push(asg);
+      } else {
+        unclustered.push(asg);
+      }
+    }
+
+    Object.values(clusters).forEach((list) => list.sort((a, b) => a.experimentNumber - b.experimentNumber));
+    unclustered.sort((a, b) => a.experimentNumber - b.experimentNumber);
+
+    return { clusters, unclustered };
+  }, [assignments]);
+
+  const existingClusterNames = useMemo(() => {
+    return Object.keys(clusterGroups.clusters);
+  }, [clusterGroups.clusters]);
+
   const publishForm = useForm<PublishAssignmentFields>({
     resolver: zodResolver(publishAssignmentSchema),
     defaultValues: {
@@ -173,6 +283,242 @@ export default function ClassroomPage({ params }: PageProps) {
       setCopiedCode(true);
       setTimeout(() => setCopiedCode(false), 2000);
     }
+  };
+
+  const isTeacher = user?.role === "teacher";
+
+  const renderAssignmentCard = (asg: any) => {
+    const relatedJournal = journals?.find((j) => j.assignmentId === asg.id);
+    const jStatus = relatedJournal?.status;
+    const isSubmitted = jStatus === "submitted";
+    const isApproved = jStatus === "approved";
+    const isChangesRequested = jStatus === "changes_requested";
+    const isLocked = isSubmitted || isApproved;
+    const hasMarks = isApproved && relatedJournal?.marks !== undefined && relatedJournal?.marks !== null;
+    const isSelected = selectedAssignmentIds.includes(asg.id);
+    const isMenuOpen = openCardMenuId === asg.id;
+
+    return (
+      <div
+        key={asg.id}
+        className={`group p-5 rounded-2xl glass-card hover:scale-[1.005] transition-all duration-300 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 ${
+          isMenuOpen ? "relative z-30" : "relative z-0"
+        } ${isSelected ? "ring-2 ring-primary/40 bg-primary/[0.03]" : ""}`}
+      >
+        <div className="flex items-start gap-3 max-w-xl">
+          {/* Checkbox for teacher bulk actions */}
+          {isTeacher && (
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedAssignmentIds((prev) =>
+                  prev.includes(asg.id) ? prev.filter((id) => id !== asg.id) : [...prev, asg.id]
+                );
+              }}
+              className="mt-1 text-muted-foreground hover:text-foreground transition-colors cursor-pointer shrink-0"
+              title={isSelected ? "Deselect" : "Select for bulk cluster action"}
+            >
+              {isSelected ? (
+                <CheckSquare className="size-4 text-primary" />
+              ) : (
+                <Square className="size-4 text-muted-foreground/60" />
+              )}
+            </button>
+          )}
+
+          <div className="flex flex-col gap-1.5">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold font-mono uppercase bg-primary/10 text-primary border border-primary/20">
+                Exp #{asg.experimentNumber}
+              </span>
+              {isTeacher && asg.clusterName && (
+                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-indigo-500/10 text-indigo-500 border border-indigo-500/20 flex items-center gap-1">
+                  <Folder className="size-2.5" />
+                  {asg.clusterName}
+                </span>
+              )}
+              <h4 className="font-extrabold text-base tracking-tight text-foreground group-hover:text-primary transition-colors">
+                {asg.title}
+              </h4>
+            </div>
+            <p className="text-xs font-medium text-muted-foreground leading-relaxed line-clamp-2">
+              {asg.aim}
+            </p>
+
+            {/* Teacher Remarks Callout */}
+            {isApproved && relatedJournal?.teacherRemarks && (
+              <div className="flex items-start gap-1.5 text-[11px] mt-0.5">
+                <span className="font-semibold text-muted-foreground shrink-0">Teacher Remarks:</span>
+                <span className="italic text-foreground/90 font-medium line-clamp-2">"{relatedJournal.teacherRemarks}"</span>
+              </div>
+            )}
+
+            {/* Annotation Breakdown Chips Row */}
+            {relatedJournal?.annotationCounts && Object.keys(relatedJournal.annotationCounts).length > 0 && (
+              <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                <span className="text-[10px] font-bold text-muted-foreground mr-0.5">Feedback:</span>
+                {Object.entries(relatedJournal.annotationCounts).map(([type, count]) => {
+                  const typeIcons: Record<string, string> = {
+                    Comment: "💬",
+                    Suggestion: "✨",
+                    Highlight: "🖍",
+                    Warning: "⚠️",
+                    Approval: "✅",
+                    Question: "❓",
+                  };
+                  const num = Number(count);
+                  return (
+                    <span key={type} className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-muted/40 text-foreground border border-border/40 flex items-center gap-1">
+                      <span>{typeIcons[type] || "💬"}</span> {num} {type}{num > 1 ? "s" : ""}
+                    </span>
+                  );
+                })}
+              </div>
+            )}
+
+            <div className="flex flex-wrap items-center gap-4 mt-0.5 text-[11px] font-medium text-muted-foreground">
+              {hasMarks ? (
+                <span className="flex items-center gap-1 text-foreground font-bold bg-muted/40 border border-border/50 px-2 py-0.5 rounded-md">
+                  <Sparkles className="size-3 text-amber-500" /> Grade: {relatedJournal.marks} / {asg.maxMarks} ({Math.round((relatedJournal.marks / asg.maxMarks) * 100)}%)
+                </span>
+              ) : (
+                <span className="flex items-center gap-1 text-foreground font-semibold">
+                  <Sparkles className="size-3 text-amber-500" /> Max Marks: {asg.maxMarks}
+                </span>
+              )}
+              <span className="flex items-center gap-1">
+                <Calendar className="size-3 text-muted-foreground/70" /> Deadline: {new Date(asg.deadline).toLocaleDateString()}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Card Actions */}
+        <div className="flex items-center gap-2 md:self-center shrink-0">
+          {isTeacher ? (
+            <div className="flex items-center gap-2 relative">
+              <Button
+                asChild
+                variant="outline"
+                size="sm"
+                className="font-semibold rounded-xl h-8 px-3 text-xs active:scale-95 transition-all duration-150 cursor-pointer"
+              >
+                <Link href={`/classrooms/${classroomId}/grades?assignment=${asg.id}`}>
+                  <span>Grade Submissions</span>
+                </Link>
+              </Button>
+
+              {/* In-place Cluster Move Menu */}
+              <div className="relative">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setOpenCardMenuId(openCardMenuId === asg.id ? null : asg.id)}
+                  className="size-8 p-0 rounded-xl cursor-pointer"
+                  title="Cluster Options"
+                >
+                  <MoreVertical className="size-3.5 text-muted-foreground" />
+                </Button>
+
+                {openCardMenuId === asg.id && (
+                  <div className="absolute right-0 top-full mt-1.5 w-56 rounded-2xl bg-popover/98 dark:bg-zinc-900/98 backdrop-blur-2xl border border-border/80 shadow-2xl p-1.5 z-50 flex flex-col gap-0.5 animate-in fade-in zoom-in-95 duration-150 ring-1 ring-black/10 dark:ring-white/10">
+                    <span className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                      Assign to Cluster
+                    </span>
+
+                    {/* Uncluster option */}
+                    <button
+                      type="button"
+                      onClick={() => updateClusterMutation.mutate({ assignmentId: asg.id, clusterName: null })}
+                      className="flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium hover:bg-accent transition-colors text-left cursor-pointer"
+                    >
+                      <span>None (Unclustered)</span>
+                      {!asg.clusterName && <Check className="size-3 text-primary" />}
+                    </button>
+
+                    {/* Existing clusters */}
+                    {existingClusterNames.map((cName) => (
+                      <button
+                        key={cName}
+                        type="button"
+                        onClick={() => updateClusterMutation.mutate({ assignmentId: asg.id, clusterName: cName })}
+                        className="flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium hover:bg-accent transition-colors text-left cursor-pointer"
+                      >
+                        <span className="truncate">{cName}</span>
+                        {asg.clusterName === cName && <Check className="size-3 text-primary" />}
+                      </button>
+                    ))}
+
+                    <div className="my-1 border-t border-border/40" />
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setOpenCardMenuId(null);
+                        setSelectedAssignmentIds([asg.id]);
+                        setShowClusterModal(true);
+                      }}
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-primary hover:bg-primary/10 transition-colors text-left cursor-pointer"
+                    >
+                      <Plus className="size-3.5" />
+                      <span>Create New Cluster...</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : !relatedJournal ? (
+            <Button
+              size="sm"
+              onClick={() => startJournalMutation.mutate(asg.id)}
+              disabled={startJournalMutation.isPending}
+              className="font-semibold rounded-xl h-8 px-3 text-xs active:scale-95 transition-all duration-150 cursor-pointer"
+            >
+              {startJournalMutation.isPending && startJournalMutation.variables === asg.id ? (
+                <span className="flex items-center gap-1.5">
+                  <Loader2 className="size-3 animate-spin" />
+                  <span>Starting...</span>
+                </span>
+              ) : (
+                <span>Start Journal</span>
+              )}
+            </Button>
+          ) : (
+            <div className="flex items-center gap-2.5">
+              <span
+                className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase border text-center ${
+                  isSubmitted
+                    ? "bg-blue-500/10 text-blue-600 border-blue-500/20"
+                    : isApproved
+                    ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
+                    : isChangesRequested
+                    ? "bg-rose-500/10 text-rose-600 border-rose-500/20"
+                    : "bg-amber-500/10 text-amber-600 border-amber-500/20"
+                }`}
+              >
+                {isSubmitted
+                  ? "Handed In"
+                  : isApproved
+                  ? "Approved"
+                  : isChangesRequested
+                  ? "Changes Requested"
+                  : "In Progress"}
+              </span>
+              <Button
+                asChild
+                size="sm"
+                variant={isLocked ? "outline" : "default"}
+                className="font-semibold rounded-xl h-8 px-3.5 text-xs active:scale-95 transition-all duration-150 cursor-pointer"
+              >
+                <Link href={`/editor/${relatedJournal.id}`}>
+                  {isApproved ? "View Grade & Journal" : isLocked ? "Preview Journal" : "Resume Journal"}
+                </Link>
+              </Button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
   };
 
   if (classroomLoading || assignmentsLoading) {
@@ -195,8 +541,6 @@ export default function ClassroomPage({ params }: PageProps) {
       </div>
     );
   }
-
-  const isTeacher = user?.role === "teacher";
 
   return (
     <div className="min-h-screen bg-slate-100/60 dark:bg-zinc-950 bg-textured-workspace text-foreground flex flex-col">
@@ -364,14 +708,27 @@ export default function ClassroomPage({ params }: PageProps) {
                 </Link>
 
                 {isTeacher && (
-                  <Button
-                    onClick={() => setShowPublishModal(true)}
-                    size="sm"
-                    className="gap-1.5 text-xs font-semibold rounded-xl h-9 px-4 active:scale-95 transition-all duration-150 cursor-pointer whitespace-nowrap"
-                  >
-                    <Plus className="size-3.5" />
-                    <span>Publish Experiment</span>
-                  </Button>
+                  <>
+                    <Button
+                      onClick={() => setShowClusterModal(true)}
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5 text-xs font-semibold rounded-xl h-9 px-3.5 active:scale-95 transition-all cursor-pointer whitespace-nowrap border-border/80"
+                      title="Manage experiment clusters and cycles"
+                    >
+                      <Layers className="size-3.5 text-indigo-500" />
+                      <span>Manage Clusters</span>
+                    </Button>
+
+                    <Button
+                      onClick={() => setShowPublishModal(true)}
+                      size="sm"
+                      className="gap-1.5 text-xs font-semibold rounded-xl h-9 px-4 active:scale-95 transition-all duration-150 cursor-pointer whitespace-nowrap"
+                    >
+                      <Plus className="size-3.5" />
+                      <span>Publish Experiment</span>
+                    </Button>
+                  </>
                 )}
               </>
             )}
@@ -480,157 +837,79 @@ export default function ClassroomPage({ params }: PageProps) {
             )}
           </div>
         ) : activeTab === "assignments" ? (
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-6">
             {assignments && assignments.length > 0 ? (
-              assignments.map((asg) => {
-                const relatedJournal = journals?.find((j) => j.assignmentId === asg.id);
-                const jStatus = relatedJournal?.status;
-                const isSubmitted = jStatus === "submitted";
-                const isApproved = jStatus === "approved";
-                const isChangesRequested = jStatus === "changes_requested";
-                const isLocked = isSubmitted || isApproved;
-                const hasMarks = isApproved && relatedJournal?.marks !== undefined && relatedJournal?.marks !== null;
-
+              isTeacher ? (
+                <>
+                  {/* 1. Render Grouped Clusters (Teacher Only) */}
+                  {existingClusterNames.map((cName) => {
+                    const cAssignments = clusterGroups.clusters[cName];
                     return (
                       <div
-                        key={asg.id}
-                        className="group p-6 rounded-2xl glass-card hover:scale-[1.01] transition-all duration-300 flex flex-col md:flex-row justify-between items-start md:items-center gap-5"
+                        key={cName}
+                        className="flex flex-col gap-3 p-5 rounded-3xl glass-card border border-indigo-500/20 bg-indigo-500/[0.02]"
                       >
-                        <div className="flex flex-col gap-2 max-w-xl">
-                          <div className="flex items-center gap-2">
-                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold font-mono uppercase bg-primary/10 text-primary border border-primary/20">
-                              Exp #{asg.experimentNumber}
-                            </span>
-                            <h4 className="font-extrabold text-lg tracking-tight text-foreground group-hover:text-primary transition-colors">
-                              {asg.title}
-                            </h4>
+                        <div className="flex items-center justify-between gap-3 flex-wrap pb-2 border-b border-indigo-500/15">
+                          <div className="flex items-center gap-2.5">
+                            <div className="size-8 rounded-xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center font-bold">
+                              <Folder className="size-4" />
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <h3 className="font-extrabold text-base tracking-tight text-foreground">{cName}</h3>
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/10 text-indigo-500 border border-indigo-500/20">
+                                {cAssignments.length} {cAssignments.length === 1 ? "Practical" : "Practicals"}
+                              </span>
+                            </div>
                           </div>
-                          <p className="text-xs font-medium text-muted-foreground leading-relaxed line-clamp-2">
-                            {asg.aim}
-                          </p>
 
-                          {/* Teacher Remarks Callout (Subtle Typographic Quote) */}
-                          {isApproved && relatedJournal?.teacherRemarks && (
-                            <div className="flex items-start gap-1.5 text-[11px] mt-0.5">
-                              <span className="font-semibold text-muted-foreground shrink-0">Teacher Remarks:</span>
-                              <span className="italic text-foreground/90 font-medium line-clamp-2">"{relatedJournal.teacherRemarks}"</span>
-                            </div>
-                          )}
-
-                          {/* Annotation Breakdown Chips Row (Subtle Monochrome Badges) */}
-                          {relatedJournal?.annotationCounts && Object.keys(relatedJournal.annotationCounts).length > 0 && (
-                            <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
-                              <span className="text-[10px] font-bold text-muted-foreground mr-0.5">Feedback:</span>
-                              {Object.entries(relatedJournal.annotationCounts).map(([type, count]) => {
-                                const typeIcons: Record<string, string> = {
-                                  Comment: "💬",
-                                  Suggestion: "✨",
-                                  Highlight: "🖍",
-                                  Warning: "⚠️",
-                                  Approval: "✅",
-                                  Question: "❓",
-                                };
-                                const num = Number(count);
-                                return (
-                                  <span key={type} className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-muted/40 text-foreground border border-border/40 flex items-center gap-1">
-                                    <span>{typeIcons[type] || "💬"}</span> {num} {type}{num > 1 ? "s" : ""}
-                                  </span>
-                                );
-                              })}
-                            </div>
-                          )}
-
-                          <div className="flex flex-wrap items-center gap-4 mt-1 text-[11px] font-medium text-muted-foreground">
-                            {hasMarks ? (
-                              <span className="flex items-center gap-1 text-foreground font-bold bg-muted/40 border border-border/50 px-2.5 py-0.5 rounded-md">
-                                <Sparkles className="size-3 text-amber-500" /> Grade: {relatedJournal.marks} / {asg.maxMarks} ({Math.round((relatedJournal.marks / asg.maxMarks) * 100)}%)
-                              </span>
-                            ) : (
-                              <span className="flex items-center gap-1 text-foreground font-semibold">
-                                <Sparkles className="size-3 text-amber-500" /> Max Marks: {asg.maxMarks}
-                              </span>
-                            )}
-                            <span className="flex items-center gap-1">
-                              <Calendar className="size-3 text-muted-foreground/70" /> Deadline: {new Date(asg.deadline).toLocaleDateString()}
-                            </span>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => disbandClusterMutation.mutate(cName)}
+                              disabled={disbandClusterMutation.isPending}
+                              className="text-xs text-muted-foreground hover:text-destructive h-8 px-2.5 rounded-lg cursor-pointer"
+                              title="Disband cluster (experiments become unclustered)"
+                            >
+                              <FolderX className="size-3.5 mr-1" />
+                              <span>Disband Cluster</span>
+                            </Button>
                           </div>
                         </div>
 
-                        {(() => {
-                          if (isTeacher) {
-                            return (
-                              <Button
-                                asChild
-                                variant="outline"
-                                size="sm"
-                                className="font-semibold rounded-xl h-9 px-4 text-xs active:scale-95 transition-all duration-150 cursor-pointer md:self-center shrink-0"
-                              >
-                                <Link href={`/classrooms/${classroomId}/grades?assignment=${asg.id}`}>
-                                  <span>Grade Submissions</span>
-                                </Link>
-                              </Button>
-                            );
-                          }
-
-                          if (!relatedJournal) {
-                            const isStartingThis = startJournalMutation.isPending && startJournalMutation.variables === asg.id;
-                            return (
-                              <Button
-                                size="sm"
-                                onClick={() => startJournalMutation.mutate(asg.id)}
-                                disabled={startJournalMutation.isPending}
-                                className="font-semibold rounded-xl h-9 px-4 text-xs active:scale-95 transition-all duration-150 cursor-pointer md:self-center shrink-0"
-                              >
-                                {isStartingThis ? (
-                                  <span className="flex items-center gap-1.5">
-                                    <Loader2 className="size-3.5 animate-spin" />
-                                    <span>Starting...</span>
-                                  </span>
-                                ) : (
-                                  <span>Start Journal</span>
-                                )}
-                              </Button>
-                            );
-                          }
-
-                          const badgeClass = isSubmitted
-                            ? "bg-blue-500/10 text-blue-600 border-blue-500/20"
-                            : isApproved
-                            ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
-                            : isChangesRequested
-                            ? "bg-rose-500/10 text-rose-600 border-rose-500/20"
-                            : "bg-amber-500/10 text-amber-600 border-amber-500/20";
-
-                          const badgeLabel = isSubmitted
-                            ? "Handed In"
-                            : isApproved
-                            ? "Approved"
-                            : isChangesRequested
-                            ? "Changes Requested"
-                            : "In Progress";
-
-                          return (
-                            <div className="flex items-center gap-3 md:self-center shrink-0">
-                              <span className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase border text-center ${badgeClass}`}>
-                                {badgeLabel}
-                              </span>
-                              <Button
-                                asChild
-                                size="sm"
-                                variant={isLocked ? "outline" : "default"}
-                                className="font-semibold rounded-xl h-9 px-4 text-xs active:scale-95 transition-all duration-150 cursor-pointer"
-                              >
-                                <Link href={`/editor/${relatedJournal.id}`}>
-                                  {isApproved ? "View Grade & Journal" : isLocked ? "Preview Journal" : "Resume Journal"}
-                                </Link>
-                              </Button>
-                            </div>
-                          );
-                        })()}
+                        <div className="flex flex-col gap-3">
+                          {cAssignments.map((asg) => renderAssignmentCard(asg))}
+                        </div>
                       </div>
                     );
-                  })
-                ) : (
+                  })}
+
+                  {/* 2. Render Unclustered Experiments (Teacher Only) */}
+                  {clusterGroups.unclustered.length > 0 && (
+                    <div className="flex flex-col gap-3">
+                      {existingClusterNames.length > 0 && (
+                        <div className="flex items-center gap-2 px-1">
+                          <FileText className="size-4 text-muted-foreground" />
+                          <h4 className="font-bold text-xs uppercase tracking-wider text-muted-foreground">
+                            Unclustered Experiments ({clusterGroups.unclustered.length})
+                          </h4>
+                        </div>
+                      )}
+                      <div className="flex flex-col gap-3">
+                        {clusterGroups.unclustered.map((asg) => renderAssignmentCard(asg))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                /* Flat Sequential List for Students (Zero Cluster Clutter) */
+                <div className="flex flex-col gap-3">
+                  {[...assignments]
+                    .sort((a, b) => a.experimentNumber - b.experimentNumber)
+                    .map((asg) => renderAssignmentCard(asg))}
+                </div>
+              )
+            ) : (
               <div className="py-16 flex flex-col items-center justify-center border-2 border-dashed border-border rounded-2xl glass-card">
                 <div className="size-14 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mb-4">
                   <FileText className="size-7" />
@@ -655,35 +934,68 @@ export default function ClassroomPage({ params }: PageProps) {
           </div>
         ) : activeTab === "submissions" ? (
           <div className="flex flex-col gap-4">
-            {/* Batch Filter Pills */}
-            {classroom?.batches && classroom.batches.length > 0 && (
-              <div className="flex items-center gap-2 overflow-x-auto pb-1">
-                <span className="text-xs font-semibold text-muted-foreground mr-1">Batch Filter:</span>
-                <button
-                  onClick={() => setSelectedBatch("ALL")}
-                  className={`px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                    selectedBatch === "ALL"
-                      ? "bg-primary text-primary-foreground shadow-xs"
-                      : "glass-pill text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  All Batches
-                </button>
-                {classroom.batches.map((b: string) => (
+            {/* Division & Batch Filter Strip */}
+            <div className="flex flex-col gap-2.5 pb-1">
+              {/* Division Filter */}
+              {availableDivisions.length > 0 && (
+                <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                  <span className="text-xs font-semibold text-muted-foreground mr-1">Division:</span>
                   <button
-                    key={b}
-                    onClick={() => setSelectedBatch(b)}
+                    onClick={() => setSelectedDivision("ALL")}
                     className={`px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                      selectedBatch === b
+                      selectedDivision === "ALL"
                         ? "bg-primary text-primary-foreground shadow-xs"
                         : "glass-pill text-muted-foreground hover:text-foreground"
                     }`}
                   >
-                    {b}
+                    All Divisions
                   </button>
-                ))}
-              </div>
-            )}
+                  {availableDivisions.map((d: string) => (
+                    <button
+                      key={d}
+                      onClick={() => setSelectedDivision(d)}
+                      className={`px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                        selectedDivision === d
+                          ? "bg-primary text-primary-foreground shadow-xs"
+                          : "glass-pill text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      Division {d}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Batch Filter Pills */}
+              {classroom?.batches && classroom.batches.length > 0 && (
+                <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                  <span className="text-xs font-semibold text-muted-foreground mr-1">Batch:</span>
+                  <button
+                    onClick={() => setSelectedBatch("ALL")}
+                    className={`px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      selectedBatch === "ALL"
+                        ? "bg-primary text-primary-foreground shadow-xs"
+                        : "glass-pill text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    All Batches
+                  </button>
+                  {classroom.batches.map((b: string) => (
+                    <button
+                      key={b}
+                      onClick={() => setSelectedBatch(b)}
+                      className={`px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                        selectedBatch === b
+                          ? "bg-primary text-primary-foreground shadow-xs"
+                          : "glass-pill text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {b}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
 
             {submissionsLoading ? (
               <p className="text-xs text-muted-foreground animate-pulse font-medium">
@@ -701,7 +1013,11 @@ export default function ClassroomPage({ params }: PageProps) {
               </div>
             ) : (
               submissions
-                .filter((sub) => selectedBatch === "ALL" || sub.studentBatch === selectedBatch || !sub.studentBatch)
+                .filter((sub) => {
+                  const matchBatch = selectedBatch === "ALL" || sub.studentBatch === selectedBatch || !sub.studentBatch;
+                  const matchDivision = selectedDivision === "ALL" || sub.studentDivision === selectedDivision || !sub.studentDivision;
+                  return matchBatch && matchDivision;
+                })
                 .map((sub) => (
                   <div
                     key={sub.id}
@@ -915,6 +1231,24 @@ export default function ClassroomPage({ params }: PageProps) {
                 )}
               </div>
 
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold text-muted-foreground">Cluster / Lab Cycle (Optional)</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    placeholder="e.g. Cluster 1: DC Circuits (leave blank for Unclustered)"
+                    list="cluster-suggestions"
+                    className="h-10 rounded-xl border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring flex-1"
+                    {...publishForm.register("clusterName")}
+                  />
+                  <datalist id="cluster-suggestions">
+                    {existingClusterNames.map((c) => (
+                      <option key={c} value={c} />
+                    ))}
+                  </datalist>
+                </div>
+              </div>
+
               <div className="flex items-center gap-3 justify-end mt-2">
                 <Button type="button" variant="outline" onClick={() => setShowPublishModal(false)} className="rounded-xl">
                   Cancel
@@ -939,7 +1273,7 @@ export default function ClassroomPage({ params }: PageProps) {
               </div>
               <button
                 onClick={() => setShowAnnouncementModal(false)}
-                className="text-muted-foreground hover:text-foreground text-sm font-bold p-1 rounded-lg"
+                className="text-muted-foreground hover:text-foreground text-sm font-bold p-1 rounded-lg cursor-pointer"
               >
                 ✕
               </button>
@@ -1009,6 +1343,151 @@ export default function ClassroomPage({ params }: PageProps) {
                 </Button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cluster Manager Modal */}
+      {showClusterModal && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-6 animate-fade-in">
+          <div className="glass-card w-full max-w-lg p-6 rounded-3xl flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Layers className="size-5 text-indigo-500" />
+                <h3 className="font-bold text-lg tracking-tight">Manage Practical Clusters</h3>
+              </div>
+              <button
+                onClick={() => setShowClusterModal(false)}
+                className="text-muted-foreground hover:text-foreground text-sm font-bold p-1 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Clusters group practical experiments into evaluation modules or continuous assessment cycles.
+              Disbanding a cluster never deletes student journals or marks; it simply returns the practicals to standalone status.
+            </p>
+
+            {/* Existing Clusters List */}
+            <div className="flex flex-col gap-2.5 mt-1">
+              {existingClusterNames.length === 0 ? (
+                <div className="p-6 text-center rounded-2xl border border-dashed border-border/60 text-xs text-muted-foreground">
+                  No clusters created yet. Use the card action menu or the form below to create your first cluster.
+                </div>
+              ) : (
+                existingClusterNames.map((cName) => {
+                  const count = clusterGroups.clusters[cName]?.length || 0;
+                  return (
+                    <div
+                      key={cName}
+                      className="p-3.5 rounded-2xl bg-muted/30 border border-border/60 flex items-center justify-between gap-3"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <Folder className="size-4 text-indigo-500 shrink-0" />
+                        <div>
+                          <h4 className="text-sm font-bold text-foreground">{cName}</h4>
+                          <span className="text-[11px] text-muted-foreground">
+                            {count} {count === 1 ? "Experiment" : "Experiments"}
+                          </span>
+                        </div>
+                      </div>
+
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => disbandClusterMutation.mutate(cName)}
+                        disabled={disbandClusterMutation.isPending}
+                        className="text-xs text-destructive hover:bg-destructive/10 h-8 px-3 rounded-xl cursor-pointer"
+                      >
+                        <FolderX className="size-3.5 mr-1" />
+                        Disband
+                      </Button>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Create New Cluster Row */}
+            <div className="flex flex-col gap-2 pt-3 border-t border-border/40">
+              <label className="text-xs font-semibold text-muted-foreground">Create New Cluster Name</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  placeholder="e.g. Cycle 1: DC Circuits & Network Theorems"
+                  value={newClusterName}
+                  onChange={(e) => setNewClusterName(e.target.value)}
+                  className="flex-1 h-10 rounded-xl border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                />
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    const trimmed = newClusterName.trim();
+                    if (!trimmed) return;
+                    if (selectedAssignmentIds.length > 0) {
+                      bulkAssignMutation.mutate({ assignmentIds: selectedAssignmentIds, clusterName: trimmed });
+                    } else {
+                      toast.info(`Cluster "${trimmed}" prepared! Now assign practicals to it via the card menu.`);
+                    }
+                    setNewClusterName("");
+                    setShowClusterModal(false);
+                  }}
+                  disabled={!newClusterName.trim()}
+                  className="h-10 px-4 rounded-xl text-xs font-semibold cursor-pointer"
+                >
+                  Create
+                </Button>
+              </div>
+            </div>
+
+            <div className="flex justify-end mt-2">
+              <Button variant="outline" size="sm" onClick={() => setShowClusterModal(false)} className="rounded-xl cursor-pointer">
+                Close
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Floating Multi-Select Bulk Action Bar for Teachers */}
+      {isTeacher && selectedAssignmentIds.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-zinc-900/95 dark:bg-zinc-800/95 text-white backdrop-blur-xl border border-white/20 shadow-2xl rounded-2xl px-5 py-3 flex items-center gap-4 animate-in fade-in slide-in-from-bottom-5 duration-200">
+          <span className="text-xs font-bold whitespace-nowrap">
+            {selectedAssignmentIds.length} {selectedAssignmentIds.length === 1 ? "Experiment" : "Experiments"} Selected
+          </span>
+
+          <div className="h-4 w-px bg-white/20" />
+
+          <div className="flex items-center gap-2">
+            <select
+              className="bg-white/10 hover:bg-white/20 text-white text-xs font-semibold rounded-xl px-3 py-1.5 border border-white/20 outline-none cursor-pointer"
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val === "UNCLUSTER") {
+                  bulkAssignMutation.mutate({ assignmentIds: selectedAssignmentIds, clusterName: null });
+                } else if (val) {
+                  bulkAssignMutation.mutate({ assignmentIds: selectedAssignmentIds, clusterName: val });
+                }
+                e.target.value = "";
+              }}
+              defaultValue=""
+            >
+              <option value="" disabled className="text-zinc-900">Move to Cluster...</option>
+              <option value="UNCLUSTER" className="text-zinc-900">None (Uncluster)</option>
+              {existingClusterNames.map((c) => (
+                <option key={c} value={c} className="text-zinc-900">{c}</option>
+              ))}
+            </select>
+
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setSelectedAssignmentIds([])}
+              className="text-xs text-white/70 hover:text-white h-8 px-2.5 rounded-lg cursor-pointer"
+            >
+              Cancel
+            </Button>
           </div>
         </div>
       )}

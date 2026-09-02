@@ -97,6 +97,18 @@ function translateSubscripts(text: string): string {
     return group.split("").map((c: string) => SUBSCRIPTS[c] || c).join("");
   });
 
+  // 4. Extend active subscript sequence when typing contiguous letters directly following a Unicode subscript (e.g. Vᵢ + n -> Vᵢₙ)
+  const UNICODE_SUBS = "₀₁₂₃₄₅₆₇₈₉₊₋₌₍₎ₐₑₕᵢⱼₖₗₘₙₒₚᵣₛₜᵤᵥₓᵧ";
+  const subRegex = new RegExp(`([${UNICODE_SUBS}]+)([a-zA-Z0-9]+)`, "g");
+  let prev = "";
+  while (result !== prev) {
+    prev = result;
+    result = result.replace(subRegex, (_, subs, rest) => {
+      const converted = rest.split("").map((c: string) => SUBSCRIPTS[c] || c).join("");
+      return subs + converted;
+    });
+  }
+
   return result;
 }
 

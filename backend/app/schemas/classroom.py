@@ -44,3 +44,6 @@ class ClassroomMemberResponse(BaseModel):
     email: str
     joinedAt: datetime
     status: str
+    rollNumber: str | None = None
+    division: str | None = None
+    batch: str | None = None

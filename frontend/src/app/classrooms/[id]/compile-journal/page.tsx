@@ -50,6 +50,13 @@ export default function CompileJournalPage({ params }: PageProps) {
     enabled: isSingleMode,
   });
 
+  // 4c. Fetch classroom submissions to identify student author metadata if teacher is viewing
+  const { data: classroomSubmissions } = useQuery<any[]>({
+    queryKey: ["submissions", classroomId],
+    queryFn: () => api.get(`/journals/classroom/${classroomId}/submissions`),
+    enabled: Boolean(classroomId),
+  });
+
   // 5. Compile and sort the practicals in sequential order
   const compiledPracticals = useMemo(() => {
     if (!assignments || assignments.length === 0) return [];
@@ -111,6 +118,41 @@ export default function CompileJournalPage({ params }: PageProps) {
     return list;
   }, [assignments, journals, singleJournal, isSingleMode, targetJournalId]);
 
+  const currentJournal = isSingleMode ? singleJournal : compiledPracticals[0]?.journal;
+
+  const targetSubmission = useMemo(() => {
+    if (!classroomSubmissions || !currentJournal) return null;
+    return classroomSubmissions.find(
+      (s) => s.id === currentJournal.id || s.journalId === currentJournal.id || s.studentId === currentJournal.studentId
+    );
+  }, [classroomSubmissions, currentJournal]);
+
+  // Unified candidate credentials (handles both student exporting own journal and teacher previewing student work)
+  const candidateName =
+    targetSubmission?.studentName ||
+    user?.profile?.name ||
+    user?.name ||
+    "Student Name";
+
+  const candidateEnrollment =
+    targetSubmission?.enrollmentNumber ||
+    targetSubmission?.studentEnrollment ||
+    user?.profile?.enrollmentNumber ||
+    "—";
+
+  const candidateBatch =
+    targetSubmission?.studentBatch ||
+    user?.profile?.batch ||
+    classroom?.batches?.[0] ||
+    "—";
+
+  const candidateDivision =
+    targetSubmission?.studentDivision ||
+    user?.profile?.division ||
+    classroom?.divisions?.[0] ||
+    classroom?.division ||
+    "—";
+
   const isLoading =
     userLoading || classroomLoading || assignmentsLoading || journalsLoading || (isSingleMode && singleJournalLoading);
 
@@ -157,7 +199,7 @@ export default function CompileJournalPage({ params }: PageProps) {
         <div className="flex items-center gap-3">
           <Button
             onClick={() => window.print()}
-            className="gap-2 bg-primary text-primary-foreground font-bold shadow-md hover:shadow-lg transition-all cursor-pointer h-9 px-4 rounded-xl"
+            className="gap-2 font-semibold transition-all cursor-pointer h-9 px-4 rounded-xl"
           >
             <Printer className="size-4" />
             <span>{isSingleMode ? "Save as PDF" : "Save Master Journal as PDF"}</span>
@@ -213,16 +255,15 @@ export default function CompileJournalPage({ params }: PageProps) {
                 </div>
                 <div className="grid grid-cols-2 gap-y-2.5 text-xs">
                   <span className="font-bold text-zinc-600">Student Name:</span>
-                  <strong className="text-zinc-950 font-bold">{user?.fullName || "Student Name"}</strong>
+                  <strong className="text-zinc-950 font-bold">{candidateName}</strong>
 
-                  <span className="font-bold text-zinc-600">Roll Number:</span>
-                  <strong className="text-zinc-950 font-mono font-bold">{user?.rollNumber || "—"}</strong>
+                  <span className="font-bold text-zinc-600">Enrollment / Roll No:</span>
+                  <strong className="text-zinc-950 font-mono font-bold">{candidateEnrollment}</strong>
 
-                  <span className="font-bold text-zinc-600">Enrollment No:</span>
-                  <strong className="text-zinc-950 font-mono font-bold">{user?.enrollmentId || user?.id?.slice(0, 10) || "—"}</strong>
-
-                  <span className="font-bold text-zinc-600">Lab Batch / Group:</span>
-                  <strong className="text-zinc-950 font-mono font-bold">{user?.batch || "Batch A"}</strong>
+                  <span className="font-bold text-zinc-600">Division / Batch:</span>
+                  <strong className="text-zinc-950 font-mono font-bold">
+                    {candidateDivision !== "—" ? `Div ${candidateDivision}` : ""}{candidateBatch !== "—" ? ` • ${candidateBatch}` : (candidateDivision !== "—" ? "" : "—")}
+                  </strong>
 
                   <span className="font-bold text-zinc-600">Date of Compilation:</span>
                   <span className="text-zinc-950 font-medium">{new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</span>
@@ -251,9 +292,9 @@ export default function CompileJournalPage({ params }: PageProps) {
 
               <div className="my-8 px-4 sm:px-8 text-justify text-sm sm:text-base leading-relaxed text-zinc-800 font-serif space-y-4">
                 <p>
-                  This is to certify that <strong>{user?.fullName || "the student"}</strong>, bearing 
-                  Roll Number <strong>{user?.rollNumber || "—"}</strong> and Enrollment Number <strong>{user?.enrollmentId || user?.id?.slice(0, 10) || "—"}</strong>, 
-                  is a bona fide student of Semester <strong>{classroom?.semester || "IV"}</strong> in the academic year <strong>{new Date().getFullYear()}–{new Date().getFullYear() + 1}</strong>.
+                  This is to certify that <strong>{candidateName}</strong>, bearing 
+                  Enrollment / Roll Number <strong>{candidateEnrollment}</strong>, 
+                  is a bona fide student of Semester <strong>{classroom?.semester || user?.profile?.semester || "IV"}</strong> in the academic year <strong>{new Date().getFullYear()}–{new Date().getFullYear() + 1}</strong>.
                 </p>
                 <p>
                   He / She has satisfactorily completed the prescribed course of laboratory coursework and practical assignments in 
@@ -422,15 +463,17 @@ export default function CompileJournalPage({ params }: PageProps) {
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4 pt-3 border-t border-zinc-200 text-xs text-zinc-700 bg-zinc-50/70 p-3 rounded border border-zinc-200">
                     <div>
                       <span className="text-[10px] font-bold uppercase text-zinc-500 block">Candidate Name</span>
-                      <strong className="text-zinc-950 font-bold">{user?.fullName || "Student Name"}</strong>
+                      <strong className="text-zinc-950 font-bold">{candidateName}</strong>
                     </div>
                     <div>
-                      <span className="text-[10px] font-bold uppercase text-zinc-500 block">Roll Number</span>
-                      <strong className="text-zinc-950 font-mono font-bold">{user?.rollNumber || "—"}</strong>
+                      <span className="text-[10px] font-bold uppercase text-zinc-500 block">Enrollment / Roll No</span>
+                      <strong className="text-zinc-950 font-mono font-bold">{candidateEnrollment}</strong>
                     </div>
                     <div>
-                      <span className="text-[10px] font-bold uppercase text-zinc-500 block">Enrollment ID</span>
-                      <strong className="text-zinc-950 font-mono font-bold">{user?.enrollmentId || user?.id?.slice(0, 10) || "—"}</strong>
+                      <span className="text-[10px] font-bold uppercase text-zinc-500 block">Division / Batch</span>
+                      <strong className="text-zinc-950 font-mono font-bold">
+                        {candidateDivision !== "—" ? `Div ${candidateDivision}` : ""}{candidateBatch !== "—" ? ` • ${candidateBatch}` : (candidateDivision !== "—" ? "" : "—")}
+                      </strong>
                     </div>
                     <div>
                       <span className="text-[10px] font-bold uppercase text-zinc-500 block">Submission Date</span>

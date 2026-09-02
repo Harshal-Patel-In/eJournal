@@ -10,7 +10,7 @@
 
 "use client";
 
-import { use, useEffect, useMemo, useState } from "react";
+import React, { use, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
@@ -23,6 +23,8 @@ import {
   AlertTriangle,
   FileEdit,
   Download,
+  Folder,
+  Layers,
   Table,
   ListFilter,
   Check,
@@ -56,7 +58,9 @@ export default function ClassroomGradesPage({ params }: PageProps) {
   const urlAssignment = searchParams.get("assignment");
 
   const [activeTab, setActiveTab] = useState<"matrix" | "submissions">("matrix");
+  const [selectedDivision, setSelectedDivision] = useState<string>("ALL");
   const [selectedBatch, setSelectedBatch] = useState<string>("ALL");
+  const [clusterScope, setClusterScope] = useState<string>("ALL");
   const [selectedAssignment, setSelectedAssignment] = useState<string>(urlAssignment || "ALL");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<StatusFilterType>("ALL");
@@ -85,9 +89,16 @@ export default function ClassroomGradesPage({ params }: PageProps) {
 
   // 3. Fetch 2D Gradebook Matrix
   const { data: gradebookData, isLoading: gradebookLoading } = useQuery<any>({
-    queryKey: ["gradebook", classroomId, selectedBatch],
-    queryFn: () =>
-      api.get(`/classrooms/${classroomId}/gradebook${selectedBatch !== "ALL" ? `?batch=${selectedBatch}` : ""}`),
+    queryKey: ["gradebook", classroomId, selectedBatch, selectedDivision],
+    queryFn: () => {
+      const params = new URLSearchParams();
+      if (selectedBatch !== "ALL") params.append("batch", selectedBatch);
+      if (selectedDivision !== "ALL") params.append("division", selectedDivision);
+      const qs = params.toString();
+      return api.get(`/classrooms/${classroomId}/gradebook${qs ? `?${qs}` : ""}`);
+    },
+    staleTime: 0,
+    refetchOnWindowFocus: true,
   });
 
   // 4. Fetch classroom submissions for teacher (including drafts)
@@ -228,7 +239,12 @@ export default function ClassroomGradesPage({ params }: PageProps) {
   }, [submissions, selectedBatch, selectedAssignment, searchQuery, statusFilter]);
 
   const activeAssignmentObj = assignments?.find((a: any) => a.id === selectedAssignment);
-  const isFiltersActive = searchQuery.trim() !== "" || statusFilter !== "ALL" || selectedBatch !== "ALL" || selectedAssignment !== "ALL";
+  const isFiltersActive =
+    searchQuery.trim() !== "" ||
+    statusFilter !== "ALL" ||
+    selectedBatch !== "ALL" ||
+    selectedDivision !== "ALL" ||
+    selectedAssignment !== "ALL";
 
   // Dropdown Options
   const practicalOptions: DropdownOption[] = useMemo(() => {
@@ -249,30 +265,96 @@ export default function ClassroomGradesPage({ params }: PageProps) {
     ];
   }, [assignments, submissions]);
 
-  const batchOptions: DropdownOption[] = useMemo(() => {
-    const batches = gradebookData?.summary?.availableBatches || classroom?.batches || [];
+  const divisionOptions: DropdownOption[] = useMemo(() => {
+    const divs =
+      gradebookData?.summary?.availableDivisions ||
+      classroom?.divisions ||
+      (classroom?.division ? [classroom.division] : []);
     return [
-      { value: "ALL", label: "All Batches" },
-      ...batches.map((b: string) => ({
-        value: b,
-        label: `Batch ${b}`,
-        badge: b,
+      {
+        value: "ALL",
+        label: "All Divisions",
+        icon: <Layers className="size-3.5 text-muted-foreground shrink-0" />,
+      },
+      ...divs.map((d: string) => ({
+        value: d,
+        label: `Division ${d}`,
+        badge: d,
+        icon: <Layers className="size-3.5 text-muted-foreground shrink-0" />,
       })),
     ];
   }, [gradebookData, classroom]);
 
+  const batchOptions: DropdownOption[] = useMemo(() => {
+    const batches = gradebookData?.summary?.availableBatches || classroom?.batches || [];
+    return [
+      {
+        value: "ALL",
+        label: "All Batches",
+        icon: <Folder className="size-3.5 text-muted-foreground shrink-0" />,
+      },
+      ...batches.map((b: string) => ({
+        value: b,
+        label: `Batch ${b}`,
+        badge: b,
+        icon: <Folder className="size-3.5 text-muted-foreground shrink-0" />,
+      })),
+    ];
+  }, [gradebookData, classroom]);
+
+  // Cluster grouping and scope for 2D matrix
+  const matrixClusters = useMemo(() => {
+    const rawAssignments = gradebookData?.assignments || [];
+    const clusters: Record<string, any[]> = {};
+    const unclustered: any[] = [];
+
+    for (const asg of rawAssignments) {
+      const c = asg.clusterName?.trim();
+      if (c) {
+        if (!clusters[c]) clusters[c] = [];
+        clusters[c].push(asg);
+      } else {
+        unclustered.push(asg);
+      }
+    }
+
+    return { clusters, unclustered };
+  }, [gradebookData?.assignments]);
+
+  const existingClusterNames = useMemo(() => {
+    return Object.keys(matrixClusters.clusters);
+  }, [matrixClusters.clusters]);
+
   const sortOptions: DropdownOption[] = [
-    { value: "enrollment_asc", label: "Enrollment (Asc)" },
-    { value: "name_asc", label: "Student Name (A-Z)" },
-    { value: "percentage_desc", label: "Highest Score %" },
-    { value: "percentage_asc", label: "Lowest Score %" },
+    {
+      value: "enrollment_asc",
+      label: "Enrollment (Asc)",
+      icon: <ListFilter className="size-3.5 text-muted-foreground shrink-0" />,
+    },
+    {
+      value: "name_asc",
+      label: "Student Name (A-Z)",
+      icon: <User className="size-3.5 text-muted-foreground shrink-0" />,
+    },
+    {
+      value: "percentage_desc",
+      label: "Highest Score %",
+      icon: <Award className="size-3.5 text-emerald-500 shrink-0" />,
+    },
+    {
+      value: "percentage_asc",
+      label: "Lowest Score %",
+      icon: <Award className="size-3.5 text-amber-500 shrink-0" />,
+    },
   ];
 
   const handleResetFilters = () => {
     setSearchQuery("");
     setStatusFilter("ALL");
+    setSelectedDivision("ALL");
     setSelectedBatch("ALL");
     setSelectedAssignment("ALL");
+    setClusterScope("ALL");
   };
 
   // Handle CSV Export
@@ -280,8 +362,11 @@ export default function ClassroomGradesPage({ params }: PageProps) {
     try {
       setIsExportingCsv(true);
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
-      const batchParam = selectedBatch !== "ALL" ? `?batch=${selectedBatch}` : "";
-      const res = await fetch(`${apiUrl}/classrooms/${classroomId}/gradebook/export/csv${batchParam}`, {
+      const params = new URLSearchParams();
+      if (selectedBatch !== "ALL") params.append("batch", selectedBatch);
+      if (selectedDivision !== "ALL") params.append("division", selectedDivision);
+      const qs = params.toString();
+      const res = await fetch(`${apiUrl}/classrooms/${classroomId}/gradebook/export/csv${qs ? `?${qs}` : ""}`, {
         method: "GET",
         credentials: "include",
       });
@@ -295,7 +380,9 @@ export default function ClassroomGradesPage({ params }: PageProps) {
       const a = document.createElement("a");
       a.href = url;
       const safeName = (classroom?.name || "Classroom").replace(/[^a-zA-Z0-9_-]/g, "_");
-      a.download = `Gradebook_${safeName}${selectedBatch !== "ALL" ? `_${selectedBatch}` : ""}.csv`;
+      const divTag = selectedDivision !== "ALL" ? `_Div_${selectedDivision}` : "";
+      const batchTag = selectedBatch !== "ALL" ? `_Batch_${selectedBatch}` : "";
+      a.download = `Gradebook_${safeName}${divTag}${batchTag}.csv`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
@@ -305,6 +392,86 @@ export default function ClassroomGradesPage({ params }: PageProps) {
     } finally {
       setIsExportingCsv(false);
     }
+  };
+
+  const displayedClusters = useMemo(() => {
+    if (clusterScope === "ALL") {
+      return existingClusterNames.map((cName) => ({
+        name: cName,
+        assignments: matrixClusters.clusters[cName] || [],
+      }));
+    }
+    if (clusterScope === "UNCLUSTERED") {
+      return [];
+    }
+    return [
+      {
+        name: clusterScope,
+        assignments: matrixClusters.clusters[clusterScope] || [],
+      },
+    ];
+  }, [clusterScope, existingClusterNames, matrixClusters]);
+
+  const displayedUnclustered = useMemo(() => {
+    if (clusterScope === "ALL" || clusterScope === "UNCLUSTERED") {
+      return matrixClusters.unclustered;
+    }
+    return [];
+  }, [clusterScope, matrixClusters.unclustered]);
+
+  const renderGradeCell = (asg: any, g: any) => {
+    const statusStr = g.status || "not_started";
+    const marks = g.marks;
+
+    return (
+      <td key={asg.id} className={`text-center border-l border-border/40 ${isCompactDensity ? "py-1 px-1.5" : "py-2 px-2.5"}`}>
+        {statusStr === "approved" && marks !== null ? (
+          <Link
+            href={`/editor/${g.journalId}`}
+            className={`inline-flex items-center gap-1 rounded-full font-extrabold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 hover:scale-105 transition-transform cursor-pointer ${
+              isCompactDensity ? "px-2 py-0.5 text-[10px]" : "px-2.5 py-1 text-[11px]"
+            }`}
+            title={`Approved: ${marks}/${asg.maxMarks}${g.approvedAt ? ` on ${new Date(g.approvedAt).toLocaleDateString()}` : ""}`}
+          >
+            <Check className="size-3" />
+            <span>{marks}/{asg.maxMarks}</span>
+          </Link>
+        ) : statusStr === "submitted" || statusStr === "late_submitted" ? (
+          <Link
+            href={`/editor/${g.journalId}`}
+            className={`inline-flex items-center gap-1 rounded-full font-bold bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-500/30 hover:scale-105 transition-transform cursor-pointer ${
+              isCompactDensity ? "px-2 py-0.5 text-[9px]" : "px-2.5 py-1 text-[10px]"
+            }`}
+            title="Submitted: Ready for evaluation"
+          >
+            <Clock className="size-3" />
+            <span>Grade</span>
+          </Link>
+        ) : statusStr === "changes_requested" ? (
+          <Link
+            href={`/editor/${g.journalId}`}
+            className={`inline-flex items-center gap-1 rounded-full font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 hover:scale-105 transition-transform cursor-pointer ${
+              isCompactDensity ? "px-2 py-0.5 text-[9px]" : "px-2.5 py-1 text-[10px]"
+            }`}
+            title="Revision requested"
+          >
+            <FileEdit className="size-3" />
+            <span>Revision</span>
+          </Link>
+        ) : statusStr === "draft" ? (
+          <span
+            className={`inline-flex items-center gap-1 rounded-full font-medium bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-500/20 ${
+              isCompactDensity ? "px-1.5 py-0.2 text-[9px]" : "px-2 py-0.5 text-[10px]"
+            }`}
+            title="Student draft in progress"
+          >
+            In Progress
+          </span>
+        ) : (
+          <span className="text-[11px] text-muted-foreground/40 font-medium" title="Not started">—</span>
+        )}
+      </td>
+    );
   };
 
   return (
@@ -475,156 +642,289 @@ export default function ClassroomGradesPage({ params }: PageProps) {
           </div>
         )}
 
-        {/* Single Unified Horizontal Toolbar (All in 1 Row) */}
-        <div className="p-2.5 rounded-2xl glass-card flex flex-wrap items-center justify-between gap-2.5 border border-border/70 shadow-2xs">
-          {/* Left Controls: Search Box + Status Filter Pills */}
-          <div className="flex flex-wrap items-center gap-2 flex-1 min-w-[280px]">
-            {/* Search Input */}
-            <div className="relative min-w-[180px] flex-1 max-w-xs">
-              <Search className="size-3.5 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                placeholder="Search student, enrollment, email..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full h-8.5 pl-8.5 pr-7 rounded-xl bg-muted/40 border border-border/70 text-xs font-medium text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-              />
-              {searchQuery && (
+        {/* Single Unified Horizontal Toolbar (Uniform Equal Gaps, No Overlaps, No Stacking, Unclipped Dropdowns) */}
+        <div className="w-fit max-w-full px-3 py-2 rounded-2xl glass-card flex items-center gap-2.5 border border-border/70 shadow-2xs relative z-30 flex-nowrap">
+          {/* 1. Search Box */}
+          <div className="relative w-44 sm:w-48 shrink-0">
+            <Search className="size-3.5 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Search student..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full h-8 pl-8.5 pr-7 rounded-xl bg-muted/40 dark:bg-zinc-800/60 border border-border/70 text-xs font-medium text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
+              >
+                <X className="size-3" />
+              </button>
+            )}
+          </div>
+
+          {/* 2. Status Segmented Control */}
+          <div className="flex items-center p-0.5 bg-muted/40 dark:bg-zinc-800/60 rounded-xl border border-border/70 text-[11px] font-bold shrink-0">
+            <button
+              onClick={() => setStatusFilter("ALL")}
+              className={`px-2 py-0.5 rounded-lg transition-all cursor-pointer ${
+                statusFilter === "ALL"
+                  ? "bg-background dark:bg-zinc-700/80 text-foreground shadow-2xs"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              All
+            </button>
+            <button
+              onClick={() => setStatusFilter("approved")}
+              className={`px-2 py-0.5 rounded-lg transition-all cursor-pointer ${
+                statusFilter === "approved"
+                  ? "bg-emerald-600 text-white shadow-2xs"
+                  : "text-muted-foreground hover:text-emerald-600"
+              }`}
+            >
+              Approved
+            </button>
+            <button
+              onClick={() => setStatusFilter("submitted")}
+              className={`px-2 py-0.5 rounded-lg transition-all cursor-pointer ${
+                statusFilter === "submitted"
+                  ? "bg-indigo-600 text-white shadow-2xs"
+                  : "text-muted-foreground hover:text-indigo-600"
+              }`}
+            >
+              Pending
+            </button>
+            <button
+              onClick={() => setStatusFilter("changes_requested")}
+              className={`px-2 py-0.5 rounded-lg transition-all cursor-pointer ${
+                statusFilter === "changes_requested"
+                  ? "bg-amber-600 text-white shadow-2xs"
+                  : "text-muted-foreground hover:text-amber-600"
+              }`}
+            >
+              Revision
+            </button>
+            <button
+              onClick={() => setStatusFilter("draft")}
+              className={`px-2 py-0.5 rounded-lg transition-all cursor-pointer ${
+                statusFilter === "draft"
+                  ? "bg-slate-700 dark:bg-zinc-600 text-white shadow-2xs"
+                  : "text-muted-foreground hover:text-slate-700"
+              }`}
+            >
+              Draft
+            </button>
+          </div>
+
+          {/* Hairline Divider */}
+          <div className="h-4 w-px bg-border/60 shrink-0" />
+
+          {/* 3. Practical Selector (In Submissions Mode) */}
+          {activeTab === "submissions" && assignments && assignments.length > 0 && (
+            <GlassDropdown
+              value={selectedAssignment}
+              options={practicalOptions}
+              onChange={(val) => setSelectedAssignment(val)}
+              placeholder="Select Practical"
+              className="shrink-0"
+              buttonClassName="h-8 px-2.5 text-xs"
+            />
+          )}
+
+          {/* 4. Division Selector */}
+          {divisionOptions.length > 1 && (
+            <GlassDropdown
+              value={selectedDivision}
+              options={divisionOptions}
+              onChange={(val) => setSelectedDivision(val)}
+              placeholder="Select Division"
+              className="shrink-0"
+              buttonClassName="h-8 px-2.5 text-xs"
+            />
+          )}
+
+          {/* 5. Batch Selector */}
+          {((classroom?.batches && classroom.batches.length > 0) || (gradebookData?.summary?.availableBatches?.length > 0)) && (
+            <GlassDropdown
+              value={selectedBatch}
+              options={batchOptions}
+              onChange={(val) => setSelectedBatch(val)}
+              placeholder="Select Batch"
+              className="shrink-0"
+              buttonClassName="h-8 px-2.5 text-xs"
+            />
+          )}
+
+          {/* Hairline Divider */}
+          <div className="h-4 w-px bg-border/60 shrink-0" />
+
+          {/* 6. Sorting Dropdown */}
+          <GlassDropdown
+            value={sortOption}
+            options={sortOptions}
+            onChange={(val) => setSortOption(val as SortOptionType)}
+            placeholder="Sort By"
+            className="shrink-0"
+            buttonClassName="h-8 px-2.5 text-xs"
+          />
+
+          {/* 7. Density Switcher (Matrix Mode) */}
+          {activeTab === "matrix" && (
+            <Button
+              onClick={() => setIsCompactDensity(!isCompactDensity)}
+              variant="ghost"
+              size="sm"
+              className="h-8 px-2.5 rounded-xl text-xs font-bold text-muted-foreground bg-muted/40 dark:bg-zinc-800/60 hover:bg-muted/60 dark:hover:bg-zinc-700/60 border border-border/70 hover:text-foreground cursor-pointer shrink-0 transition-all gap-1.5"
+              title={isCompactDensity ? "Switch to Comfortable spacing" : "Switch to Compact density"}
+            >
+              {isCompactDensity ? <Maximize2 className="size-3.5" /> : <Minimize2 className="size-3.5" />}
+              <span>{isCompactDensity ? "Spacious" : "Compact"}</span>
+            </Button>
+          )}
+
+        </div>
+
+        {/* Linear-Style Active Filters Strip */}
+        {isFiltersActive && (
+          <div className="flex items-center flex-wrap gap-2 px-1 text-xs animate-in fade-in-50 slide-in-from-top-1 duration-150">
+            <span className="text-muted-foreground font-semibold text-[11px] flex items-center gap-1 shrink-0">
+              <Filter className="size-3 text-indigo-500" />
+              Filtered by:
+            </span>
+
+            {/* Search Query Chip */}
+            {searchQuery.trim() !== "" && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-muted/60 dark:bg-zinc-800/80 border border-border/80 text-[11px] font-medium text-foreground">
+                <span>Search: &ldquo;{searchQuery}&rdquo;</span>
                 <button
                   onClick={() => setSearchQuery("")}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
+                  className="text-muted-foreground hover:text-foreground cursor-pointer rounded-sm hover:bg-muted p-0.5 transition-colors"
+                  title="Remove search filter"
                 >
-                  <X className="size-3" />
+                  <X className="size-2.5" />
                 </button>
-              )}
-            </div>
+              </span>
+            )}
 
-            {/* Status Segmented Control */}
-            <div className="flex items-center p-0.5 bg-muted/50 rounded-xl border border-border/50 text-xs font-bold shrink-0">
-              <button
-                onClick={() => setStatusFilter("ALL")}
-                className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
-                  statusFilter === "ALL"
-                    ? "bg-background text-foreground shadow-2xs"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                All
-              </button>
-              <button
-                onClick={() => setStatusFilter("approved")}
-                className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
-                  statusFilter === "approved"
-                    ? "bg-emerald-600 text-white shadow-2xs"
-                    : "text-muted-foreground hover:text-emerald-600"
-                }`}
-              >
-                Approved
-              </button>
-              <button
-                onClick={() => setStatusFilter("submitted")}
-                className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
-                  statusFilter === "submitted"
-                    ? "bg-indigo-600 text-white shadow-2xs"
-                    : "text-muted-foreground hover:text-indigo-600"
-                }`}
-              >
-                Pending
-              </button>
-              <button
-                onClick={() => setStatusFilter("changes_requested")}
-                className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
-                  statusFilter === "changes_requested"
-                    ? "bg-amber-600 text-white shadow-2xs"
-                    : "text-muted-foreground hover:text-amber-600"
-                }`}
-              >
-                Revision
-              </button>
-              <button
-                onClick={() => setStatusFilter("draft")}
-                className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
-                  statusFilter === "draft"
-                    ? "bg-slate-700 text-white shadow-2xs"
-                    : "text-muted-foreground hover:text-slate-700"
-                }`}
-              >
-                Draft
-              </button>
-            </div>
+            {/* Status Filter Chip */}
+            {statusFilter !== "ALL" && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-muted/60 dark:bg-zinc-800/80 border border-border/80 text-[11px] font-medium text-foreground capitalize">
+                <span>Status: {statusFilter.replace("_", " ")}</span>
+                <button
+                  onClick={() => setStatusFilter("ALL")}
+                  className="text-muted-foreground hover:text-foreground cursor-pointer rounded-sm hover:bg-muted p-0.5 transition-colors"
+                  title="Remove status filter"
+                >
+                  <X className="size-2.5" />
+                </button>
+              </span>
+            )}
+
+            {/* Practical Filter Chip */}
+            {selectedAssignment !== "ALL" && activeAssignmentObj && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-muted/60 dark:bg-zinc-800/80 border border-border/80 text-[11px] font-medium text-foreground">
+                <span>Practical: Exp {activeAssignmentObj.experimentNumber}</span>
+                <button
+                  onClick={() => setSelectedAssignment("ALL")}
+                  className="text-muted-foreground hover:text-foreground cursor-pointer rounded-sm hover:bg-muted p-0.5 transition-colors"
+                  title="Remove practical filter"
+                >
+                  <X className="size-2.5" />
+                </button>
+              </span>
+            )}
+
+            {/* Division Filter Chip */}
+            {selectedDivision !== "ALL" && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-muted/60 dark:bg-zinc-800/80 border border-border/80 text-[11px] font-medium text-foreground">
+                <span>Division: {selectedDivision}</span>
+                <button
+                  onClick={() => setSelectedDivision("ALL")}
+                  className="text-muted-foreground hover:text-foreground cursor-pointer rounded-sm hover:bg-muted p-0.5 transition-colors"
+                  title="Remove division filter"
+                >
+                  <X className="size-2.5" />
+                </button>
+              </span>
+            )}
+
+            {/* Batch Filter Chip */}
+            {selectedBatch !== "ALL" && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-muted/60 dark:bg-zinc-800/80 border border-border/80 text-[11px] font-medium text-foreground">
+                <span>Batch: {selectedBatch}</span>
+                <button
+                  onClick={() => setSelectedBatch("ALL")}
+                  className="text-muted-foreground hover:text-foreground cursor-pointer rounded-sm hover:bg-muted p-0.5 transition-colors"
+                  title="Remove batch filter"
+                >
+                  <X className="size-2.5" />
+                </button>
+              </span>
+            )}
+
+            {/* Reset All Button */}
+            <button
+              onClick={handleResetFilters}
+              className="text-[11px] font-bold text-indigo-500 hover:text-indigo-600 dark:hover:text-indigo-400 cursor-pointer ml-1 transition-colors hover:underline"
+            >
+              Reset all
+            </button>
           </div>
-
-          {/* Right Controls: Practical, Batch, Sort, Reset & Density */}
-          <div className="flex flex-wrap items-center gap-2 shrink-0">
-            {/* Practical Selector (In Submissions Mode) */}
-            {activeTab === "submissions" && assignments && assignments.length > 0 && (
-              <div className="w-auto min-w-[160px] max-w-[220px]">
-                <GlassDropdown
-                  value={selectedAssignment}
-                  options={practicalOptions}
-                  onChange={(val) => setSelectedAssignment(val)}
-                  placeholder="Select Practical"
-                />
-              </div>
-            )}
-
-            {/* Batch Selector */}
-            {((classroom?.batches && classroom.batches.length > 0) || (gradebookData?.summary?.availableBatches?.length > 0)) && (
-              <div className="w-auto min-w-[110px] max-w-[150px]">
-                <GlassDropdown
-                  value={selectedBatch}
-                  options={batchOptions}
-                  onChange={(val) => setSelectedBatch(val)}
-                  placeholder="Select Batch"
-                />
-              </div>
-            )}
-
-            {/* Sorting Dropdown */}
-            <div className="w-auto min-w-[140px] max-w-[180px]">
-              <GlassDropdown
-                value={sortOption}
-                options={sortOptions}
-                onChange={(val) => setSortOption(val as SortOptionType)}
-                placeholder="Sort By"
-              />
-            </div>
-
-            {/* Reset Filters Pill */}
-            {isFiltersActive && (
-              <Button
-                onClick={handleResetFilters}
-                variant="ghost"
-                size="sm"
-                className="h-8.5 px-2.5 text-xs font-semibold text-muted-foreground hover:text-foreground gap-1.5 rounded-xl border border-border/50 cursor-pointer"
-                title="Reset active filters"
-              >
-                <RotateCcw className="size-3" />
-                <span>Reset</span>
-              </Button>
-            )}
-
-            {/* Density Switcher (Matrix Mode) */}
-            {activeTab === "matrix" && (
-              <Button
-                onClick={() => setIsCompactDensity(!isCompactDensity)}
-                variant="ghost"
-                size="sm"
-                className="h-8.5 px-2.5 rounded-xl text-xs font-bold text-muted-foreground border border-border/60 hover:text-foreground cursor-pointer shrink-0"
-                title={isCompactDensity ? "Switch to Comfortable spacing" : "Switch to Compact density"}
-              >
-                {isCompactDensity ? <Maximize2 className="size-3.5" /> : <Minimize2 className="size-3.5" />}
-                <span className="ml-1 text-xs">{isCompactDensity ? "Spacious" : "Compact"}</span>
-              </Button>
-            )}
-          </div>
-        </div>
+        )}
 
         {/* ========================================================================= */}
         {/* TAB 1: 2D GRADEBOOK MATRIX SPREADSHEET */}
         {/* ========================================================================= */}
         {activeTab === "matrix" && (
           <div className="rounded-3xl glass-card border border-border/80 overflow-hidden shadow-sm flex flex-col">
+            {/* Cluster Scope Ribbon */}
+            {existingClusterNames.length > 0 && (
+              <div className="flex items-center gap-2 p-3 bg-muted/30 border-b border-border/60 overflow-x-auto">
+                <span className="text-xs font-semibold text-muted-foreground mr-1 flex items-center gap-1.5 shrink-0">
+                  <Layers className="size-3.5 text-indigo-500" />
+                  Cluster Scope:
+                </span>
+                <button
+                  onClick={() => setClusterScope("ALL")}
+                  className={`px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                    clusterScope === "ALL"
+                      ? "bg-indigo-600 text-white shadow-xs"
+                      : "glass-pill text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  All Experiments & Clusters
+                </button>
+                {existingClusterNames.map((cName) => (
+                  <button
+                    key={cName}
+                    onClick={() => setClusterScope(cName)}
+                    className={`px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+                      clusterScope === cName
+                        ? "bg-indigo-600 text-white shadow-xs"
+                        : "glass-pill text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <Folder className="size-3" />
+                    <span>{cName}</span>
+                  </button>
+                ))}
+                {matrixClusters.unclustered.length > 0 && (
+                  <button
+                    onClick={() => setClusterScope("UNCLUSTERED")}
+                    className={`px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                      clusterScope === "UNCLUSTERED"
+                        ? "bg-indigo-600 text-white shadow-xs"
+                        : "glass-pill text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Unclustered Only
+                  </button>
+                )}
+              </div>
+            )}
+
             {gradebookLoading ? (
               <div className="flex items-center justify-center p-16">
                 <p className="text-xs text-muted-foreground animate-pulse">Calculating gradebook matrix...</p>
@@ -646,6 +946,51 @@ export default function ClassroomGradesPage({ params }: PageProps) {
               <div className="overflow-x-auto relative">
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
+                    {/* Multi-Tiered Header Row 1 (Cluster Groupings) - Only if clusters exist */}
+                    {existingClusterNames.length > 0 && (
+                      <tr className="border-b border-border/40 bg-muted/70 text-xs font-extrabold">
+                        <th
+                          colSpan={4}
+                          className="pl-4 py-2 bg-muted/95 backdrop-blur z-20 border-r border-border/60 text-muted-foreground sticky left-0 uppercase tracking-wider text-[10px]"
+                        >
+                          Student Details
+                        </th>
+
+                        {displayedClusters.map((cluster) => (
+                          <th
+                            key={cluster.name}
+                            colSpan={cluster.assignments.length + 1}
+                            className="py-2 px-2 text-center bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border-x border-indigo-500/20 font-bold"
+                          >
+                            <span className="flex items-center justify-center gap-1">
+                              <Folder className="size-3.5" />
+                              <span>{cluster.name}</span>
+                              <span className="text-[10px] font-normal opacity-80">
+                                ({cluster.assignments.length} practicals)
+                              </span>
+                            </span>
+                          </th>
+                        ))}
+
+                        {displayedUnclustered.length > 0 && (
+                          <th
+                            colSpan={displayedUnclustered.length}
+                            className="py-2 px-2 text-center bg-muted/50 text-muted-foreground border-x border-border/40 font-bold text-[11px]"
+                          >
+                            Unclustered Experiments ({displayedUnclustered.length})
+                          </th>
+                        )}
+
+                        <th
+                          colSpan={3}
+                          className="py-2 px-3 text-center bg-muted/90 text-muted-foreground font-bold pr-4 uppercase tracking-wider text-[10px]"
+                        >
+                          Summary
+                        </th>
+                      </tr>
+                    )}
+
+                    {/* Column Header Row 2 */}
                     <tr className="border-b border-border/60 bg-muted/50 text-muted-foreground font-bold">
                       {/* Pinned Left Columns */}
                       <th className={`pl-4 w-10 shrink-0 ${isCompactDensity ? "py-1.5" : "py-3"} sticky left-0 bg-muted/95 backdrop-blur z-20 border-r border-border/40`}>
@@ -657,20 +1002,55 @@ export default function ClassroomGradesPage({ params }: PageProps) {
                       <th className={`min-w-[170px] ${isCompactDensity ? "py-1.5 px-2.5" : "py-3 px-3.5"} sticky left-[150px] bg-muted/95 backdrop-blur z-20 border-r border-border/60 shadow-xs`}>
                         Student Name
                       </th>
-
                       <th className={`w-16 ${isCompactDensity ? "py-1.5 px-2" : "py-3 px-3"}`}>Batch</th>
 
-                      {/* Practical Columns */}
-                      {gradebookData.assignments.map((asg: any) => (
-                        <th key={asg.id} className={`min-w-[130px] text-center border-l border-border/40 ${isCompactDensity ? "py-1.5 px-2" : "py-3 px-3"}`}>
+                      {/* Clustered Practical Columns + Subtotal */}
+                      {displayedClusters.map((cluster) => (
+                        <React.Fragment key={cluster.name}>
+                          {cluster.assignments.map((asg: any) => (
+                            <th key={asg.id} className={`min-w-[125px] text-center border-l border-border/40 ${isCompactDensity ? "py-1.5 px-2" : "py-3 px-3"}`}>
+                              <div className="flex flex-col items-center">
+                                <span className="text-foreground font-extrabold">Exp #{asg.experimentNumber}</span>
+                                <span className="text-[10px] text-muted-foreground/70 font-semibold truncate max-w-[105px]" title={asg.title}>
+                                  {asg.title || `Max: ${asg.maxMarks}`}
+                                </span>
+                              </div>
+                            </th>
+                          ))}
+                          {/* Cluster Subtotal Header */}
+                          <th className={`min-w-[90px] text-center border-x border-indigo-500/25 bg-indigo-500/15 text-indigo-800 dark:text-indigo-200 font-extrabold ${isCompactDensity ? "py-1.5 px-1.5" : "py-3 px-2"}`} title="Cluster Subtotal Marks">
+                            <div className="flex flex-col items-center">
+                              <span>SubT</span>
+                              <span className="text-[9px] font-normal opacity-75">Marks</span>
+                            </div>
+                          </th>
+                        </React.Fragment>
+                      ))}
+
+                      {/* Unclustered Practical Columns */}
+                      {displayedUnclustered.map((asg: any) => (
+                        <th key={asg.id} className={`min-w-[125px] text-center border-l border-border/40 ${isCompactDensity ? "py-1.5 px-2" : "py-3 px-3"}`}>
                           <div className="flex flex-col items-center">
                             <span className="text-foreground font-extrabold">Exp #{asg.experimentNumber}</span>
-                            <span className="text-[10px] text-muted-foreground/70 font-semibold truncate max-w-[110px]" title={asg.title}>
+                            <span className="text-[10px] text-muted-foreground/70 font-semibold truncate max-w-[105px]" title={asg.title}>
                               {asg.title || `Max: ${asg.maxMarks}`}
                             </span>
                           </div>
                         </th>
                       ))}
+
+                      {/* Fallback if no clusters exist at all in classroom */}
+                      {existingClusterNames.length === 0 &&
+                        gradebookData.assignments.map((asg: any) => (
+                          <th key={asg.id} className={`min-w-[130px] text-center border-l border-border/40 ${isCompactDensity ? "py-1.5 px-2" : "py-3 px-3"}`}>
+                            <div className="flex flex-col items-center">
+                              <span className="text-foreground font-extrabold">Exp #{asg.experimentNumber}</span>
+                              <span className="text-[10px] text-muted-foreground/70 font-semibold truncate max-w-[110px]" title={asg.title}>
+                                {asg.title || `Max: ${asg.maxMarks}`}
+                              </span>
+                            </div>
+                          </th>
+                        ))}
 
                       {/* Total Score & Standing Columns */}
                       <th className={`min-w-[120px] text-center border-l border-border/40 bg-muted/60 ${isCompactDensity ? "py-1.5" : "py-3"}`}>
@@ -714,62 +1094,53 @@ export default function ClassroomGradesPage({ params }: PageProps) {
                             )}
                           </td>
 
-                          {/* Practical Evaluation Cells */}
-                          {gradebookData.assignments.map((asg: any) => {
-                            const g = student.grades[asg.id] || {};
-                            const statusStr = g.status || "not_started";
-                            const marks = g.marks;
+                          {/* Clustered Practical Evaluation Cells + Subtotal */}
+                          {displayedClusters.map((cluster) => (
+                            <React.Fragment key={cluster.name}>
+                              {cluster.assignments.map((asg: any) => {
+                                const g = student.grades[asg.id] || {};
+                                return renderGradeCell(asg, g);
+                              })}
+                              {/* Cluster Subtotal Cell */}
+                              {(() => {
+                                const cSummary = student.clusterSummaries?.[cluster.name];
+                                return (
+                                  <td
+                                    key={`subt-${cluster.name}`}
+                                    className={`text-center font-bold font-mono border-x border-indigo-500/20 bg-indigo-500/[0.04] text-indigo-700 dark:text-indigo-300 ${
+                                      isCompactDensity ? "py-1 px-1.5" : "py-2 px-2"
+                                    }`}
+                                  >
+                                    {cSummary ? (
+                                      <div className="flex flex-col items-center">
+                                        <span className="font-extrabold text-xs">
+                                          {cSummary.earned} / {cSummary.evaluatedMax || cSummary.totalMax}
+                                        </span>
+                                        <span className="text-[9px] text-muted-foreground font-medium">
+                                          ({cSummary.approvedCount}/{cSummary.totalCount} eval)
+                                        </span>
+                                      </div>
+                                    ) : (
+                                      <span className="text-muted-foreground/50">—</span>
+                                    )}
+                                  </td>
+                                );
+                              })()}
+                            </React.Fragment>
+                          ))}
 
-                            return (
-                              <td key={asg.id} className={`text-center border-l border-border/40 ${isCompactDensity ? "py-1 px-1.5" : "py-2 px-2.5"}`}>
-                                {statusStr === "approved" && marks !== null ? (
-                                  <Link
-                                    href={`/editor/${g.journalId}`}
-                                    className={`inline-flex items-center gap-1 rounded-full font-extrabold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 hover:scale-105 transition-transform cursor-pointer ${
-                                      isCompactDensity ? "px-2 py-0.5 text-[10px]" : "px-2.5 py-1 text-[11px]"
-                                    }`}
-                                    title={`Approved: ${marks}/${asg.maxMarks}${g.approvedAt ? ` on ${new Date(g.approvedAt).toLocaleDateString()}` : ""}`}
-                                  >
-                                    <Check className="size-3" />
-                                    <span>{marks}/{asg.maxMarks}</span>
-                                  </Link>
-                                ) : statusStr === "submitted" || statusStr === "late_submitted" ? (
-                                  <Link
-                                    href={`/editor/${g.journalId}`}
-                                    className={`inline-flex items-center gap-1 rounded-full font-bold bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-500/30 hover:scale-105 transition-transform cursor-pointer ${
-                                      isCompactDensity ? "px-2 py-0.5 text-[9px]" : "px-2.5 py-1 text-[10px]"
-                                    }`}
-                                    title="Submitted: Ready for evaluation"
-                                  >
-                                    <Clock className="size-3" />
-                                    <span>Grade</span>
-                                  </Link>
-                                ) : statusStr === "changes_requested" ? (
-                                  <Link
-                                    href={`/editor/${g.journalId}`}
-                                    className={`inline-flex items-center gap-1 rounded-full font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 hover:scale-105 transition-transform cursor-pointer ${
-                                      isCompactDensity ? "px-2 py-0.5 text-[9px]" : "px-2.5 py-1 text-[10px]"
-                                    }`}
-                                    title="Revision requested"
-                                  >
-                                    <FileEdit className="size-3" />
-                                    <span>Revision</span>
-                                  </Link>
-                                ) : statusStr === "draft" ? (
-                                  <span
-                                    className={`inline-flex items-center gap-1 rounded-full font-medium bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-500/20 ${
-                                      isCompactDensity ? "px-1.5 py-0.2 text-[9px]" : "px-2 py-0.5 text-[10px]"
-                                    }`}
-                                    title="Student draft in progress"
-                                  >
-                                    In Progress
-                                  </span>
-                                ) : (
-                                  <span className="text-[11px] text-muted-foreground/40 font-medium" title="Not started">—</span>
-                                )}
-                              </td>
-                            );
+                          {/* Unclustered Practical Cells */}
+                          {displayedUnclustered.map((asg: any) => {
+                            const g = student.grades[asg.id] || {};
+                            return renderGradeCell(asg, g);
                           })}
+
+                          {/* Fallback if no clusters exist at all in classroom */}
+                          {existingClusterNames.length === 0 &&
+                            gradebookData.assignments.map((asg: any) => {
+                              const g = student.grades[asg.id] || {};
+                              return renderGradeCell(asg, g);
+                            })}
 
                           {/* Totals & Standing */}
                           <td className={`text-center border-l border-border/40 bg-muted/20 ${isCompactDensity ? "py-1.5" : "py-3"}`}>

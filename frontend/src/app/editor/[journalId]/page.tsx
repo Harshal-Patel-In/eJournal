@@ -704,6 +704,8 @@ export default function EditorPage({ params }: PageProps) {
               journalId={journalId}
               classroomId={classroomId}
               journalStatus={status}
+              assignment={assignment}
+              studentId={journal?.studentId}
               maxMarks={assignment?.maxMarks || 10}
               currentMarks={journal?.marks}
               currentRemarks={journal?.teacherRemarks}

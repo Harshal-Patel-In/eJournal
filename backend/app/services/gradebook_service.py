@@ -30,7 +30,7 @@ class GradebookService:
         self.user_repo = UserRepository()
 
     async def get_classroom_gradebook(
-        self, classroom_id: str, teacher_id: str, batch: str | None = None
+        self, classroom_id: str, teacher_id: str, batch: str | None = None, division: str | None = None
     ) -> dict:
         """Construct the full 2D grading matrix for a classroom (Teacher only)."""
         classroom = await self.classroom_repo.find_by_id(classroom_id)
@@ -83,12 +83,17 @@ class GradebookService:
             key = (str(j.get("studentId", "")), str(j.get("assignmentId", "")))
             journal_map[key] = j
 
-        # 4. Extract batches and build student rows
+        # 4. Extract batches and divisions, and build student rows
         available_batches_set: set[str] = set(classroom.get("batches", []))
+        available_divisions_set: set[str] = set()
+        if classroom.get("division"):
+            available_divisions_set.add(classroom["division"].strip().upper())
+
         student_rows = []
         total_eval_percentages = []
 
         active_batch_filter = (batch or "ALL").strip().upper()
+        active_division_filter = (division or "ALL").strip().upper()
 
         for m in all_memberships:
             student_id = m.get("studentId")
@@ -100,12 +105,19 @@ class GradebookService:
             student_name = profile.get("name") or (user.get("name") if user else None) or (user.get("email") if user else "Student")
             enrollment_no = profile.get("enrollmentNumber") or m.get("enrollmentNumber") or "N/A"
             student_batch = (profile.get("batch") or m.get("batch") or "").strip().upper()
+            student_division = (profile.get("division") or m.get("division") or classroom.get("division") or "").strip().upper()
 
             if student_batch:
                 available_batches_set.add(student_batch)
+            if student_division:
+                available_divisions_set.add(student_division)
 
             # Apply batch filter if specified
             if active_batch_filter != "ALL" and student_batch != active_batch_filter:
+                continue
+
+            # Apply division filter if specified
+            if active_division_filter != "ALL" and student_division != active_division_filter:
                 continue
 
             student_grades: dict[str, dict] = {}
@@ -172,14 +184,47 @@ class GradebookService:
             else:
                 standing = "Pending"
 
+            # Calculate cluster summaries for this student
+            cluster_summaries: dict[str, dict] = {}
+            for asg in assignments:
+                c_name = asg.get("clusterName") or "Unclustered"
+                if c_name not in cluster_summaries:
+                    cluster_summaries[c_name] = {
+                        "clusterName": c_name,
+                        "earned": 0.0,
+                        "evaluatedMax": 0.0,
+                        "totalMax": 0.0,
+                        "approvedCount": 0,
+                        "totalCount": 0,
+                        "pendingCount": 0,
+                    }
+                asg_max = float(asg.get("maxMarks", 10))
+                cluster_summaries[c_name]["totalMax"] += asg_max
+                cluster_summaries[c_name]["totalCount"] += 1
+
+                grade_info = student_grades.get(asg["id"])
+                if grade_info and grade_info["status"] == "approved" and grade_info["marks"] is not None:
+                    cluster_summaries[c_name]["earned"] += float(grade_info["marks"])
+                    cluster_summaries[c_name]["evaluatedMax"] += asg_max
+                    cluster_summaries[c_name]["approvedCount"] += 1
+                else:
+                    cluster_summaries[c_name]["pendingCount"] += 1
+
+            for c_name, c_data in cluster_summaries.items():
+                c_data["earned"] = round(c_data["earned"], 2)
+                c_data["evaluatedMax"] = round(c_data["evaluatedMax"], 2)
+                c_data["totalMax"] = round(c_data["totalMax"], 2)
+
             student_rows.append(
                 {
                     "studentId": student_id,
                     "name": student_name,
                     "enrollmentNumber": enrollment_no,
+                    "division": student_division or classroom.get("division") or "N/A",
                     "batch": student_batch or "N/A",
                     "email": user.get("email") if user else None,
                     "grades": student_grades,
+                    "clusterSummaries": cluster_summaries,
                     "totalMarksObtained": round(marks_obtained_sum, 2),
                     "evaluatedMaxMarks": round(evaluated_max_marks_sum, 2),
                     "totalMaxMarks": round(term_max_marks_sum, 2),
@@ -218,6 +263,7 @@ class GradebookService:
                     "maxMarks": a.get("maxMarks", 10),
                     "aim": a.get("aim"),
                     "deadline": a.get("deadline"),
+                    "clusterName": a.get("clusterName"),
                 }
                 for a in assignments
             ],
@@ -226,16 +272,18 @@ class GradebookService:
                 "totalStudents": len(student_rows),
                 "totalAssignments": len(assignments),
                 "classAveragePercentage": class_avg_percentage,
+                "availableDivisions": sorted(list(available_divisions_set)),
                 "availableBatches": sorted(list(available_batches_set)),
+                "selectedDivision": active_division_filter,
                 "selectedBatch": active_batch_filter,
             },
         }
 
     async def export_gradebook_csv(
-        self, classroom_id: str, teacher_id: str, batch: str | None = None
+        self, classroom_id: str, teacher_id: str, batch: str | None = None, division: str | None = None
     ) -> StreamingResponse:
         """Stream a downloadable .csv spreadsheet of classroom marks."""
-        gradebook_data = await self.get_classroom_gradebook(classroom_id, teacher_id, batch)
+        gradebook_data = await self.get_classroom_gradebook(classroom_id, teacher_id, batch, division)
         classroom = gradebook_data["classroom"]
         assignments = gradebook_data["assignments"]
         students = gradebook_data["students"]
@@ -248,16 +296,28 @@ class GradebookService:
         writer.writerow(["eJournal — Academic Gradebook & Evaluation Report"])
         writer.writerow(["Classroom:", classroom.get("name", "N/A"), "Subject:", classroom.get("subject", "N/A")])
         writer.writerow(["Department:", classroom.get("department", "N/A"), "Semester / Div:", f"Sem {classroom.get('semester', '')} - Div {classroom.get('division', '')}"])
-        writer.writerow(["Batch Filter:", summary.get("selectedBatch", "ALL"), "Export Date (UTC):", datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")])
+        writer.writerow(["Division Filter:", summary.get("selectedDivision", "ALL"), "Batch Filter:", summary.get("selectedBatch", "ALL"), "Export Date (UTC):", datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")])
         writer.writerow(["Total Students:", summary.get("totalStudents", 0), "Class Avg Score:", f"{summary.get('classAveragePercentage', 0)}%"])
         writer.writerow([])  # Blank spacer row
 
+        # Collect unique clusters in order
+        cluster_names_ordered: list[str] = []
+        for asg in assignments:
+            c = asg.get("clusterName") or "Unclustered"
+            if c not in cluster_names_ordered:
+                cluster_names_ordered.append(c)
+
         # Table Column Headers
-        headers = ["Sr. No.", "Enrollment No.", "Student Name", "Batch"]
+        headers = ["Sr. No.", "Enrollment No.", "Student Name", "Division", "Batch"]
         for asg in assignments:
             exp_num = asg.get("experimentNumber", 1)
             max_m = asg.get("maxMarks", 10)
-            headers.append(f"Exp #{exp_num} (Max: {max_m})")
+            c_tag = f" [{asg.get('clusterName')}]" if asg.get("clusterName") else ""
+            headers.append(f"Exp #{exp_num}{c_tag} (Max: {max_m})")
+
+        # Cluster subtotal columns
+        for c in cluster_names_ordered:
+            headers.append(f"Subtotal: {c}")
 
         headers.extend(["Total Obtained", "Total Max", "Percentage (%)", "Completed Practicals", "Standing"])
         writer.writerow(headers)
@@ -268,6 +328,7 @@ class GradebookService:
                 str(i),
                 s["enrollmentNumber"],
                 s["name"],
+                s.get("division", "N/A"),
                 s["batch"],
             ]
 
@@ -289,6 +350,18 @@ class GradebookService:
 
                 row.append(cell_val)
 
+            # Append cluster subtotals
+            c_summaries = s.get("clusterSummaries", {})
+            for c in cluster_names_ordered:
+                c_data = c_summaries.get(c, {})
+                earned = c_data.get("earned", 0.0)
+                tot_max = c_data.get("totalMax", 0.0)
+                pending = c_data.get("pendingCount", 0)
+                if pending > 0:
+                    row.append(f"{earned}/{tot_max} ({pending} Pending)")
+                else:
+                    row.append(f"{earned}/{tot_max}")
+
             pct = s["percentage"]
             standing = s.get("standing", "Pending")
 
@@ -303,8 +376,9 @@ class GradebookService:
 
         output.seek(0)
         safe_name = "".join(c if c.isalnum() else "_" for c in classroom.get("name", "Classroom")).strip("_")
+        div_suffix = f"_{summary.get('selectedDivision')}" if summary.get("selectedDivision") != "ALL" else ""
         batch_suffix = f"_{summary.get('selectedBatch')}" if summary.get("selectedBatch") != "ALL" else ""
-        filename = f"Gradebook_{safe_name}{batch_suffix}.csv"
+        filename = f"Gradebook_{safe_name}{div_suffix}{batch_suffix}.csv"
 
         return StreamingResponse(
             iter([output.getvalue()]),

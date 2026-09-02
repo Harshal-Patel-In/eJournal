@@ -7,12 +7,15 @@ import { Button } from "@/components/ui/button";
 import { InlineMathText } from "@/components/inline-math-text";
 import { applyMathShortcuts } from "@/lib/math-shortcuts";
 import { TableSpreadsheetModal } from "@/components/editor/table-spreadsheet-modal";
+import { evaluateFormulaOnRow } from "@/lib/table-formula";
 
 interface TableBlockProps {
   id: string;
   content: {
     headers?: string[];
     rows?: string[][];
+    columnFormulas?: Record<number, string>;
+    columnPrecision?: Record<number, string>;
   };
   previewMode: boolean;
 }
@@ -20,11 +23,36 @@ interface TableBlockProps {
 export default function TableBlock({ id, content, previewMode }: TableBlockProps) {
   const { blocks, addBlock, updateBlock } = useDocumentStore();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [initialFormulaCol, setInitialFormulaCol] = useState<number | null>(null);
   const [editingHeaderIdx, setEditingHeaderIdx] = useState<number | null>(null);
   const [editingCell, setEditingCell] = useState<{ r: number; c: number } | null>(null);
 
   const headers = content.headers || ["Column 1", "Column 2"];
   const rows = content.rows || [["", ""]];
+  const columnFormulas = content.columnFormulas || {};
+  const columnPrecision = content.columnPrecision || {};
+
+  // Helper to dynamically evaluate all active formulas on a single row (O(1) constant time)
+  const recomputeRowFormulas = (
+    row: string[],
+    currentHeaders: string[] = headers,
+    formulas: Record<number, string> = columnFormulas,
+    precisions: Record<number, string> = columnPrecision
+  ): string[] => {
+    let computedRow = [...row];
+    for (const [colIdxStr, formula] of Object.entries(formulas)) {
+      const targetCol = parseInt(colIdxStr, 10);
+      if (isNaN(targetCol) || targetCol < 0 || targetCol >= currentHeaders.length) continue;
+      if (!formula || !formula.trim()) continue;
+
+      const prec = precisions[targetCol] || "auto";
+      const res = evaluateFormulaOnRow(formula, currentHeaders, computedRow, "deg", prec);
+      if (res.success && res.formatted) {
+        computedRow[targetCol] = res.formatted;
+      }
+    }
+    return computedRow;
+  };
 
   const updateHeader = (colIndex: number, value: string) => {
     const nextHeaders = [...headers];
@@ -35,9 +63,9 @@ export default function TableBlock({ id, content, previewMode }: TableBlockProps
   const updateCell = (rowIndex: number, colIndex: number, value: string) => {
     const nextRows = rows.map((row, rIdx) => {
       if (rIdx === rowIndex) {
-        const nextRow = [...row];
+        let nextRow = [...row];
         nextRow[colIndex] = applyMathShortcuts(value);
-        return nextRow;
+        return recomputeRowFormulas(nextRow);
       }
       return row;
     });
@@ -46,7 +74,7 @@ export default function TableBlock({ id, content, previewMode }: TableBlockProps
 
   const addRow = () => {
     const newRow = Array(headers.length).fill("");
-    updateBlock(id, { rows: [...rows, newRow] });
+    updateBlock(id, { rows: [...rows, recomputeRowFormulas(newRow)] });
   };
 
   const removeRow = (rowIndex: number) => {
@@ -121,12 +149,24 @@ export default function TableBlock({ id, content, previewMode }: TableBlockProps
         nextRows.push(rowData);
       }
 
-      updateBlock(id, { headers: nextHeaders, rows: nextRows });
+      const recomputedPastedRows = nextRows.map((r) => recomputeRowFormulas(r, nextHeaders));
+      updateBlock(id, { headers: nextHeaders, rows: recomputedPastedRows });
     }
   };
 
-  const handleModalSave = (newHeaders: string[], newRows: string[][]) => {
-    updateBlock(id, { headers: newHeaders, rows: newRows });
+  const handleModalSave = (
+    newHeaders: string[],
+    newRows: string[][],
+    newFormulas?: Record<number, string>,
+    newPrecision?: Record<number, string>
+  ) => {
+    updateBlock(id, {
+      headers: newHeaders,
+      rows: newRows,
+      columnFormulas: newFormulas ?? columnFormulas,
+      columnPrecision: newPrecision ?? columnPrecision,
+    });
+    setIsModalOpen(false);
   };
 
   if (previewMode) {
@@ -238,12 +278,40 @@ export default function TableBlock({ id, content, previewMode }: TableBlockProps
                       className="w-full bg-background border border-primary font-bold focus:outline-none focus:ring-1 focus:ring-primary text-center text-xs py-1 px-1 rounded"
                     />
                   ) : (
-                    <div
-                      onClick={() => setEditingHeaderIdx(colIdx)}
-                      className="w-full py-1 px-2 cursor-pointer hover:bg-primary/5 rounded transition-colors text-center font-bold text-foreground flex items-center justify-center min-h-[28px]"
-                      title="Click to edit formula / label"
-                    >
-                      <InlineMathText text={header} />
+                    <div className="flex items-center justify-center gap-1 group/header relative">
+                      <div
+                        onClick={() => setEditingHeaderIdx(colIdx)}
+                        className="flex-1 py-1 px-1 cursor-pointer hover:bg-primary/5 rounded transition-colors text-center font-bold text-foreground flex items-center justify-center min-h-[28px] truncate"
+                        title="Click to edit column label"
+                      >
+                        <InlineMathText text={header} />
+                      </div>
+                      {/* Active Formula Indicator Badge */}
+                      {columnFormulas[colIdx] ? (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setInitialFormulaCol(colIdx);
+                            setIsModalOpen(true);
+                          }}
+                          className="px-1.5 py-0.5 rounded-md bg-primary/10 text-primary border border-primary/25 font-mono text-[9px] font-bold shrink-0 cursor-pointer hover:bg-primary/20 transition-colors shadow-2xs"
+                          title={`Active formula: = ${columnFormulas[colIdx]}`}
+                        >
+                          fx
+                        </button>
+                      ) : (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setInitialFormulaCol(colIdx);
+                            setIsModalOpen(true);
+                          }}
+                          className="size-5 rounded hover:bg-primary/10 hover:text-primary text-muted-foreground/60 opacity-0 group-hover/header:opacity-100 transition-opacity flex items-center justify-center text-[10px] font-mono font-bold shrink-0 cursor-pointer"
+                          title="Calculate this column in Spreadsheet Mode (fx)"
+                        >
+                          fx
+                        </button>
+                      )}
                     </div>
                   )}
                 </th>
@@ -322,10 +390,16 @@ export default function TableBlock({ id, content, previewMode }: TableBlockProps
       {/* Focus Spreadsheet Modal */}
       <TableSpreadsheetModal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={() => {
+          setIsModalOpen(false);
+          setInitialFormulaCol(null);
+        }}
         headers={headers}
         rows={rows}
+        columnFormulas={columnFormulas}
+        columnPrecision={columnPrecision}
         onSave={handleModalSave}
+        initialFormulaCol={initialFormulaCol}
       />
     </div>
   );

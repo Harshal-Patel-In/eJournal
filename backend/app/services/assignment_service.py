@@ -72,6 +72,8 @@ class AssignmentService:
             "deadline": request.deadline,
             "references": request.references.strip() if request.references else None,
             "additionalNotes": request.additionalNotes.strip() if request.additionalNotes else None,
+            "clusterName": request.clusterName.strip() if request.clusterName else None,
+            "rubric": [r.model_dump() for r in request.rubric] if request.rubric else None,
             "createdAt": datetime.now(timezone.utc),
         }
 
@@ -217,3 +219,73 @@ class AssignmentService:
         await self.list_assignments(assignment["classroomId"], user_id, role)
 
         return assignment
+
+    async def update_assignment_cluster(
+        self, teacher_id: str, classroom_id: str, assignment_id: str, cluster_name: str | None
+    ) -> dict:
+        """Update or uncluster an individual practical assignment (Teacher only)."""
+        classroom = await self.classroom_repo.find_by_id(classroom_id)
+        if not classroom or classroom.get("teacherId") != teacher_id:
+            raise AppException(
+                code=ErrorCode.FORBIDDEN,
+                message="You are not authorized to manage clusters in this classroom",
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+
+        assignment = await self.assignment_repo.find_by_id(assignment_id)
+        if not assignment or assignment.get("classroomId") != classroom_id:
+            raise AppException(
+                code=ErrorCode.ASSIGNMENT_NOT_FOUND,
+                message="Assignment not found in this classroom",
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+
+        cleaned_cluster = cluster_name.strip() if cluster_name and cluster_name.strip() else None
+        await self.assignment_repo.update_by_id(
+            assignment_id, {"$set": {"clusterName": cleaned_cluster}}
+        )
+
+        assignment["clusterName"] = cleaned_cluster
+        return assignment
+
+    async def bulk_assign_cluster(
+        self, teacher_id: str, classroom_id: str, assignment_ids: list[str], cluster_name: str | None
+    ) -> dict:
+        """Assign or uncluster multiple practicals in a batch (Teacher only)."""
+        classroom = await self.classroom_repo.find_by_id(classroom_id)
+        if not classroom or classroom.get("teacherId") != teacher_id:
+            raise AppException(
+                code=ErrorCode.FORBIDDEN,
+                message="You are not authorized to manage clusters in this classroom",
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+
+        cleaned_cluster = cluster_name.strip() if cluster_name and cluster_name.strip() else None
+        from bson import ObjectId
+        obj_ids = [ObjectId(aid) for aid in assignment_ids if ObjectId.is_valid(aid)]
+
+        modified_count = await self.assignment_repo.update_many(
+            {"_id": {"$in": obj_ids}, "classroomId": classroom_id},
+            {"$set": {"clusterName": cleaned_cluster}}
+        )
+
+        return {"updatedCount": modified_count, "clusterName": cleaned_cluster}
+
+    async def disband_cluster(
+        self, teacher_id: str, classroom_id: str, cluster_name: str
+    ) -> dict:
+        """Disband a cluster non-destructively by setting clusterName to None (Teacher only)."""
+        classroom = await self.classroom_repo.find_by_id(classroom_id)
+        if not classroom or classroom.get("teacherId") != teacher_id:
+            raise AppException(
+                code=ErrorCode.FORBIDDEN,
+                message="You are not authorized to manage clusters in this classroom",
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+
+        modified_count = await self.assignment_repo.update_many(
+            {"classroomId": classroom_id, "clusterName": cluster_name},
+            {"$set": {"clusterName": None}}
+        )
+
+        return {"disbandedCount": modified_count, "clusterName": cluster_name}

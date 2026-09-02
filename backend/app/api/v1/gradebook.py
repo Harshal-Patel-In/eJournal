@@ -18,11 +18,12 @@ router = APIRouter()
 async def get_classroom_gradebook(
     classroomId: str,
     batch: str | None = Query(None, description="Optional batch filter (e.g. B1, B2)"),
+    division: str | None = Query(None, description="Optional division filter (e.g. Division A)"),
     user: dict = Depends(RoleChecker(["teacher"])),
     gradebook_service: GradebookService = Depends(),
 ):
     """Retrieve 2D grading matrix for a classroom (Teacher only)."""
-    data = await gradebook_service.get_classroom_gradebook(classroomId, user["id"], batch)
+    data = await gradebook_service.get_classroom_gradebook(classroomId, user["id"], batch, division)
     return success_response(data)
 
 
@@ -30,11 +31,12 @@ async def get_classroom_gradebook(
 async def export_gradebook_csv(
     classroomId: str,
     batch: str | None = Query(None, description="Optional batch filter (e.g. B1, B2)"),
+    division: str | None = Query(None, description="Optional division filter (e.g. Division A)"),
     user: dict = Depends(RoleChecker(["teacher"])),
     gradebook_service: GradebookService = Depends(),
 ) -> StreamingResponse:
     """Stream official CSV gradebook export for faculty reporting (Teacher only)."""
-    return await gradebook_service.export_gradebook_csv(classroomId, user["id"], batch)
+    return await gradebook_service.export_gradebook_csv(classroomId, user["id"], batch, division)
 
 
 @router.get("/analytics/student", response_model=ApiResponse[dict])

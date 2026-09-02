@@ -157,11 +157,15 @@ class ClassroomService:
         for mem in memberships:
             student = await self.user_repo.find_by_id(mem["studentId"])
             if student:
+                prof = student.get("profile") or {}
                 member_list.append({
                     "studentId": mem["studentId"],
-                    "name": student.get("profile", {}).get("name"),
+                    "name": prof.get("name"),
                     "email": student["email"],
                     "joinedAt": mem["joinedAt"],
-                    "status": mem["status"]
+                    "status": mem["status"],
+                    "rollNumber": prof.get("rollNumber"),
+                    "division": prof.get("division"),
+                    "batch": prof.get("batch"),
                 })
         return member_list

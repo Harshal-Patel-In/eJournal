@@ -19,6 +19,7 @@ interface GlassDropdownProps {
   placeholder?: string;
   icon?: React.ReactNode;
   className?: string;
+  buttonClassName?: string;
   align?: "left" | "right";
   renderMath?: boolean;
 }
@@ -30,6 +31,7 @@ export function GlassDropdown({
   placeholder = "Select...",
   icon,
   className = "",
+  buttonClassName = "",
   align = "left",
   renderMath = true,
 }: GlassDropdownProps) {
@@ -56,11 +58,11 @@ export function GlassDropdown({
   };
 
   return (
-    <div ref={dropdownRef} className={`relative inline-block ${className || "w-auto min-w-[140px]"}`}>
+    <div ref={dropdownRef} className={`relative inline-block ${isOpen ? "z-50" : "z-10"} ${className || "w-auto min-w-[140px]"}`}>
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full h-9 px-3 rounded-xl bg-background hover:bg-muted/40 border border-border text-xs font-semibold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 flex items-center justify-between gap-2.5 transition-all cursor-pointer select-none shadow-2xs whitespace-nowrap"
+        className={`w-full ${buttonClassName || "h-9 px-3"} rounded-xl bg-muted/40 dark:bg-zinc-800/60 hover:bg-muted/60 dark:hover:bg-zinc-700/60 border border-border/70 text-xs font-semibold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 flex items-center justify-between gap-2 transition-all cursor-pointer select-none shadow-2xs whitespace-nowrap`}
       >
         <div className="flex items-center gap-2 truncate text-left">
           {icon || selectedOption?.icon}
