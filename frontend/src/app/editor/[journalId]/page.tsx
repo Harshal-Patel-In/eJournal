@@ -153,7 +153,9 @@ export default function EditorPage({ params }: PageProps) {
     },
     onError: (err: any) => {
       setSaving(false);
-      if (err.status === 409 || err.code === "REVISION_CONFLICT" || err.message?.includes("409")) {
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        setSyncStatus("offline");
+      } else if (err.status === 409 || err.code === "REVISION_CONFLICT" || err.message?.includes("409")) {
         setSyncStatus("conflict");
         setShowConflictDialog(true);
       } else {
@@ -280,6 +282,41 @@ export default function EditorPage({ params }: PageProps) {
     }, 2500);
     return () => clearTimeout(timer);
   }, [title, blocks, isDirty, isSaving, previewMode, clientRevision, syncStatus, saveMutation]);
+
+  // Real-time network connectivity handling (RULE-INF06, Phase 5.5)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const handleOnline = () => {
+      const state = useDocumentStore.getState();
+      state.setSyncStatus(state.isDirty ? "unsaved" : "synced");
+      toast.success("Network connection restored.", { title: "🌐 Online" });
+      if (state.isDirty && !state.isSaving && state.title) {
+        saveMutation.mutate({
+          title: state.title,
+          blocks: state.blocks,
+          clientRevision: state.clientRevision,
+        });
+      }
+    };
+
+    const handleOffline = () => {
+      useDocumentStore.getState().setSyncStatus("offline");
+      toast.warning("Working offline. Changes are saved locally.", { title: "📡 Offline" });
+    };
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+
+    if (!navigator.onLine) {
+      useDocumentStore.getState().setSyncStatus("offline");
+    }
+
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, [saveMutation]);
 
   const handleDragEnd = (result: DropResult) => {
     if (!result.destination) return;
@@ -424,11 +461,41 @@ export default function EditorPage({ params }: PageProps) {
 
           {/* Local Recovery Banner */}
           {localRecoverySnapshot && isEditable && (
-            <div className="p-4 rounded-xl border border-blue-500/30 bg-blue-500/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-              <span className="text-sm font-bold text-foreground">💾 Unsaved Offline Draft Recovered</span>
+            <div className="p-4 rounded-xl border border-blue-500/30 bg-blue-500/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-in fade-in-50 duration-200">
+              <div className="flex items-center gap-2.5">
+                <span className="size-2 rounded-full bg-blue-500 animate-pulse shrink-0" />
+                <span className="text-sm font-bold text-foreground">💾 Unsaved Offline Draft Recovered</span>
+                {localRecoverySnapshot.savedAt && (
+                  <span className="text-xs text-muted-foreground hidden sm:inline">
+                    (Saved locally at {new Date(localRecoverySnapshot.savedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })})
+                  </span>
+                )}
+              </div>
               <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" onClick={() => clearLocalSnapshot(journalId)}>Discard</Button>
-                <Button size="sm" onClick={() => loadLocalRecovery(localRecoverySnapshot.title, localRecoverySnapshot.blocks)}>Restore</Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    clearLocalSnapshot(journalId);
+                    setLocalRecoverySnapshot(null);
+                    toast.info("Offline draft discarded.");
+                  }}
+                  className="rounded-xl text-xs font-semibold cursor-pointer"
+                >
+                  Discard
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    loadLocalRecovery(localRecoverySnapshot.title, localRecoverySnapshot.blocks);
+                    clearLocalSnapshot(journalId);
+                    setLocalRecoverySnapshot(null);
+                    toast.success("Offline draft restored into editor!", { title: "💾 Restored" });
+                  }}
+                  className="rounded-xl text-xs font-semibold cursor-pointer"
+                >
+                  Restore
+                </Button>
               </div>
             </div>
           )}
