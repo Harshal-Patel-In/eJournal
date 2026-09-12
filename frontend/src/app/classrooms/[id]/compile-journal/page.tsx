@@ -207,8 +207,123 @@ export default function CompileJournalPage({ params }: PageProps) {
         </div>
       </header>
 
+      {/* Scoped CSS to strictly enforce high-contrast academic print typography in dark mode & PDF export */}
+      <style dangerouslySetInnerHTML={{ __html: `
+        .academic-paper,
+        .academic-paper * {
+          color-scheme: light !important;
+        }
+        .academic-paper .text-foreground,
+        .academic-paper .text-foreground\\/90 {
+          color: #18181b !important;
+        }
+        .academic-paper .text-muted-foreground,
+        .academic-paper .text-muted-foreground\\/90,
+        .academic-paper .text-muted-foreground\\/80,
+        .academic-paper .text-muted-foreground\\/70,
+        .academic-paper .text-muted-foreground\\/60 {
+          color: #52525b !important;
+        }
+        .academic-paper p {
+          color: #18181b !important;
+        }
+        .academic-paper .bg-background {
+          background-color: #ffffff !important;
+        }
+        .academic-paper .bg-card {
+          background-color: #ffffff !important;
+        }
+        .academic-paper .katex,
+        .academic-paper .katex * {
+          color: #09090b !important;
+        }
+        .academic-paper pre {
+          background-color: #f4f4f5 !important;
+          color: #18181b !important;
+        }
+        .academic-paper pre code {
+          color: #18181b !important;
+        }
+        .academic-paper table {
+          background-color: #ffffff !important;
+          border-color: #27272a !important;
+        }
+        .academic-paper tbody {
+          background-color: #ffffff !important;
+        }
+        .academic-paper td {
+          color: #18181b !important;
+        }
+        .academic-paper th {
+          color: #09090b !important;
+        }
+        .academic-paper .dark\\:text-blue-100\\/80 {
+          color: #1e3a8a !important;
+        }
+        .academic-paper .dark\\:bg-blue-950\\/10 {
+          background-color: #eff6ff !important;
+        }
+        .academic-paper .dark\\:border-blue-900\\/30 {
+          border-color: #bfdbfe !important;
+        }
+        .academic-paper .dark\\:text-emerald-100\\/90 {
+          color: #064e3b !important;
+        }
+        .academic-paper .dark\\:bg-emerald-950\\/10 {
+          background-color: #ecfdf5 !important;
+        }
+        .academic-paper .dark\\:border-emerald-900\\/30 {
+          border-color: #a7f3d0 !important;
+        }
+        @media print {
+          body, html {
+            background-color: #ffffff !important;
+            color: #000000 !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          .academic-paper {
+            background-color: #ffffff !important;
+            color: #000000 !important;
+            box-shadow: none !important;
+            border: none !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            width: 100% !important;
+            max-width: 100% !important;
+          }
+          .academic-paper * {
+            color: #000000 !important;
+          }
+          .academic-paper .katex,
+          .academic-paper .katex * {
+            color: #000000 !important;
+          }
+          .academic-paper table {
+            border-color: #000000 !important;
+          }
+          .academic-paper td,
+          .academic-paper th {
+            border-color: #71717a !important;
+            color: #000000 !important;
+          }
+        }
+      `}} />
+
       {/* Main Bound Academic Document Container */}
-      <main className="max-w-4xl mx-auto my-8 print:my-0 p-8 sm:p-12 print:p-0 bg-white text-zinc-900 shadow-2xl print:shadow-none rounded-2xl print:rounded-none border border-border print:border-none">
+      <main
+        className="academic-paper max-w-4xl mx-auto my-8 print:my-0 p-8 sm:p-12 print:p-0 bg-white text-zinc-950 shadow-2xl print:shadow-none rounded-2xl print:rounded-none border border-border print:border-none select-text"
+        style={{
+          colorScheme: "light",
+          ["--foreground" as any]: "240 10% 3.9%",
+          ["--background" as any]: "0 0% 100%",
+          ["--muted-foreground" as any]: "240 3.8% 46.1%",
+          ["--muted" as any]: "240 4.8% 95.9%",
+          ["--card" as any]: "0 0% 100%",
+          ["--card-foreground" as any]: "240 10% 3.9%",
+          ["--border" as any]: "240 5.9% 90%",
+        }}
+      >
         
         {/* =========================================================================
             WHOLE JOURNAL MODE ONLY: COVER PAGE, CERTIFICATE & INDEX TABLE

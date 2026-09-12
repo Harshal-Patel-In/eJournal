@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { use, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
@@ -274,14 +274,17 @@ export default function EditorPage({ params }: PageProps) {
     },
   });
 
+  const saveMutationRef = useRef(saveMutation);
+  saveMutationRef.current = saveMutation;
+
   // Auto-Save Debounce
   useEffect(() => {
     if (!isDirty || isSaving || previewMode || !title || syncStatus === "conflict" || syncStatus === "offline") return;
     const timer = setTimeout(() => {
-      saveMutation.mutate({ title, blocks, clientRevision });
+      saveMutationRef.current.mutate({ title, blocks, clientRevision });
     }, 2500);
     return () => clearTimeout(timer);
-  }, [title, blocks, isDirty, isSaving, previewMode, clientRevision, syncStatus, saveMutation]);
+  }, [title, blocks, isDirty, isSaving, previewMode, clientRevision, syncStatus]);
 
   // Real-time network connectivity handling (RULE-INF06, Phase 5.5)
   useEffect(() => {
@@ -292,7 +295,7 @@ export default function EditorPage({ params }: PageProps) {
       state.setSyncStatus(state.isDirty ? "unsaved" : "synced");
       toast.success("Network connection restored.", { title: "🌐 Online" });
       if (state.isDirty && !state.isSaving && state.title) {
-        saveMutation.mutate({
+        saveMutationRef.current.mutate({
           title: state.title,
           blocks: state.blocks,
           clientRevision: state.clientRevision,
@@ -301,27 +304,43 @@ export default function EditorPage({ params }: PageProps) {
     };
 
     const handleOffline = () => {
-      useDocumentStore.getState().setSyncStatus("offline");
-      toast.warning("Working offline. Changes are saved locally.", { title: "📡 Offline" });
+      const state = useDocumentStore.getState();
+      if (state.syncStatus !== "offline") {
+        state.setSyncStatus("offline");
+        toast.warning("Working offline. Changes are saved locally.", { title: "📡 Offline" });
+      }
     };
 
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
 
     if (!navigator.onLine) {
-      useDocumentStore.getState().setSyncStatus("offline");
+      const state = useDocumentStore.getState();
+      if (state.syncStatus !== "offline") {
+        state.setSyncStatus("offline");
+      }
     }
 
     return () => {
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
     };
-  }, [saveMutation]);
+  }, []);
+
+  const handleDragStart = () => {
+    if (typeof document !== "undefined") {
+      document.body.classList.add("is-dragging-block");
+    }
+  };
 
   const handleDragEnd = (result: DropResult) => {
+    if (typeof document !== "undefined") {
+      document.body.classList.remove("is-dragging-block");
+    }
     if (!result.destination) return;
     moveBlock(result.source.index, result.destination.index);
   };
+
 
   if (
     !mounted ||
@@ -640,7 +659,7 @@ export default function EditorPage({ params }: PageProps) {
             )}
 
             {/* Document Blocks List */}
-            <DragDropContext onDragEnd={handleDragEnd}>
+            <DragDropContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
               <Droppable droppableId="journal-blocks">
                 {(providedDroppable) => (
                   <div

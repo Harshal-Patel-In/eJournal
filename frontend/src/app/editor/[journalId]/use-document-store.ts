@@ -243,9 +243,12 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
       syncStatus: isSaving ? "saving" : state.isDirty ? "unsaved" : "synced",
     })),
 
-  setDirty: (isDirty) => set({ isDirty }),
+  setDirty: (isDirty) =>
+    set((state) => (state.isDirty === isDirty ? state : { isDirty })),
 
-  setSyncStatus: (syncStatus) => set({ syncStatus }),
+  setSyncStatus: (syncStatus) =>
+    set((state) => (state.syncStatus === syncStatus ? state : { syncStatus })),
+
 
   setRevision: (serverRevision, savedAt) =>
     set((state) => {

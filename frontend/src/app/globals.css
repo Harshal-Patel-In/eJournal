@@ -426,4 +426,93 @@
   .shadow-xs, .shadow-sm, .shadow-md, .shadow-xl, .shadow-2xl {
     box-shadow: none !important;
   }
-}
+}
+
+/* Ultra-Compact 4px Smooth Notification Scrollbar */
+.notif-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(161, 161, 170, 0.4) transparent;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.notif-scrollbar::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+.notif-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.notif-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(161, 161, 170, 0.35);
+  border-radius: 9999px;
+}
+.notif-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(161, 161, 170, 0.7);
+}
+
+/* ==========================================================================
+   Aesthetic Hardware-Accelerated Custom Cursors (Apple / Modern Creative App)
+   ========================================================================== */
+@media (pointer: fine) {
+  /* Default Platform Cursor (Modern Designer Precision Dart) */
+  html,
+  body {
+    cursor: url('/cursors/default.svg') 5 5, auto;
+  }
+
+  /* Interactive Elements (Buttons, Links, Selects, Interactive Cards) */
+  a,
+  button,
+  [role="button"],
+  .cursor-pointer,
+  input[type="submit"],
+  input[type="button"],
+  input[type="reset"],
+  summary,
+  select {
+    cursor: url('/cursors/pointer.svg') 8 6, pointer;
+  }
+
+  /* Grab Hand (Simple Open Palm on Hover) */
+  .cursor-grab,
+  [data-drag-handle],
+  [data-rfd-drag-handle-draggable-id] {
+    cursor: url('/cursors/grab.svg') 16 16, grab !important;
+  }
+
+  /* Grabbing Hand (Only when clicked/active or actively dragging across page) */
+  .cursor-grab:active,
+  .cursor-grabbing,
+  [data-drag-handle]:active,
+  [data-rfd-drag-handle-draggable-id]:active,
+  body.is-dragging-block,
+  body.is-dragging-block *,
+  body[style*="cursor: grabbing"],
+  body[style*="cursor: grabbing"] * {
+    cursor: url('/cursors/grabbing.svg') 16 16, grabbing !important;
+  }
+
+
+
+  /* Document Writing & Typography: Protect Academic Text Selection & Formula Typing */
+  input:not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="checkbox"]):not([type="radio"]),
+  textarea,
+  [contenteditable="true"],
+  .editor-content,
+  .katex-display,
+  code,
+  pre {
+    cursor: text !important;
+  }
+
+  /* Disabled States */
+  button:disabled,
+  [aria-disabled="true"],
+  .cursor-not-allowed,
+  :disabled {
+    cursor: not-allowed !important;
+  }
+}
+
+
+
