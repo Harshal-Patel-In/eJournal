@@ -3,6 +3,28 @@
 import { useDocumentStore } from "../use-document-store";
 import { applyMathShortcuts } from "@/lib/math-shortcuts";
 import { InlineMathText } from "@/components/inline-math-text";
+import { GlassDropdown, DropdownOption } from "@/components/ui/glass-dropdown";
+
+const HEADING_OPTIONS: DropdownOption[] = [
+  {
+    value: "1",
+    label: "H1",
+    badge: "H1",
+    description: "Title · Primary Heading",
+  },
+  {
+    value: "2",
+    label: "H2",
+    badge: "H2",
+    description: "Section · Major Header",
+  },
+  {
+    value: "3",
+    label: "H3",
+    badge: "H3",
+    description: "Subsection · Detail Header",
+  },
+];
 
 interface HeadingBlockProps {
   id: string;
@@ -27,15 +49,17 @@ export default function HeadingBlock({ id, content, previewMode }: HeadingBlockP
   return (
     <div className="flex items-center gap-3 w-full">
       {/* Level Selector */}
-      <select
-        value={level}
-        onChange={(e) => updateBlock(id, { level: parseInt(e.target.value) })}
-        className="text-xs font-semibold bg-muted hover:bg-muted/80 border border-border px-2 py-1 rounded-md cursor-pointer focus:outline-none"
-      >
-        <option value={1}>H1</option>
-        <option value={2}>H2</option>
-        <option value={3}>H3</option>
-      </select>
+      <GlassDropdown
+        size="sm"
+        value={String(level)}
+        options={HEADING_OPTIONS}
+        onChange={(val) => updateBlock(id, { level: parseInt(val, 10) })}
+        className="shrink-0"
+        buttonClassName="h-8 px-2.5 min-w-[56px] font-bold rounded-lg"
+        menuClassName="w-64"
+        showBadgeInTrigger={false}
+        renderMath={false}
+      />
 
       {/* Input */}
       <input

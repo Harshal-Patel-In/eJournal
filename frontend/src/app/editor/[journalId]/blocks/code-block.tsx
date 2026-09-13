@@ -1,6 +1,15 @@
 "use client";
 
 import { useDocumentStore } from "../use-document-store";
+import { GlassDropdown, DropdownOption } from "@/components/ui/glass-dropdown";
+
+const LANGUAGE_OPTIONS: DropdownOption[] = [
+  { value: "python", label: "Python", badge: "PY", description: "Python 3" },
+  { value: "c", label: "C Language", badge: "C", description: "C99 / C11 native" },
+  { value: "cpp", label: "C++", badge: "C++", description: "Modern C++" },
+  { value: "java", label: "Java", badge: "JAVA", description: "Java Standard Edition" },
+  { value: "javascript", label: "JavaScript", badge: "JS", description: "Node.js / Web" },
+];
 
 interface CodeBlockProps {
   id: string;
@@ -35,17 +44,17 @@ export default function CodeBlock({ id, content, previewMode }: CodeBlockProps) 
     <div className="flex flex-col gap-2 w-full border border-border p-4 rounded-xl bg-card shadow-sm">
       <div className="flex items-center justify-between border-b border-border/60 pb-2">
         <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Code Block</span>
-        <select
+        <GlassDropdown
+          size="sm"
           value={language}
-          onChange={(e) => updateBlock(id, { language: e.target.value })}
-          className="text-xs font-semibold bg-muted hover:bg-muted/80 border border-border px-2 py-1 rounded-md cursor-pointer focus:outline-none"
-        >
-          <option value="python">Python</option>
-          <option value="c">C Language</option>
-          <option value="cpp">C++</option>
-          <option value="java">Java</option>
-          <option value="javascript">JavaScript</option>
-        </select>
+          options={LANGUAGE_OPTIONS}
+          onChange={(val) => updateBlock(id, { language: val })}
+          className="shrink-0"
+          buttonClassName="h-7.5 px-2.5 text-xs font-semibold rounded-lg"
+          menuClassName="w-56"
+          showBadgeInTrigger={false}
+          renderMath={false}
+        />
       </div>
 
       <textarea

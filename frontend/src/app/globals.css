@@ -428,6 +428,84 @@
   }
 }
 
+/* ==========================================================================
+   Apple Liquid Glass Floating Scrollbar Knob (Hardware-Accelerated UI)
+   ========================================================================== */
+
+/* Completely hide the legacy browser scrollbars globally so only the Liquid Glass Knob is visible */
+html,
+body {
+  scrollbar-width: none !important; /* Firefox */
+  -ms-overflow-style: none !important; /* IE/Edge */
+}
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  display: none !important; /* Chrome, Edge, Safari, Brave, Opera */
+  width: 0 !important;
+  height: 0 !important;
+}
+
+/* Light Mode: Frosted Quartz Crystal Knob (Calibrated Contrast on Paper) */
+.liquid-glass-knob {
+  background-image: linear-gradient(180deg, rgba(30, 38, 54, 0.22) 0%, rgba(15, 20, 32, 0.30) 100%);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  box-shadow: 
+    0 2px 8px -1px rgba(0, 0, 0, 0.16),
+    inset 0 1px 1.5px 0 rgba(255, 255, 255, 0.95),
+    inset 0 -1px 1px 0 rgba(0, 0, 0, 0.08);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.liquid-glass-knob:hover {
+  background-image: linear-gradient(180deg, rgba(30, 38, 54, 0.34) 0%, rgba(15, 20, 32, 0.44) 100%);
+  border-color: rgba(255, 255, 255, 1);
+  box-shadow: 
+    0 4px 14px -1px rgba(0, 0, 0, 0.22),
+    inset 0 1.5px 2px 0 rgba(255, 255, 255, 1),
+    inset 0 -1px 1px 0 rgba(0, 0, 0, 0.12);
+}
+
+.liquid-glass-knob:active,
+.liquid-glass-knob.is-active-drag {
+  background-image: linear-gradient(180deg, rgba(20, 26, 38, 0.50) 0%, rgba(10, 14, 24, 0.60) 100%);
+  border-color: rgba(255, 255, 255, 0.75);
+  box-shadow: 
+    inset 0 2px 3px 0 rgba(0, 0, 0, 0.28),
+    0 2px 6px rgba(0, 0, 0, 0.18);
+}
+
+/* Dark Mode: Smoked Obsidian Crystal Knob (Calibrated Contrast on Void) */
+.dark .liquid-glass-knob {
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.20) 0%, rgba(255, 255, 255, 0.12) 100%);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  box-shadow: 
+    0 4px 14px -1px rgba(0, 0, 0, 0.7),
+    inset 0 1px 1px 0 rgba(255, 255, 255, 0.30),
+    inset 0 -1px 1px 0 rgba(0, 0, 0, 0.6);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.dark .liquid-glass-knob:hover {
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.34) 0%, rgba(255, 255, 255, 0.22) 100%);
+  border-color: rgba(255, 255, 255, 0.45);
+  box-shadow: 
+    0 6px 18px -1px rgba(0, 0, 0, 0.85),
+    inset 0 1.5px 2px 0 rgba(255, 255, 255, 0.50);
+}
+
+.dark .liquid-glass-knob:active,
+.dark .liquid-glass-knob.is-active-drag {
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.48) 0%, rgba(255, 255, 255, 0.35) 100%);
+  border-color: rgba(255, 255, 255, 0.60);
+  box-shadow: 
+    inset 0 1px 2px 0 rgba(255, 255, 255, 0.55),
+    0 2px 8px rgba(0, 0, 0, 0.9);
+}
+
 /* Ultra-Compact 4px Smooth Notification Scrollbar */
 .notif-scrollbar {
   scrollbar-width: thin;

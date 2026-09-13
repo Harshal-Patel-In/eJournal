@@ -46,6 +46,7 @@ import * as zod from "zod";
 import { api } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
+import { GlassDropdown } from "@/components/ui/glass-dropdown";
 import NotificationBell from "@/components/notification-bell";
 import { ThemeToggle } from "@/components/theme-toggle";
 
@@ -1294,18 +1295,22 @@ export default function ClassroomPage({ params }: PageProps) {
               {classroom?.batches && classroom.batches.length > 0 && (
                 <div className="flex flex-col gap-1.5">
                   <label className="text-xs font-semibold text-muted-foreground">Target Batch (Optional)</label>
-                  <select
+                  <GlassDropdown
                     value={announcementBatch}
-                    onChange={(e) => setAnnouncementBatch(e.target.value)}
-                    className="h-10 rounded-xl border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  >
-                    <option value="">All Batches (Entire Classroom)</option>
-                    {classroom.batches.map((b: string) => (
-                      <option key={b} value={b}>
-                        {b} Only
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(val) => setAnnouncementBatch(val)}
+                    placeholder="All Batches (Entire Classroom)"
+                    options={[
+                      { value: "", label: "All Batches (Entire Classroom)" },
+                      ...classroom.batches.map((b: string) => ({
+                        value: b,
+                        label: `${b} Only`,
+                        badge: b,
+                      })),
+                    ]}
+                    className="w-full"
+                    buttonClassName="h-10 px-3 rounded-xl bg-background"
+                    renderMath={false}
+                  />
                 </div>
               )}
 
@@ -1460,25 +1465,28 @@ export default function ClassroomPage({ params }: PageProps) {
           <div className="h-4 w-px bg-white/20" />
 
           <div className="flex items-center gap-2">
-            <select
-              className="bg-white/10 hover:bg-white/20 text-white text-xs font-semibold rounded-xl px-3 py-1.5 border border-white/20 outline-none cursor-pointer"
-              onChange={(e) => {
-                const val = e.target.value;
+            <GlassDropdown
+              value=""
+              placeholder="Move to Cluster..."
+              options={[
+                { value: "UNCLUSTER", label: "None (Uncluster)" },
+                ...existingClusterNames.map((c) => ({
+                  value: c,
+                  label: c,
+                })),
+              ]}
+              onChange={(val) => {
                 if (val === "UNCLUSTER") {
                   bulkAssignMutation.mutate({ assignmentIds: selectedAssignmentIds, clusterName: null });
                 } else if (val) {
                   bulkAssignMutation.mutate({ assignmentIds: selectedAssignmentIds, clusterName: val });
                 }
-                e.target.value = "";
               }}
-              defaultValue=""
-            >
-              <option value="" disabled className="text-zinc-900">Move to Cluster...</option>
-              <option value="UNCLUSTER" className="text-zinc-900">None (Uncluster)</option>
-              {existingClusterNames.map((c) => (
-                <option key={c} value={c} className="text-zinc-900">{c}</option>
-              ))}
-            </select>
+              size="sm"
+              buttonClassName="h-8 px-3 bg-white/10 hover:bg-white/20 text-white border-white/20 rounded-xl"
+              menuClassName="w-52"
+              renderMath={false}
+            />
 
             <Button
               variant="ghost"
