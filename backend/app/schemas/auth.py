@@ -65,5 +65,6 @@ class UserMeResponse(BaseModel):
     is_verified: bool
     is_profile_complete: bool
     profile: UserProfileSchema
+    access_token: str | None = None
     createdAt: datetime
     updatedAt: datetime

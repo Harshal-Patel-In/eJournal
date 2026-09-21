@@ -20,7 +20,16 @@ router = APIRouter(prefix="/profile")
 @router.get("", response_model=ApiResponse[UserMeResponse])
 async def get_profile(user: dict = Depends(get_active_user)):
     """Fetch current user's profile and account registration details."""
-    return success_response(user)
+    access_token = create_jwt_token(
+        data={
+            "sub": user["email"],
+            "role": user["role"],
+            "is_profile_complete": user.get("is_profile_complete", False),
+        }
+    )
+    user_data = dict(user)
+    user_data["access_token"] = access_token
+    return success_response(user_data)
 
 
 @router.put("", response_model=ApiResponse[UserMeResponse])
@@ -35,23 +44,26 @@ async def update_profile(
     If all required fields are provided, locks profile and allows dashboard/editor access.
     """
     updated_user = await auth_service.update_profile(user, payload)
-    
+
     # Generate new token with updated is_profile_complete status
     access_token = create_jwt_token(
         data={
             "sub": updated_user["email"],
             "role": updated_user["role"],
-            "is_profile_complete": updated_user["is_profile_complete"]
+            "is_profile_complete": updated_user["is_profile_complete"],
         }
     )
-    
+
     response.set_cookie(
         key="access_token",
         value=access_token,
         httponly=True,
         max_age=30 * 60,
-        samesite="lax",
-        secure=settings.cookie_secure,
+        samesite="none" if settings.is_production else "lax",
+        secure=True if settings.is_production else settings.cookie_secure,
+        path="/",
     )
-    
-    return success_response(updated_user)
+
+    user_data = dict(updated_user)
+    user_data["access_token"] = access_token
+    return success_response(user_data)

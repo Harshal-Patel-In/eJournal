@@ -43,6 +43,18 @@ export default function ProfileSetupPage() {
     retry: false,
   });
 
+  // If profile is already marked complete (e.g. from previous save), sync token and advance to dashboard
+  useEffect(() => {
+    if (user?.is_profile_complete) {
+      if (user?.access_token && typeof document !== "undefined") {
+        const isHttps = window.location.protocol === "https:";
+        document.cookie = `access_token=${user.access_token}; path=/; max-age=1800; SameSite=Lax; ${isHttps ? "Secure;" : ""}`;
+      }
+      router.push("/dashboard");
+      router.refresh();
+    }
+  }, [user, router]);
+
   // Redirect to login if unauthenticated (handles side-effect outside render phase)
   useEffect(() => {
     if (error || (!isLoading && !user)) {
@@ -59,8 +71,12 @@ export default function ProfileSetupPage() {
   });
 
   const mutation = useMutation({
-    mutationFn: (data: ProfileFields) => api.put("/profile", data),
-    onSuccess: () => {
+    mutationFn: (data: ProfileFields) => api.put<any>("/profile", data),
+    onSuccess: (res: any) => {
+      if (res?.access_token && typeof document !== "undefined") {
+        const isHttps = window.location.protocol === "https:";
+        document.cookie = `access_token=${res.access_token}; path=/; max-age=1800; SameSite=Lax; ${isHttps ? "Secure;" : ""}`;
+      }
       router.push("/dashboard");
       router.refresh();
     },

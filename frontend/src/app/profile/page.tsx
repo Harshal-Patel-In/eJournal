@@ -112,6 +112,10 @@ export default function ProfilePage() {
   const updateMutation = useMutation({
     mutationFn: (data: any) => api.put("/profile", data),
     onSuccess: (updatedUser: any) => {
+      if (updatedUser?.access_token && typeof document !== "undefined") {
+        const isHttps = window.location.protocol === "https:";
+        document.cookie = `access_token=${updatedUser.access_token}; path=/; max-age=1800; SameSite=Lax; ${isHttps ? "Secure;" : ""}`;
+      }
       queryClient.setQueryData(["profile"], updatedUser);
       queryClient.invalidateQueries({ queryKey: ["profile"] });
       toast.success("Profile updated successfully! Document metadata synchronized.");
