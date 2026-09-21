@@ -69,10 +69,31 @@ class Settings(BaseSettings):
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=30)
     JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = Field(default=7)
 
-    # Email Service (Brevo/Resend HTTP API)
+    # Email Service (SMTP, Brevo, Resend)
+    SMTP_HOST: str = Field(default="smtp.gmail.com", description="SMTP server host")
+    SMTP_PORT: int = Field(default=587, description="SMTP server port")
+    SMTP_USER: str | None = Field(default=None, description="SMTP username / email")
+    SMTP_EMAIL: str | None = Field(default=None, description="SMTP username / email alias")
+    SMTP_PASSWORD: str | None = Field(default=None, description="SMTP password")
+    SMTP_APP_PASSWORD: str | None = Field(default=None, description="SMTP app password alias")
+    SMTP_FROM_NAME: str = Field(default="eJournal", description="Sender display name")
+    SMTP_FROM_EMAIL: str = Field(default="noreply@ejournal.com", description="Sender email address")
     BREVO_API_KEY: str | None = Field(default=None, description="Brevo transaction API key")
     RESEND_API_KEY: str | None = Field(default=None, description="Resend transaction API key")
-    SMTP_FROM_EMAIL: str = Field(default="noreply@ejournal.com", description="Sender email address")
+
+    @property
+    def effective_smtp_user(self) -> str | None:
+        return self.SMTP_USER or self.SMTP_EMAIL
+
+    @property
+    def effective_smtp_password(self) -> str | None:
+        return self.SMTP_PASSWORD or self.SMTP_APP_PASSWORD
+
+    @property
+    def effective_smtp_from_email(self) -> str:
+        if self.SMTP_FROM_EMAIL and self.SMTP_FROM_EMAIL != "noreply@ejournal.com":
+            return self.SMTP_FROM_EMAIL
+        return self.effective_smtp_user or self.SMTP_FROM_EMAIL
 
     # Logging
     LOG_LEVEL: str = Field(default="INFO")
