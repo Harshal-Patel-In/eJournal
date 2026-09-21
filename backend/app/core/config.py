@@ -102,6 +102,7 @@ class Settings(BaseSettings):
     CLOUDINARY_CLOUD_NAME: str | None = Field(default=None, description="Cloudinary cloud name")
     CLOUDINARY_API_KEY: str | None = Field(default=None, description="Cloudinary API key")
     CLOUDINARY_API_SECRET: str | None = Field(default=None, description="Cloudinary API secret")
+    CLOUDINARY_URL: str | None = Field(default=None, description="Cloudinary connection URL")
 
 
     @property

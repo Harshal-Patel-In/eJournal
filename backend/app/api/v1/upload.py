@@ -33,22 +33,25 @@ def _destroy_cloud_or_local_file(asset: dict) -> None:
     from app.core.config import settings
 
     public_id = asset.get("publicId")
-    if (
-        public_id
-        and settings.CLOUDINARY_CLOUD_NAME
-        and settings.CLOUDINARY_API_KEY
-        and settings.CLOUDINARY_API_SECRET
-    ):
+    cloud_name = getattr(settings, "CLOUDINARY_CLOUD_NAME", None) or os.environ.get("CLOUDINARY_CLOUD_NAME")
+    api_key = getattr(settings, "CLOUDINARY_API_KEY", None) or os.environ.get("CLOUDINARY_API_KEY")
+    api_secret = getattr(settings, "CLOUDINARY_API_SECRET", None) or os.environ.get("CLOUDINARY_API_SECRET")
+    cloudinary_url = getattr(settings, "CLOUDINARY_URL", None) or os.environ.get("CLOUDINARY_URL")
+
+    if public_id and (cloudinary_url or (cloud_name and api_key and api_secret)):
         try:
             import cloudinary
             import cloudinary.uploader
 
-            cloudinary.config(
-                cloud_name=settings.CLOUDINARY_CLOUD_NAME,
-                api_key=settings.CLOUDINARY_API_KEY,
-                api_secret=settings.CLOUDINARY_API_SECRET,
-                secure=True,
-            )
+            if cloudinary_url:
+                cloudinary.config(cloudinary_url=cloudinary_url, secure=True)
+            else:
+                cloudinary.config(
+                    cloud_name=cloud_name,
+                    api_key=api_key,
+                    api_secret=api_secret,
+                    secure=True,
+                )
             cloudinary.uploader.destroy(public_id)
             logger.info("Asset successfully destroyed from cloud storage: %s", public_id)
         except Exception as e:
@@ -116,23 +119,29 @@ async def upload_image(
 
     # 1. Cloud Storage Integration (Preferred if credentials are provided)
     from app.core.config import settings
+    import asyncio
 
-    if (
-        settings.CLOUDINARY_CLOUD_NAME
-        and settings.CLOUDINARY_API_KEY
-        and settings.CLOUDINARY_API_SECRET
-    ):
+    cloud_name = getattr(settings, "CLOUDINARY_CLOUD_NAME", None) or os.environ.get("CLOUDINARY_CLOUD_NAME")
+    api_key = getattr(settings, "CLOUDINARY_API_KEY", None) or os.environ.get("CLOUDINARY_API_KEY")
+    api_secret = getattr(settings, "CLOUDINARY_API_SECRET", None) or os.environ.get("CLOUDINARY_API_SECRET")
+    cloudinary_url = getattr(settings, "CLOUDINARY_URL", None) or os.environ.get("CLOUDINARY_URL")
+
+    if cloudinary_url or (cloud_name and api_key and api_secret):
         import cloudinary
         import cloudinary.uploader
 
-        cloudinary.config(
-            cloud_name=settings.CLOUDINARY_CLOUD_NAME,
-            api_key=settings.CLOUDINARY_API_KEY,
-            api_secret=settings.CLOUDINARY_API_SECRET,
-            secure=True,
-        )
+        if cloudinary_url:
+            cloudinary.config(cloudinary_url=cloudinary_url, secure=True)
+        else:
+            cloudinary.config(
+                cloud_name=cloud_name,
+                api_key=api_key,
+                api_secret=api_secret,
+                secure=True,
+            )
         try:
-            upload_result = cloudinary.uploader.upload(
+            upload_result = await asyncio.to_thread(
+                cloudinary.uploader.upload,
                 content,
                 folder="ejournal_attachments",
                 resource_type="image",
@@ -155,11 +164,10 @@ async def upload_image(
                 "publicId": public_id,
             })
         except Exception as e:
-            logger.error("Cloud storage upload failed: %s", str(e))
-            # Sanitize error message to prevent leaking vendor information
+            logger.error("Cloud storage upload failed: %s", str(e), exc_info=True)
             raise AppException(
                 code=ErrorCode.UPLOAD_FAILED,
-                message="Image upload failed. Please try again.",
+                message=f"Cloud storage upload failed: {str(e)}",
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
@@ -174,10 +182,11 @@ async def upload_image(
     try:
         with open(filepath, "wb") as f:
             f.write(content)
-    except Exception:
+    except Exception as e:
+        logger.error("Failed to write upload to server disk: %s", str(e), exc_info=True)
         raise AppException(
             code=ErrorCode.INTERNAL_ERROR,
-            message="Failed to write upload to server disk",
+            message=f"Server disk upload failed: {str(e)}. Please configure Cloudinary for cloud deployments.",
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
 
