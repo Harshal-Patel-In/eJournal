@@ -292,9 +292,10 @@ export default function ClassroomPage({ params }: PageProps) {
     const relatedJournal = journals?.find((j) => j.assignmentId === asg.id);
     const jStatus = relatedJournal?.status;
     const isSubmitted = jStatus === "submitted";
+    const isLateSubmitted = jStatus === "late_submitted";
     const isApproved = jStatus === "approved";
     const isChangesRequested = jStatus === "changes_requested";
-    const isLocked = isSubmitted || isApproved;
+    const isLocked = isSubmitted || isLateSubmitted || isApproved;
     const hasMarks = isApproved && relatedJournal?.marks !== undefined && relatedJournal?.marks !== null;
     const isSelected = selectedAssignmentIds.includes(asg.id);
     const isMenuOpen = openCardMenuId === asg.id;
@@ -488,19 +489,23 @@ export default function ClassroomPage({ params }: PageProps) {
             <div className="flex items-center gap-2.5">
               <span
                 className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase border text-center ${
-                  isSubmitted
-                    ? "bg-blue-500/10 text-blue-600 border-blue-500/20"
-                    : isApproved
+                  isApproved
                     ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
-                    : isChangesRequested
+                    : isLateSubmitted
                     ? "bg-rose-500/10 text-rose-600 border-rose-500/20"
+                    : isSubmitted
+                    ? "bg-blue-500/10 text-blue-600 border-blue-500/20"
+                    : isChangesRequested
+                    ? "bg-amber-500/10 text-amber-600 border-amber-500/20"
                     : "bg-amber-500/10 text-amber-600 border-amber-500/20"
                 }`}
               >
-                {isSubmitted
-                  ? "Handed In"
-                  : isApproved
+                {isApproved
                   ? "Approved"
+                  : isLateSubmitted
+                  ? "Late Submitted"
+                  : isSubmitted
+                  ? "Handed In"
                   : isChangesRequested
                   ? "Changes Requested"
                   : "In Progress"}

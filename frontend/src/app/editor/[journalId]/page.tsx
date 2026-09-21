@@ -466,6 +466,12 @@ export default function EditorPage({ params }: PageProps) {
 
   const classroomId = assignment?.classroomId || "";
   const isTeacher = user?.role === "teacher";
+  const isPastDeadline = Boolean(
+    status === "late_submitted" ||
+    journal?.isLate ||
+    (assignment?.deadline && new Date() > new Date(assignment.deadline))
+  );
+  const canUnsubmit = (status === "submitted" || status === "late_submitted") && !isTeacher && !isPastDeadline;
 
   return (
     <div className="flex min-h-screen flex-col bg-slate-100/70 dark:bg-zinc-950 bg-textured-workspace text-foreground selection:bg-primary/10 relative">
@@ -481,6 +487,7 @@ export default function EditorPage({ params }: PageProps) {
         onToggleReviewDrawer={() => setShowReviewDrawer(!showReviewDrawer)}
         showReviewDrawer={showReviewDrawer}
         userRole={user?.role}
+        canUnsubmit={canUnsubmit}
       />
 
       {/* Conflict Modal */}
@@ -731,10 +738,12 @@ export default function EditorPage({ params }: PageProps) {
                 <p className="text-xs text-muted-foreground">
                   {journal?.isRevoked
                     ? "The student unsubmitted this journal to draft status. Teacher grading is locked until resubmitted."
+                    : isPastDeadline
+                    ? "Handed in after deadline. Submissions past the deadline are locked for evaluation and cannot be unsubmitted."
                     : "Handed in for evaluation. Student can unsubmit before deadline."}
                 </p>
               </div>
-              {(status === "submitted" || status === "late_submitted") && !isTeacher && (
+              {canUnsubmit && (
                 <Button
                   variant="outline"
                   size="sm"

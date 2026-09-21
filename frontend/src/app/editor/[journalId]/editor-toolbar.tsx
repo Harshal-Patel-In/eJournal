@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, Check, Eye, EyeOff, Save, Loader2, Send, Download, ChevronDown, RefreshCw, History, MessageSquare, ShieldCheck, Printer } from "lucide-react";
+import { ArrowLeft, Check, Eye, EyeOff, Save, Loader2, Send, Download, ChevronDown, RefreshCw, History, MessageSquare, ShieldCheck, Printer, Lock } from "lucide-react";
 import { useDocumentStore } from "./use-document-store";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -18,6 +18,7 @@ interface EditorToolbarProps {
   onToggleReviewDrawer?: () => void;
   showReviewDrawer?: boolean;
   userRole?: string;
+  canUnsubmit?: boolean;
 }
 
 export default function EditorToolbar({
@@ -31,6 +32,7 @@ export default function EditorToolbar({
   onToggleReviewDrawer,
   showReviewDrawer,
   userRole,
+  canUnsubmit = true,
 }: EditorToolbarProps) {
   const {
     title,
@@ -213,21 +215,34 @@ export default function EditorToolbar({
                   <span>Read Only</span>
                 </Button>
               ) : status === "submitted" || status === "late_submitted" ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={onUnsubmit}
-                  disabled={isUnsubmitting}
-                  className="gap-1.5 text-xs font-medium cursor-pointer text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/20 border-rose-200 rounded-xl h-8 active:scale-95 transition-all"
-                  title="Unsubmit this journal to resume drafting or make changes"
-                >
-                  {isUnsubmitting ? (
-                    <Loader2 className="size-3.5 animate-spin" />
-                  ) : (
-                    <RefreshCw className="size-3.5" />
-                  )}
-                  <span>Undo Hand In</span>
-                </Button>
+                canUnsubmit ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={onUnsubmit}
+                    disabled={isUnsubmitting}
+                    className="gap-1.5 text-xs font-medium cursor-pointer text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/20 border-rose-200 rounded-xl h-8 active:scale-95 transition-all"
+                    title="Unsubmit this journal to resume drafting or make changes"
+                  >
+                    {isUnsubmitting ? (
+                      <Loader2 className="size-3.5 animate-spin" />
+                    ) : (
+                      <RefreshCw className="size-3.5" />
+                    )}
+                    <span>Undo Hand In</span>
+                  </Button>
+                ) : (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled
+                    className="gap-1.5 text-xs font-medium opacity-60 rounded-xl h-8"
+                    title="Submissions past the deadline are locked and cannot be unsubmitted"
+                  >
+                    <Lock className="size-3.5" />
+                    <span>Locked</span>
+                  </Button>
+                )
               ) : (
                 <Button
                   variant="outline"
