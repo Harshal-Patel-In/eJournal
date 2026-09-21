@@ -41,6 +41,12 @@ export default function LoginPage() {
   const mutation = useMutation({
     mutationFn: (data: LoginFields) => api.post<{ access_token: string; user: { is_profile_complete: boolean } }>("/auth/login", data),
     onSuccess: (data) => {
+      // Store the access token on the frontend domain so Vercel's middleware recognizes it
+      if (typeof window !== "undefined" && data?.access_token) {
+        const isSecure = window.location.protocol === "https:";
+        document.cookie = `access_token=${data.access_token}; path=/; max-age=1800; SameSite=Lax${isSecure ? "; Secure" : ""}`;
+      }
+
       // Purge all stale cached queries from previous user sessions
       queryClient.clear();
 

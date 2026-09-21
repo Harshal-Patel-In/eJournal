@@ -112,6 +112,9 @@ export default function DashboardPage() {
       return api.post("/auth/logout");
     },
     onSuccess: () => {
+      if (typeof document !== "undefined") {
+        document.cookie = "access_token=; path=/; max-age=0; SameSite=Lax";
+      }
       queryClient.clear();
       router.push("/auth/login");
       router.refresh();

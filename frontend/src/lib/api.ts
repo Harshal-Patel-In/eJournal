@@ -43,12 +43,19 @@ export class ApiRequestError extends Error {
   }
 }
 
+function getClientCookie(name: string): string | null {
+  if (typeof document === "undefined") return null;
+  const match = document.cookie.match(new RegExp("(?:^|; )" + name + "=([^;]*)"));
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
 /**
  * Core fetch wrapper with response envelope handling.
  *
  * - Automatically parses the response envelope
  * - Throws ApiRequestError on failure responses
  * - Includes credentials for HTTP-only cookie auth (RULE-AUTH01)
+ * - Attaches Bearer token from client cookie for cross-domain support
  */
 async function request<T>(
   endpoint: string,
@@ -56,13 +63,19 @@ async function request<T>(
 ): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`;
 
+  const clientToken = getClientCookie("access_token");
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...(options.headers as Record<string, string>),
+  };
+  if (clientToken && !headers["Authorization"]) {
+    headers["Authorization"] = `Bearer ${clientToken}`;
+  }
+
   const response = await fetch(url, {
     ...options,
     credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      ...options.headers,
-    },
+    headers,
   });
 
   const body: ApiResponse<T> = await response.json();
@@ -84,6 +97,9 @@ async function request<T>(
         window.location.pathname !== "/"
       ) {
         window.dispatchEvent(new Event("unauthorized"));
+      }
+      if (typeof document !== "undefined") {
+        document.cookie = "access_token=; path=/; max-age=0; SameSite=Lax";
       }
       try {
         await fetch(`${API_BASE_URL}/auth/logout`, {

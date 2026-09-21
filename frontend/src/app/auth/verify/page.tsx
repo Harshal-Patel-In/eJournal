@@ -51,8 +51,12 @@ function VerifyContent() {
 
   // Verify OTP mutation
   const verifyMutation = useMutation({
-    mutationFn: (data: VerifyFields) => api.post("/auth/verify-otp", data),
-    onSuccess: () => {
+    mutationFn: (data: VerifyFields) => api.post<{ access_token: string }>("/auth/verify-otp", data),
+    onSuccess: (data) => {
+      if (typeof window !== "undefined" && data?.access_token) {
+        const isSecure = window.location.protocol === "https:";
+        document.cookie = `access_token=${data.access_token}; path=/; max-age=1800; SameSite=Lax${isSecure ? "; Secure" : ""}`;
+      }
       setSuccessMsg("Account successfully verified! Redirecting to setup...");
       setTimeout(() => {
         router.push("/profile/setup");

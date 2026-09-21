@@ -64,8 +64,8 @@ async def verify_otp(
         value=access_token,
         httponly=True,
         max_age=30 * 60,  # 30 mins
-        samesite="lax",
-        secure=settings.cookie_secure,
+        samesite="none" if settings.is_production else "lax",
+        secure=True if settings.is_production else settings.cookie_secure,
         path="/",
     )
 
@@ -108,8 +108,8 @@ async def login(
         value=access_token,
         httponly=True,
         max_age=30 * 60,  # 30 mins
-        samesite="lax",
-        secure=settings.cookie_secure,
+        samesite="none" if settings.is_production else "lax",
+        secure=True if settings.is_production else settings.cookie_secure,
         path="/",
     )
 
@@ -129,8 +129,8 @@ async def logout(response: Response):
     response.delete_cookie(
         key="access_token",
         httponly=True,
-        samesite="lax",
-        secure=settings.cookie_secure,
+        samesite="none" if settings.is_production else "lax",
+        secure=True if settings.is_production else settings.cookie_secure,
         path="/",
     )
     return success_response("Logged out successfully")
