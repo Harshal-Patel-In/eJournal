@@ -224,6 +224,15 @@ export function formatLatexForKatex(input: string): string {
   return finalLatex;
 }
 
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 export default function KatexRenderer({ latex, displayMode = false }: KatexRendererProps) {
   const formattedLatex = useMemo(() => formatLatexForKatex(latex), [latex]);
 
@@ -237,9 +246,10 @@ export default function KatexRenderer({ latex, displayMode = false }: KatexRende
       });
     } catch (error) {
       console.error("Failed to render math:", error);
-      return `<span class="text-destructive font-mono text-xs">Error parsing formula: ${latex}</span>`;
+      return `<span class="text-destructive font-mono text-xs">Error parsing formula: ${escapeHtml(latex)}</span>`;
     }
-  }, [formattedLatex, displayMode]);
+  }, [formattedLatex, displayMode, latex]);
 
   return <span dangerouslySetInnerHTML={{ __html: html }} />;
 }
+

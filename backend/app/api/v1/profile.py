@@ -6,6 +6,7 @@ RULE-AUTH06: Redirect to profile setup if incomplete.
 
 from fastapi import APIRouter, Depends, Response
 
+from app.core.config import settings
 from app.dependencies.auth import get_active_user
 from app.schemas.auth import UserMeResponse
 from app.schemas.profile import ProfileUpdateRequest
@@ -50,7 +51,7 @@ async def update_profile(
         httponly=True,
         max_age=30 * 60,
         samesite="lax",
-        secure=False,
+        secure=settings.cookie_secure,
     )
     
     return success_response(updated_user)

@@ -29,8 +29,8 @@ def setup_logging() -> None:
     ]
 
     if settings.ENVIRONMENT == "development":
-        # Pretty console output for development
-        renderer = structlog.dev.ConsoleRenderer()
+        # Pretty console output for development without dumping giant local variable AST trees
+        renderer = structlog.dev.ConsoleRenderer(exception_formatter=structlog.dev.plain_traceback)
     else:
         # JSON output for production (RULE-LOG01)
         renderer = structlog.processors.JSONRenderer()

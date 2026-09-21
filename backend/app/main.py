@@ -85,11 +85,20 @@ def create_app() -> FastAPI:
     # Mount API v1 router (RULE-API02: versioned APIs)
     app.include_router(api_v1_router, prefix="/api/v1")
 
-    # Serve static uploads files (e.g. for image blocks in visual editor)
+    # Serve static uploads with strict CSP and nosniff to prevent Stored XSS via SVGs (SEC-09)
     from fastapi.staticfiles import StaticFiles
+    from starlette.responses import Response
     import os
     os.makedirs("uploads", exist_ok=True)
-    app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+
+    class SecureStaticFiles(StaticFiles):
+        async def get_response(self, path: str, scope) -> Response:
+            response = await super().get_response(path, scope)
+            response.headers["Content-Security-Policy"] = "default-src 'none'; style-src 'unsafe-inline'"
+            response.headers["X-Content-Type-Options"] = "nosniff"
+            return response
+
+    app.mount("/uploads", SecureStaticFiles(directory="uploads"), name="uploads")
 
     return app
 

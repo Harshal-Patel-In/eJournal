@@ -27,10 +27,20 @@ export default function TableBlock({ id, content, previewMode }: TableBlockProps
   const [editingHeaderIdx, setEditingHeaderIdx] = useState<number | null>(null);
   const [editingCell, setEditingCell] = useState<{ r: number; c: number } | null>(null);
 
-  const headers = content.headers || ["Column 1", "Column 2"];
-  const rows = content.rows || [["", ""]];
-  const columnFormulas = content.columnFormulas || {};
-  const columnPrecision = content.columnPrecision || {};
+  // Self-healing schema normalization (defends against legacy corrupt payloads)
+  const safeHeaders: string[] = Array.isArray(content?.headers) && content.headers.length > 0
+    ? content.headers
+    : ["Column 1", "Column 2"];
+
+  const safeRows: string[][] = Array.isArray(content?.rows) && content.rows.length > 0
+    ? content.rows.map((row) => (Array.isArray(row) ? row.map((cell) => String(cell ?? "")) : Array(safeHeaders.length).fill("")))
+    : [Array(safeHeaders.length).fill("")];
+
+  const headers = safeHeaders;
+  const rows = safeRows;
+  const columnFormulas = content?.columnFormulas || {};
+  const columnPrecision = content?.columnPrecision || {};
+  const teacherNote = (content as any)?.teacherNote;
 
   // Helper to dynamically evaluate all active formulas on a single row (O(1) constant time)
   const recomputeRowFormulas = (
@@ -172,6 +182,12 @@ export default function TableBlock({ id, content, previewMode }: TableBlockProps
   if (previewMode) {
     return (
       <div className="overflow-x-auto w-full my-4 border border-border rounded-xl shadow-xs custom-scrollbar bg-card print:overflow-visible print:border-none print:shadow-none print:my-2 page-break-avoid">
+        {teacherNote && (
+          <div className="mx-3 mt-3 px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs font-medium flex items-center gap-2">
+            <span className="font-extrabold uppercase text-[10px] tracking-wider px-1.5 py-0.5 rounded bg-amber-500/20">Teacher Note</span>
+            <span>{teacherNote}</span>
+          </div>
+        )}
         <table className="min-w-full divide-y divide-border text-xs print:min-w-0 print:w-full print:table-auto print:border-collapse print:divide-zinc-400">
           <thead className="bg-muted/40 print:bg-zinc-100">
             <tr className="print:border-b print:border-zinc-400">
@@ -254,6 +270,25 @@ export default function TableBlock({ id, content, previewMode }: TableBlockProps
           </Button>
         </div>
       </div>
+
+      {teacherNote && (
+        <div className="px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs font-medium flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="font-extrabold uppercase text-[10px] tracking-wider px-1.5 py-0.5 rounded bg-amber-500/20">Teacher Note</span>
+            <span>{teacherNote}</span>
+          </div>
+          <button
+            onClick={() => {
+              const updated = { ...content };
+              delete (updated as any).teacherNote;
+              updateBlock(id, updated);
+            }}
+            className="text-[10px] text-amber-600/70 hover:text-amber-700 dark:hover:text-amber-200 cursor-pointer underline"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {/* Grid Canvas with Math Render & Inline Inputs */}
       <div className="overflow-x-auto border border-border/60 rounded-xl custom-scrollbar bg-background">

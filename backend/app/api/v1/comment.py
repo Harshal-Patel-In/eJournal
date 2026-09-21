@@ -33,8 +33,8 @@ async def list_journal_comments(
     user: dict = Depends(get_active_user),
     comment_service: CommentService = Depends(),
 ):
-    """Fetch all comment annotations for a specific journal document."""
-    comments = await comment_service.list_journal_comments(journalId)
+    """Fetch all comment annotations for a specific journal document after authorization check."""
+    comments = await comment_service.list_journal_comments(journalId, user["id"], user["role"])
     return success_response(comments)
 
 
@@ -44,9 +44,10 @@ async def resolve_comment(
     user: dict = Depends(get_active_user),
     comment_service: CommentService = Depends(),
 ):
-    """Resolve a comment thread."""
-    success = await comment_service.resolve_comment(commentId)
+    """Resolve a comment thread after authorization check."""
+    success = await comment_service.resolve_comment(commentId, user["id"], user["role"])
     return success_response({"success": success})
+
 
 
 @router.post("/{commentId}/apply-suggestion", response_model=ApiResponse[dict])

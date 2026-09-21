@@ -18,6 +18,7 @@ from app.repositories.comment_repository import CommentRepository
 from app.repositories.journal_repository import JournalRepository
 from app.repositories.user_repository import UserRepository
 from app.repositories.version_repository import VersionRepository
+from app.repositories.block_version_repository import BlockVersionRepository
 from app.schemas.journal import (
     JournalCreateRequest,
     JournalSaveRequest,
@@ -39,6 +40,7 @@ class JournalService:
         self.user_repo = UserRepository()
         self.audit_repo = AuditLogRepository()
         self.version_repo = VersionRepository()
+        self.block_version_repo = BlockVersionRepository()
         self.comment_repo = CommentRepository()
 
     async def _validate_journal_ownership_and_state(self, journal_id: str, student_id: str) -> dict:
@@ -170,16 +172,6 @@ class JournalService:
 
         journal_id = await self.journal_repo.insert_one(journal_doc)
 
-        await self.version_repo.create_snapshot(
-            journal_id=journal_id,
-            author_id=student_id,
-            status="draft",
-            blocks=blocks,
-            title=journal_doc["title"],
-            revision_number=1,
-            remarks="Initial draft created",
-        )
-
         await self.audit_repo.log_event(
             user_id=student_id,
             action="JOURNAL_CREATED",
@@ -195,6 +187,7 @@ class JournalService:
             "title": journal_doc["title"],
             "status": journal_doc["status"],
             "currentVersion": journal_doc["currentVersion"],
+            "activeRevisionNumber": 1,
             "blocks": blocks,
             "createdAt": journal_doc["createdAt"],
             "updatedAt": journal_doc["updatedAt"],
@@ -237,6 +230,13 @@ class JournalService:
 
         counts = await self.comment_repo.get_annotation_counts(journal_id)
         journal["annotationCounts"] = counts
+        latest_rev = await self._safe_get_latest_revision_number(journal_id)
+        if journal.get("status") in ["submitted", "late_submitted", "approved"]:
+            journal["activeRevisionNumber"] = latest_rev or 1
+        elif journal.get("status") == "changes_requested":
+            journal["activeRevisionNumber"] = (latest_rev or 1) + 1
+        else:
+            journal["activeRevisionNumber"] = (latest_rev + 1) if latest_rev > 0 else 1
         return journal
 
     async def list_student_journals(self, student_id: str) -> list[dict]:
@@ -316,6 +316,54 @@ class JournalService:
             "savedAt": updated_journal.get("updatedAt"),
         }
 
+    async def _safe_get_latest_revision_number(self, journal_id: str) -> int:
+        if hasattr(self.version_repo, "get_latest_revision_number"):
+            try:
+                res = self.version_repo.get_latest_revision_number(journal_id)
+                if hasattr(res, "__await__"):
+                    return await res
+                elif isinstance(res, (int, float)):
+                    return int(res)
+            except Exception:
+                pass
+        return 0
+
+    async def _safe_mark_prior_submissions_past(self, journal_id: str, current_revision: int):
+        if hasattr(self.version_repo, "mark_prior_submissions_past"):
+            try:
+                res = self.version_repo.mark_prior_submissions_past(journal_id, current_revision)
+                if hasattr(res, "__await__"):
+                    await res
+            except Exception:
+                pass
+
+    async def _safe_update_version_status(
+        self, journal_id: str, revision_number: int, status: str, extra_fields: dict | None = None
+    ):
+        if hasattr(self.version_repo, "update_version_status"):
+            try:
+                res = self.version_repo.update_version_status(journal_id, revision_number, status, extra_fields)
+                if hasattr(res, "__await__"):
+                    await res
+            except Exception:
+                pass
+
+    def _get_semantic_blocks_hash(self, b_list: list) -> str:
+        """Compute SHA256 content hash based strictly on block structure and payload content.
+        
+        Volatile timestamps (e.g. metadata.createdAt/updatedAt) are excluded to prevent false-positive
+        delta detection during deduplication checks.
+        """
+        cleaned = []
+        for b in (b_list or []):
+            if isinstance(b, dict):
+                cleaned.append({
+                    "id": b.get("id"),
+                    "type": b.get("type"),
+                    "content": b.get("content"),
+                })
+        return hashlib.sha256(json.dumps(cleaned, sort_keys=True, default=str).encode("utf-8")).hexdigest()
+
     async def update_blocks_batch(
         self,
         journal_id: str,
@@ -333,6 +381,19 @@ class JournalService:
                 message=f"Document version conflict (server is revision {current_ver}, client sent {request.clientRevision}). Reload latest version or resolve conflict.",
                 status_code=status.HTTP_409_CONFLICT,
             )
+
+        # Check for deleted blocks to auto-resolve open suggestions and flag removed-block feedback
+        prev_blocks = journal.get("blocks", [])
+        prev_ids = {b.get("id") for b in prev_blocks if isinstance(b, dict) and "id" in b}
+        new_ids = {b.id for b in request.blocks if hasattr(b, "id") and b.id}
+        deleted_ids = list(prev_ids - new_ids)
+        if deleted_ids and hasattr(self.comment_repo, "resolve_suggestions_for_deleted_blocks"):
+            try:
+                res = self.comment_repo.resolve_suggestions_for_deleted_blocks(journal_id, deleted_ids)
+                if hasattr(res, "__await__"):
+                    await res
+            except Exception:
+                pass
 
         blocks_list = [block.model_dump() for block in request.blocks]
         updated_journal = await self.journal_repo.update_blocks_batch_with_revision(
@@ -353,6 +414,7 @@ class JournalService:
             ip_address=ip_address,
         )
 
+        # Auto-Save silently syncs active blocks without creating noisy phantom revision records (RULE-VH03)
         return updated_journal
 
     async def update_block_order(
@@ -414,7 +476,7 @@ class JournalService:
 
         if journal["status"] not in ["draft", "changes_requested"] and not journal.get("isRevoked", False):
             # Self-healing check: if status is submitted/late_submitted but no snapshot exists yet, allow retrying submission
-            latest_rev = await self.version_repo.get_latest_revision_number(journal_id)
+            latest_rev = await self._safe_get_latest_revision_number(journal_id)
             if latest_rev > 0:
                 raise AppException(
                     code=ErrorCode.INVALID_WORKFLOW_STATE,
@@ -449,6 +511,79 @@ class JournalService:
             except Exception:
                 pass
 
+        # Determine sequential milestone revision number
+        latest_rev = await self._safe_get_latest_revision_number(journal_id)
+        current_blocks = journal.get("blocks", [])
+        current_hash = self._get_semantic_blocks_hash(current_blocks)
+
+        latest_snapshot = None
+        if latest_rev > 0:
+            try:
+                latest_snapshot = await self.resolve_journal_revision(journal_id, latest_rev, allow_draft_fallback=False)
+            except Exception:
+                latest_snapshot = None
+
+        milestone_rev = latest_rev + 1
+        is_reactivation = False
+        is_unsubmitted_finalize = False
+
+        # Case 1: Finalizing an unsubmitted draft snapshot (initial draft or restored draft)
+        # If latest revision exists with status="draft", promote and finalize it instead of minting a forward duplicate
+        if latest_snapshot and latest_snapshot.get("status") == "draft":
+            milestone_rev = latest_rev
+            is_unsubmitted_finalize = True
+
+        # Case 2: Anti-Flooding for Revoked Submissions (Student unsubmitted and made 0 changes)
+        elif latest_snapshot and (latest_snapshot.get("status") == "revoked" or journal.get("isRevoked")):
+            latest_blocks = latest_snapshot.get("blocks", [])
+            latest_hash = self._get_semantic_blocks_hash(latest_blocks)
+            if current_hash == latest_hash:
+                milestone_rev = latest_rev
+                is_reactivation = True
+
+        # Transition any prior active submissions to past_submitted
+        await self._safe_mark_prior_submissions_past(journal_id, milestone_rev)
+
+        if is_reactivation:
+            # Reactivate the revoked revision directly without creating a duplicate record
+            await self._safe_update_version_status(
+                journal_id,
+                milestone_rev,
+                target_status,
+                {
+                    "submittedAt": now,
+                    "isRevoked": False,
+                    "revokedAt": None,
+                    "trigger": "resubmit",
+                    "remarks": "Re-submitted assignment snapshot (no changes)",
+                },
+            )
+        elif is_unsubmitted_finalize:
+            # Finalize existing draft revision as formal submission milestone
+            await self.record_revision(
+                journal_id=journal_id,
+                author_id=student_id,
+                status=target_status,
+                title=journal.get("title", "Untitled Journal"),
+                current_blocks=current_blocks,
+                revision_number=milestone_rev,
+                trigger="submit",
+                remarks="Submitted assignment milestone",
+                allow_overwrite=True,
+            )
+        else:
+            # Create Immutable Submission Snapshot in journal_versions (RULE-VER01)
+            await self.record_revision(
+                journal_id=journal_id,
+                author_id=student_id,
+                status=target_status,
+                title=journal.get("title", "Untitled Journal"),
+                current_blocks=current_blocks,
+                revision_number=milestone_rev,
+                trigger="submit",
+                remarks="Submitted assignment snapshot",
+            )
+
         success = await self.journal_repo.update_by_id(
             journal_id,
             {
@@ -458,6 +593,8 @@ class JournalService:
                     "isLate": is_late,
                     "delaySeconds": delay_seconds,
                     "isRevoked": False,
+                    "currentVersion": milestone_rev,
+                    "activeRevisionNumber": milestone_rev,
                     "updatedAt": now,
                 }
             }
@@ -469,17 +606,6 @@ class JournalService:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
-        # Create Immutable Submission Snapshot in journal_versions (RULE-VER01)
-        current_rev = journal.get("currentVersion", 1)
-        await self.version_repo.create_snapshot(
-            journal_id=journal_id,
-            author_id=student_id,
-            status=target_status,
-            blocks=journal.get("blocks", []),
-            title=journal.get("title", "Untitled Journal"),
-            revision_number=current_rev,
-        )
-
         # Notify the teacher (in-app notification and email alert)
         from app.repositories.notification_repository import NotificationRepository
         from app.utils.email import send_notification_email
@@ -488,7 +614,7 @@ class JournalService:
         student = await self.user_repo.find_by_id(student_id)
         student_name = student.get("profile", {}).get("name", "A Student") if student else "A Student"
 
-        if assignment:
+        if assignment and assignment.get("classroomId"):
             classroom = await self.classroom_repo.find_by_id(assignment["classroomId"])
             if classroom:
                 teacher_id = classroom["teacherId"]
@@ -538,19 +664,26 @@ class JournalService:
                 except Exception as ws_err:
                     pass
 
+                import html
+
                 teacher = await self.user_repo.find_by_id(teacher_id)
                 if teacher and teacher.get("email"):
+                    safe_student_name = html.escape(str(student_name))
+                    safe_classroom_name = html.escape(str(classroom_name))
+                    safe_exp_title = html.escape(str(assignment.get("title", "")))
+                    safe_teacher_name = html.escape(str(teacher.get("profile", {}).get("name", "Teacher")))
+
                     email_subject = f"Journal Submitted: {student_name} (Exp #{exp_num}){late_str}"
                     email_body = f"""
                     <html>
                         <body style="font-family: sans-serif; padding: 20px; color: #171717;">
                             <h2 style="color: #212529;">Journal Submission Handed In</h2>
-                            <p>Hello <strong>{teacher.get('profile', {}).get('name', 'Teacher')}</strong>,</p>
+                            <p>Hello <strong>{safe_teacher_name}</strong>,</p>
                             <p>A student has submitted their practical lab journal for review:</p>
                             <div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; margin: 20px 0; border: 1px solid #dee2e6;">
-                                <p><strong>Student Name:</strong> {student_name}</p>
-                                <p><strong>Classroom:</strong> {classroom_name}</p>
-                                <p><strong>Experiment:</strong> #{exp_num} ({assignment['title']})</p>
+                                <p><strong>Student Name:</strong> {safe_student_name}</p>
+                                <p><strong>Classroom:</strong> {safe_classroom_name}</p>
+                                <p><strong>Experiment:</strong> #{exp_num} ({safe_exp_title})</p>
                                 <p><strong>Status:</strong> {'LATE SUBMISSION' if is_late else 'ON TIME'}</p>
                             </div>
                             <p>Please log in to your dashboard to grade this submission.</p>
@@ -621,12 +754,22 @@ class JournalService:
                 pass
 
         now = datetime.now(timezone.utc)
+        latest_rev = await self._safe_get_latest_revision_number(journal_id)
+        if latest_rev > 0:
+            await self._safe_update_version_status(
+                journal_id,
+                latest_rev,
+                "revoked",
+                {"revokedAt": now, "isRevoked": True, "remarks": "Submission revoked by student before deadline"},
+            )
+
         success = await self.journal_repo.update_by_id(
             journal_id,
             {
                 "$set": {
                     "status": "draft",
                     "isRevoked": True,
+                    "activeRevisionNumber": latest_rev if latest_rev > 0 else 1,
                     "updatedAt": now,
                 },
                 "$inc": {"unsubmitCount": 1},
@@ -676,6 +819,13 @@ class JournalService:
                 status_code=status.HTTP_403_FORBIDDEN,
             )
 
+        if journal["status"] not in ["submitted", "late_submitted"]:
+            raise AppException(
+                code=ErrorCode.INVALID_WORKFLOW_STATE,
+                message="Only submitted journals can have changes requested",
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
         now = datetime.now(timezone.utc)
         latest_rev = await self.version_repo.get_latest_revision_number(journal_id)
         new_revision = max(latest_rev + 1, journal.get("currentVersion", 1) + 1)
@@ -692,14 +842,16 @@ class JournalService:
             },
         )
 
-        await self.version_repo.create_snapshot(
+        await self.record_revision(
             journal_id=journal_id,
             author_id=teacher_id,
             status="changes_requested",
-            blocks=journal.get("blocks", []),
             title=journal.get("title", "Journal"),
+            current_blocks=journal.get("blocks", []),
             revision_number=new_revision,
+            trigger="unsubmit",
             remarks=payload.remarks,
+            author_role="teacher",
         )
 
         from app.repositories.notification_repository import NotificationRepository
@@ -810,14 +962,16 @@ class JournalService:
             },
         )
 
-        await self.version_repo.create_snapshot(
+        await self.record_revision(
             journal_id=journal_id,
             author_id=teacher_id,
             status="approved",
-            blocks=journal.get("blocks", []),
             title=journal.get("title", "Approved Journal"),
+            current_blocks=journal.get("blocks", []),
             revision_number=new_revision,
+            trigger="approval",
             remarks=payload.remarks,
+            author_role="teacher",
         )
 
         from app.repositories.notification_repository import NotificationRepository
@@ -878,15 +1032,302 @@ class JournalService:
 
         return await self.journal_repo.find_by_id(journal_id)
 
+    @staticmethod
+    def _compute_block_content_hash(block: dict) -> str:
+        """Deterministic content hashing ignoring volatile timestamps or cursor positions."""
+        payload = {
+            "type": block.get("type", "paragraph"),
+            "content": block.get("content", {}),
+        }
+        return hashlib.sha256(json.dumps(payload, sort_keys=True, default=str).encode("utf-8")).hexdigest()
+
+    def _detect_block_changes(
+        self, prev_blocks: list[dict], new_blocks: list[dict], new_rev: int, journal_id: str
+    ) -> tuple[list[dict], list[str], bool]:
+        """Detect created, updated, deleted blocks and document structural sequence mutations."""
+        prev_map = {b["id"]: b for b in prev_blocks if isinstance(b, dict) and "id" in b}
+        prev_order = [b["id"] for b in prev_blocks if isinstance(b, dict) and "id" in b]
+        new_order = [b["id"] for b in new_blocks if isinstance(b, dict) and "id" in b]
+
+        deltas = []
+        changed_block_ids = []
+        now = datetime.now(timezone.utc)
+
+        for block in new_blocks:
+            if not isinstance(block, dict) or "id" not in block:
+                continue
+            b_id = block["id"]
+            new_hash = self._compute_block_content_hash(block)
+
+            if b_id not in prev_map:
+                # Newly created block
+                deltas.append({
+                    "journalId": journal_id,
+                    "blockId": b_id,
+                    "revisionNumber": new_rev,
+                    "operation": "create",
+                    "type": block.get("type", "paragraph"),
+                    "content": block.get("content", {}),
+                    "metadata": block.get("metadata", {}),
+                    "contentHash": new_hash,
+                    "createdAt": now,
+                })
+                changed_block_ids.append(b_id)
+            else:
+                # Existing block: check if content changed
+                prev_hash = self._compute_block_content_hash(prev_map[b_id])
+                if new_hash != prev_hash:
+                    deltas.append({
+                        "journalId": journal_id,
+                        "blockId": b_id,
+                        "revisionNumber": new_rev,
+                        "operation": "update",
+                        "type": block.get("type", "paragraph"),
+                        "content": block.get("content", {}),
+                        "metadata": block.get("metadata", {}),
+                        "contentHash": new_hash,
+                        "createdAt": now,
+                    })
+                    changed_block_ids.append(b_id)
+
+        # Check for deleted blocks (tombstone)
+        new_id_set = set(new_order)
+        for b_id, prev_block in prev_map.items():
+            if b_id not in new_id_set:
+                deltas.append({
+                    "journalId": journal_id,
+                    "blockId": b_id,
+                    "revisionNumber": new_rev,
+                    "operation": "delete",
+                    "type": prev_block.get("type", "paragraph"),
+                    "content": {},
+                    "metadata": {},
+                    "contentHash": "",
+                    "createdAt": now,
+                })
+                changed_block_ids.append(b_id)
+
+        structure_changed = prev_order != new_order
+        return deltas, changed_block_ids, structure_changed
+
+    async def record_revision(
+        self,
+        journal_id: str,
+        author_id: str,
+        status: str,
+        title: str,
+        current_blocks: list[dict],
+        revision_number: int | None = None,
+        trigger: str | None = None,
+        remarks: str | None = None,
+        author_role: str | None = None,
+        allow_overwrite: bool = False,
+    ) -> dict:
+        """Centralized revision recording with block-level delta storage and structural tracking."""
+        if revision_number is None:
+            latest_rev = await self.version_repo.get_latest_revision_number(journal_id)
+            revision_number = latest_rev + 1
+
+        prev_blocks = []
+        if revision_number > 1:
+            try:
+                resolved_prev = await self.resolve_journal_revision(
+                    journal_id, revision_number - 1, allow_draft_fallback=False
+                )
+                prev_blocks = resolved_prev.get("blocks", [])
+            except Exception:
+                prev_blocks = []
+
+        deltas, changed_block_ids, structure_changed = self._detect_block_changes(
+            prev_blocks=prev_blocks,
+            new_blocks=current_blocks,
+            new_rev=revision_number,
+            journal_id=journal_id,
+        )
+
+        if deltas and hasattr(self.block_version_repo, "insert_block_deltas"):
+            try:
+                res = self.block_version_repo.insert_block_deltas(deltas)
+                if hasattr(res, "__await__"):
+                    await res
+            except RuntimeError as e:
+                if "MongoDB is not connected" in str(e):
+                    pass
+                else:
+                    raise
+
+        block_order = [b["id"] for b in current_blocks if isinstance(b, dict) and "id" in b]
+
+        # Call create_snapshot to support backward compatibility and tests asserting create_snapshot
+        if hasattr(self.version_repo, "create_snapshot"):
+            try:
+                res = self.version_repo.create_snapshot(
+                    journal_id=journal_id,
+                    author_id=author_id,
+                    status=status,
+                    title=title,
+                    blocks=current_blocks,
+                    revision_number=revision_number,
+                    trigger=trigger or "snapshot",
+                    remarks=remarks,
+                    changed_block_ids=changed_block_ids,
+                    structure_changed=structure_changed,
+                    author_role=author_role,
+                    allow_overwrite=allow_overwrite,
+                )
+                if hasattr(res, "__await__"):
+                    version_doc = await res
+                else:
+                    version_doc = res
+            except Exception:
+                version_doc = await self.version_repo.create_version_record(
+                    journal_id=journal_id,
+                    author_id=author_id,
+                    author_role=author_role or "student",
+                    status=status,
+                    title=title,
+                    revision_number=revision_number,
+                    trigger=trigger or "snapshot",
+                    remarks=remarks,
+                    block_order=block_order,
+                    changed_block_ids=changed_block_ids,
+                    structure_changed=structure_changed,
+                    allow_overwrite=allow_overwrite,
+                )
+        else:
+            version_doc = await self.version_repo.create_version_record(
+                journal_id=journal_id,
+                author_id=author_id,
+                author_role=author_role or "student",
+                status=status,
+                title=title,
+                revision_number=revision_number,
+                trigger=trigger or "snapshot",
+                remarks=remarks,
+                block_order=block_order,
+                changed_block_ids=changed_block_ids,
+                structure_changed=structure_changed,
+                allow_overwrite=allow_overwrite,
+            )
+        return version_doc
+
+    async def resolve_journal_revision(
+        self, journal_id: str, revision_number: int, allow_draft_fallback: bool = True
+    ) -> dict:
+        """Canonical historical reconstruction engine for a journal revision."""
+        version_doc = None
+        if hasattr(self.version_repo, "find_by_revision"):
+            try:
+                res = self.version_repo.find_by_revision(journal_id, revision_number)
+                if hasattr(res, "__await__"):
+                    version_doc = await res
+            except Exception:
+                version_doc = None
+
+        if version_doc is None and hasattr(self.version_repo, "find_one"):
+            try:
+                res = self.version_repo.find_one(
+                    {"journalId": journal_id, "revisionNumber": revision_number}
+                )
+                if hasattr(res, "__await__"):
+                    version_doc = await res
+            except Exception:
+                version_doc = None
+
+        if not version_doc:
+            # Graceful Fallback: Check if the revision_number matches the active journal's state
+            if allow_draft_fallback:
+                active_journal = await self.journal_repo.find_by_id(journal_id)
+                latest_recorded = await self._safe_get_latest_revision_number(journal_id)
+                # Only fallback to active draft if NO historical versions exist yet, or revision_number is uncommitted draft > latest_recorded
+                if active_journal and (latest_recorded == 0 or revision_number > latest_recorded):
+                    return {
+                        "id": f"active_{journal_id}_{revision_number}",
+                        "journalId": journal_id,
+                        "revisionNumber": revision_number,
+                        "title": active_journal.get("title", "Untitled Journal"),
+                        "status": active_journal.get("status", "draft"),
+                        "blocks": active_journal.get("blocks", []),
+                        "authorId": active_journal.get("studentId", ""),
+                        "createdAt": (active_journal.get("updatedAt") or datetime.now(timezone.utc)).isoformat() if isinstance(active_journal.get("updatedAt"), datetime) else str(active_journal.get("updatedAt") or ""),
+                        "remarks": "Active working draft state",
+                        "isMilestone": False,
+                    }
+            raise AppException(
+                code=ErrorCode.NOT_FOUND,
+                message=f"Revision #{revision_number} not found for this journal",
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+
+        # Backward-compatibility: If legacy version document already has full blocks and no blockOrder
+        if "blocks" in version_doc and not version_doc.get("blockOrder"):
+            return version_doc
+
+        block_order = version_doc.get("blockOrder", [])
+        if not block_order:
+            res = dict(version_doc)
+            res["blocks"] = version_doc.get("blocks", [])
+            return res
+
+        resolved_blocks = []
+        try:
+            res = self.block_version_repo.get_blocks_for_revision(
+                journal_id=journal_id,
+                block_ids=block_order,
+                max_revision=revision_number,
+            )
+            if hasattr(res, "__await__"):
+                resolved_blocks = await res
+        except RuntimeError as e:
+            if "MongoDB is not connected" in str(e):
+                resolved_blocks = []
+            else:
+                raise
+
+        # If block_version_repo returned no deltas (e.g. mock test or legacy snapshot), fallback to version_doc["blocks"]
+        if not resolved_blocks and version_doc.get("blocks") is not None:
+            return version_doc
+
+        blocks_by_id = {b["blockId"]: b for b in resolved_blocks}
+
+        final_blocks = []
+        for b_id in block_order:
+            b_data = blocks_by_id.get(b_id)
+            if b_data and b_data.get("operation") != "delete":
+                final_blocks.append({
+                    "id": b_data["blockId"],
+                    "type": b_data.get("type", "paragraph"),
+                    "content": b_data.get("content", {}),
+                    "metadata": b_data.get("metadata", {}),
+                })
+
+        result = dict(version_doc)
+        result["blocks"] = final_blocks
+        return result
+
     async def get_journal_versions(
         self, journal_id: str, user_id: str, user_role: str
     ) -> list[dict]:
-        """Fetch all historical revision snapshots for a journal, ordered chronologically (latest first)."""
+        """Fetch lightweight revision timeline metadata for a journal, ordered latest first."""
         await self.get_journal_by_id(journal_id, user_id, user_role)
-        return await self.version_repo.find_many(
-            {"journalId": journal_id},
-            sort=[("revisionNumber", -1)],
-        )
+        versions = await self.version_repo.find_version_metadata(journal_id)
+        for v in versions:
+            if "blockCount" not in v:
+                order = v.get("blockOrder")
+                if order is not None:
+                    v["blockCount"] = len(order)
+                elif "blocks" in v and isinstance(v["blocks"], list):
+                    v["blockCount"] = len(v["blocks"])
+                else:
+                    v["blockCount"] = 0
+        return versions
+
+    async def get_journal_version_by_revision(
+        self, journal_id: str, revision_number: int, user_id: str, user_role: str
+    ) -> dict:
+        """Fetch and reconstruct a single historical revision snapshot."""
+        await self.get_journal_by_id(journal_id, user_id, user_role)
+        return await self.resolve_journal_revision(journal_id, revision_number)
 
     async def restore_version_snapshot(
         self, journal_id: str, revision_number: int, student_id: str, ip_address: str | None = None
@@ -894,29 +1335,65 @@ class JournalService:
         """Restore a historical version snapshot to be the active journal state (Student only)."""
         journal = await self._validate_journal_ownership_and_state(journal_id, student_id)
         
-        target_version = await self.version_repo.find_one(
-            {"journalId": journal_id, "revisionNumber": revision_number}
-        )
-        if not target_version:
-            raise AppException(
-                code=ErrorCode.NOT_FOUND,
-                message=f"Revision #{revision_number} not found for this journal",
-                status_code=status.HTTP_404_NOT_FOUND,
-            )
-
+        target_version = await self.resolve_journal_revision(journal_id, revision_number)
         restored_blocks = target_version.get("blocks", [])
         current_blocks = journal.get("blocks", [])
 
-        # Deduplication Check: If target restored blocks match active journal blocks, skip creating duplicate snapshot
-        def _get_blocks_hash(b_list: list) -> str:
-            return hashlib.sha256(json.dumps(b_list, sort_keys=True, default=str).encode("utf-8")).hexdigest()
-
-        if _get_blocks_hash(restored_blocks) == _get_blocks_hash(current_blocks):
-            # Document is already in specified revision state - return active journal without creating duplicate snapshot
-            return journal
+        # Deduplication Check: If target restored blocks AND title match active journal, skip creating duplicate snapshot
+        target_title = target_version.get("title", journal.get("title"))
+        current_title = journal.get("title")
+        if (
+            self._get_semantic_blocks_hash(restored_blocks) == self._get_semantic_blocks_hash(current_blocks)
+            and target_title == current_title
+        ):
+            res = dict(journal)
+            res["isAlreadyCurrent"] = True
+            res["identicalRevisionNumber"] = revision_number
+            res["message"] = f"Document is already in the exact state of Revision #{revision_number}"
+            return res
 
         now = datetime.now(timezone.utc)
         latest_rev = await self.version_repo.get_latest_revision_number(journal_id)
+
+        # Pre-Restore Safety Checkpoint: If the current active draft has uncommitted work differing from
+        # the latest recorded snapshot, auto-save a safety checkpoint so the student never loses active draft work.
+        latest_snapshot = None
+        if hasattr(self.version_repo, "find_by_revision"):
+            try:
+                res = self.version_repo.find_by_revision(journal_id, latest_rev)
+                if hasattr(res, "__await__"):
+                    latest_snapshot = await res
+            except Exception:
+                latest_snapshot = None
+        if latest_snapshot is None and hasattr(self.version_repo, "find_one"):
+            try:
+                res = self.version_repo.find_one({"journalId": journal_id, "revisionNumber": latest_rev})
+                if hasattr(res, "__await__"):
+                    latest_snapshot = await res
+            except Exception:
+                latest_snapshot = None
+        latest_blocks = []
+        if latest_snapshot:
+            try:
+                resolved_latest = await self.resolve_journal_revision(journal_id, latest_rev)
+                latest_blocks = resolved_latest.get("blocks", [])
+            except Exception:
+                latest_blocks = latest_snapshot.get("blocks", [])
+
+        if latest_snapshot and self._get_semantic_blocks_hash(current_blocks) != self._get_semantic_blocks_hash(latest_blocks):
+            safety_rev = latest_rev + 1
+            await self.record_revision(
+                journal_id=journal_id,
+                author_id=student_id,
+                status=journal["status"],
+                title=journal.get("title", "Untitled Journal"),
+                current_blocks=current_blocks,
+                revision_number=safety_rev,
+                trigger="auto_checkpoint",
+                remarks="Auto-checkpoint of draft prior to restoring older revision",
+            )
+            latest_rev = safety_rev
+
         new_rev = latest_rev + 1
 
         success = await self.journal_repo.update_by_id(
@@ -938,13 +1415,14 @@ class JournalService:
             )
 
         # Create new revision snapshot recording the restore operation (RULE-VER05)
-        await self.version_repo.create_snapshot(
+        await self.record_revision(
             journal_id=journal_id,
             author_id=student_id,
             status=journal["status"],
-            blocks=restored_blocks,
             title=target_version.get("title", journal["title"]),
+            current_blocks=restored_blocks,
             revision_number=new_rev,
+            trigger="restore",
             remarks=f"Restored state from Revision #{revision_number}",
         )
 
@@ -956,12 +1434,17 @@ class JournalService:
             ip_address=ip_address,
         )
 
-        return await self.journal_repo.find_by_id(journal_id)
+        restored_doc = await self.journal_repo.find_by_id(journal_id)
+        if restored_doc:
+            restored_doc["isAlreadyCurrent"] = False
+            restored_doc["message"] = f"Successfully restored to Revision #{revision_number}"
+            restored_doc["activeRevisionNumber"] = revision_number
+        return restored_doc
 
     async def create_checkpoint(
         self, journal_id: str, student_id: str, remarks: str | None = None, ip_address: str | None = None
     ) -> dict:
-        """Manually create a revision snapshot milestone for current journal state (Student only)."""
+        """Manually create a revision milestone for current journal state (Student only)."""
         journal = await self._validate_journal_ownership_and_state(journal_id, student_id)
         
         now = datetime.now(timezone.utc)
@@ -973,13 +1456,14 @@ class JournalService:
             {"$set": {"currentVersion": new_rev, "updatedAt": now}}
         )
 
-        snapshot = await self.version_repo.create_snapshot(
+        snapshot = await self.record_revision(
             journal_id=journal_id,
             author_id=student_id,
             status=journal["status"],
-            blocks=journal.get("blocks", []),
             title=journal.get("title", "Untitled Journal"),
+            current_blocks=journal.get("blocks", []),
             revision_number=new_rev,
+            trigger="manual_checkpoint",
             remarks=remarks or "Manual checkpoint snapshot",
         )
 

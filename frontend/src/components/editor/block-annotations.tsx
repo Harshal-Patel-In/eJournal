@@ -44,10 +44,12 @@ interface BlockAnnotationsProps {
   annotations: Annotation[];
   isTeacher: boolean;
   currentUser?: any;
+  blockType?: string;
   onApplySuggestion?: (commentId: string) => void;
   onReplyQuestion?: (annotationId: string, replyText: string) => void;
   onRejectSuggestion?: (commentId: string) => void;
   onResolveAnnotation?: (commentId: string) => void;
+  onInsertBlockBelow?: () => void;
 }
 
 const TYPE_CONFIG: Record<
@@ -445,6 +447,8 @@ function RootThreadNode({
   onApplySuggestion,
   onRejectSuggestion,
   onResolveAnnotation,
+  blockType,
+  onInsertBlockBelow,
 }: {
   node: CommentNode;
   isTeacher: boolean;
@@ -459,6 +463,8 @@ function RootThreadNode({
   onApplySuggestion?: (commentId: string) => void;
   onRejectSuggestion?: (commentId: string) => void;
   onResolveAnnotation?: (commentId: string) => void;
+  blockType?: string;
+  onInsertBlockBelow?: () => void;
 }) {
   const ann = node.comment;
   const type = ann.type || "Comment";
@@ -573,17 +579,47 @@ function RootThreadNode({
           )}
 
           {!isTeacher && ann.status !== "resolved" && (
-            <div className="ml-6 flex items-center gap-2 pt-1">
-              {onApplySuggestion && (
+            <div className="ml-6 flex flex-wrap items-center gap-2 pt-1">
+              {/* If block is not a pure media block and has text replacement, allow Apply */}
+              {onApplySuggestion && !["image", "canvas", "graph"].includes(blockType || "") && (
                 <Button
                   size="sm"
                   onClick={() => onApplySuggestion(ann.id)}
                   className="h-7 text-xs font-bold rounded-xl gap-1.5 glass-btn-emerald active:scale-95 cursor-pointer"
+                  title="Apply proposed replacement directly to block"
                 >
                   <Check className="size-3.5" />
-                  <span>Accept Suggestion</span>
+                  <span>Apply Exact Text</span>
                 </Button>
               )}
+
+              {/* Mark as Addressed (for manual edits, re-uploads, or instructional directives) */}
+              {onResolveAnnotation && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => onResolveAnnotation(ann.id)}
+                  className="h-7 text-xs font-semibold rounded-xl border-emerald-500/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/10 cursor-pointer"
+                  title="Mark this feedback resolved after making changes"
+                >
+                  <CheckCircle className="size-3.5" />
+                  <span>Mark as Addressed</span>
+                </Button>
+              )}
+
+              {/* Quick shortcut to insert a new block below if requested */}
+              {onInsertBlockBelow && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={onInsertBlockBelow}
+                  className="h-7 text-xs font-semibold rounded-xl border-blue-500/30 text-blue-700 dark:text-blue-300 hover:bg-blue-500/10 cursor-pointer"
+                  title="Insert a new block below to fulfill request"
+                >
+                  <span>+ Insert Block Below</span>
+                </Button>
+              )}
+
               {onRejectSuggestion && (
                 <Button
                   size="sm"
@@ -725,10 +761,12 @@ export default function BlockAnnotations({
   annotations,
   isTeacher,
   currentUser,
+  blockType,
   onApplySuggestion,
   onReplyQuestion,
   onRejectSuggestion,
   onResolveAnnotation,
+  onInsertBlockBelow,
 }: BlockAnnotationsProps) {
   const [expanded, setExpanded] = useState(true);
   const [activeReplyTargetId, setActiveReplyTargetId] = useState<string | null>(null);
@@ -793,6 +831,8 @@ export default function BlockAnnotations({
               onApplySuggestion={onApplySuggestion}
               onRejectSuggestion={onRejectSuggestion}
               onResolveAnnotation={onResolveAnnotation}
+              blockType={blockType}
+              onInsertBlockBelow={onInsertBlockBelow}
             />
           ))}
         </div>

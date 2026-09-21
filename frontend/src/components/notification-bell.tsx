@@ -12,6 +12,7 @@ import {
   GraduationCap,
   Megaphone,
   ClockAlert,
+  Clock,
   ChevronRight,
   ChevronDown,
   ChevronUp,
@@ -664,7 +665,6 @@ export default function NotificationBell() {
           <button
             onClick={() => toggleCategoryStack(stack.id)}
             className="p-1 text-zinc-400 hover:text-zinc-100 transition-colors cursor-pointer flex items-center gap-1 text-[10px] font-semibold"
-            title="Collapse stack"
           >
             <span>Collapse</span>
             <ChevronUp className="size-3.5" />
@@ -754,7 +754,7 @@ export default function NotificationBell() {
           {/* Ultra-Compact 4px Smooth Scrollable Container */}
           <div
             onWheel={(e) => e.stopPropagation()}
-            className="w-full max-h-[350px] overflow-y-auto px-3 pt-2 pb-8 space-y-2.5 notif-scrollbar"
+            className="w-full max-h-[360px] overflow-y-auto px-3 pt-3 pb-4 space-y-2.5 notif-scrollbar"
             style={{
               maxHeight: "350px",
               overflowY: "auto",
@@ -876,6 +876,19 @@ export default function NotificationBell() {
                   </div>
                 );
               })
+            )}
+          </div>
+
+          {/* Bottom Footer Notice Bar */}
+          <div className="shrink-0 px-4 py-2.5 bg-zinc-50/90 dark:bg-zinc-850/90 border-t border-border/60 flex items-center justify-between text-[11px] text-muted-foreground select-none">
+            <div className="flex items-center gap-1.5">
+              <Clock className="size-3 text-primary/80 shrink-0" />
+              <span>Read items auto-cleared in <strong className="text-foreground font-semibold">7 days</strong></span>
+            </div>
+            {unreadCount > 0 && (
+              <span className="text-[10px] font-medium text-muted-foreground/80">
+                {unreadCount} unread
+              </span>
             )}
           </div>
         </div>

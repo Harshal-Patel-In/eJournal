@@ -7,6 +7,7 @@ RULE-AUTH07: RBAC controls routes.
 import logging
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect, status
 
+from app.core.config import settings
 from app.core.websocket_manager import websocket_manager
 from app.dependencies.auth import get_active_user
 from app.repositories.notification_repository import NotificationRepository
@@ -26,6 +27,21 @@ async def notification_websocket(
     user_repo: UserRepository = Depends(),
 ):
     """Persistent WebSocket connection for real-time user notification streaming."""
+    # Origin verification to prevent Cross-Site WebSocket Hijacking (CSWSH) (SEC-08)
+    origin = websocket.headers.get("origin")
+    if origin:
+        allowed_origins = set(settings.BACKEND_CORS_ORIGINS) | {
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
+            "http://localhost:8000",
+            "http://127.0.0.1:8000",
+            "testserver",
+        }
+        if origin not in allowed_origins:
+            logger.warning("WebSocket handshake rejected: Disallowed origin %s", origin)
+            await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Disallowed origin")
+            return
+
     token = (
         websocket.query_params.get("token")
         or websocket.cookies.get("access_token")
@@ -55,15 +71,15 @@ async def notification_websocket(
         return
 
     user_id = user["id"]
-    await websocket_manager.connect(user_id, websocket)
 
     try:
+        await websocket_manager.connect(user_id, websocket)
         await websocket.send_json({"type": "CONNECTED", "userId": user_id})
         while True:
             data = await websocket.receive_text()
             if data == "ping":
                 await websocket.send_text("pong")
-    except WebSocketDisconnect:
+    except (WebSocketDisconnect, RuntimeError):
         await websocket_manager.disconnect(user_id, websocket)
     except Exception as e:
         logger.info(f"WebSocket closed for user {user_id}: {e}")

@@ -478,4 +478,113 @@ async def test_update_blocks_batch_revision_success(mock_audit, mock_journal):
     assert audit_repo.log_event.called
 
 
+@pytest.mark.anyio
+@patch("app.services.journal_service.JournalRepository")
+@patch("app.services.journal_service.VersionRepository")
+@patch("app.services.journal_service.AuditLogRepository")
+async def test_restore_version_creates_safety_checkpoint(mock_audit, mock_version, mock_journal):
+    """Verify restoring older version auto-saves active draft work as a safety checkpoint."""
+    journal_repo = MagicMock()
+    # Active journal has 2 blocks, whereas historical Rev 1 had 1 blank block
+    journal_repo.find_by_id = AsyncMock(
+        return_value={
+            "id": "jour_res_1",
+            "studentId": "student_123",
+            "status": "draft",
+            "title": "Lab with Unsaved Active Work",
+            "currentVersion": 2,
+            "blocks": [{"id": "b1", "type": "paragraph", "content": {"text": "Active draft content"}}],
+        }
+    )
+    journal_repo.update_by_id = AsyncMock(return_value=True)
+    mock_journal.return_value = journal_repo
+
+    version_repo = MagicMock()
+    # Target version to restore (Revision 1)
+    version_repo.find_one = AsyncMock(
+        side_effect=[
+            # 1. find target version (rev 1)
+            {
+                "id": "v1",
+                "journalId": "jour_res_1",
+                "revisionNumber": 1,
+                "title": "Initial Blank Template",
+                "blocks": [],
+            },
+            # 2. find latest snapshot (to compare active draft)
+            {
+                "id": "v1",
+                "journalId": "jour_res_1",
+                "revisionNumber": 1,
+                "title": "Initial Blank Template",
+                "blocks": [],
+            },
+        ]
+    )
+    version_repo.get_latest_revision_number = AsyncMock(return_value=1)
+    version_repo.create_snapshot = AsyncMock(return_value={"id": "v_snap"})
+    mock_version.return_value = version_repo
+
+    audit_repo = MagicMock()
+    audit_repo.log_event = AsyncMock()
+    mock_audit.return_value = audit_repo
+
+    service = JournalService()
+    result = await service.restore_version_snapshot("jour_res_1", 1, "student_123")
+
+    # Verify that create_snapshot was called TWICE:
+    # 1st call: safety checkpoint of active draft
+    # 2nd call: restored revision milestone
+    assert version_repo.create_snapshot.call_count == 2
+    first_call_kwargs = version_repo.create_snapshot.call_args_list[0][1]
+    second_call_kwargs = version_repo.create_snapshot.call_args_list[1][1]
+
+    assert "Auto-checkpoint" in first_call_kwargs["remarks"]
+    assert first_call_kwargs["revision_number"] == 2
+    assert len(first_call_kwargs["blocks"]) == 1
+
+    assert "Restored state from Revision #1" in second_call_kwargs["remarks"]
+    assert second_call_kwargs["revision_number"] == 3
+    assert len(second_call_kwargs["blocks"]) == 0
+
+
+@pytest.mark.anyio
+@patch("app.services.journal_service.JournalRepository")
+@patch("app.services.journal_service.VersionRepository")
+async def test_restore_version_deduplication_indicator(mock_version, mock_journal):
+    """Verify that restoring an identical version returns isAlreadyCurrent=True with clear feedback."""
+    journal_repo = MagicMock()
+    journal_repo.find_by_id = AsyncMock(
+        return_value={
+            "id": "jour_res_2",
+            "studentId": "student_123",
+            "status": "draft",
+            "title": "Same Document State",
+            "currentVersion": 2,
+            "blocks": [{"id": "b1", "type": "paragraph", "content": {"text": "Exact same content"}}],
+        }
+    )
+    mock_journal.return_value = journal_repo
+
+    version_repo = MagicMock()
+    # Target version has the EXACT same block content as active draft
+    version_repo.find_one = AsyncMock(
+        return_value={
+            "id": "v1",
+            "journalId": "jour_res_2",
+            "revisionNumber": 1,
+            "title": "Same Document State",
+            "blocks": [{"id": "b1", "type": "paragraph", "content": {"text": "Exact same content"}}],
+        }
+    )
+    mock_version.return_value = version_repo
+
+    service = JournalService()
+    result = await service.restore_version_snapshot("jour_res_2", 1, "student_123")
+
+    assert result.get("isAlreadyCurrent") is True
+    assert "Document is already in the exact state" in result.get("message", "")
+
+
+
 

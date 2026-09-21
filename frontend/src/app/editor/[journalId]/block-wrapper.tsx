@@ -8,6 +8,7 @@ import SlashMenu from "./slash-menu";
 interface BlockWrapperProps {
   id: string;
   index: number;
+  type?: string;
   provided: any;
   previewMode: boolean;
   children: React.ReactNode;
@@ -16,6 +17,7 @@ interface BlockWrapperProps {
 export default function BlockWrapper({
   id,
   index,
+  type,
   provided,
   previewMode,
   children,
@@ -99,7 +101,11 @@ export default function BlockWrapper({
       id={`block-${id}`}
       ref={provided.innerRef}
       {...provided.draggableProps}
-      className="group relative w-full border border-transparent hover:border-border/30 hover:bg-muted/5 rounded-xl transition-all"
+      className={`group relative w-full rounded-xl transition-all ${
+        type === "code"
+          ? "border border-transparent"
+          : "border border-transparent hover:border-border/30 hover:bg-muted/5"
+      }`}
     >
       {/* Notion-Style Compact Left Gutter (Guaranteed 8px outside block card edge) */}
       <div className="absolute right-[calc(100%+8px)] top-1.5 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150 select-none z-20 bg-background/95 dark:bg-zinc-900/95 backdrop-blur-md border border-border/70 shadow-xs px-1 py-0.5 rounded-lg">

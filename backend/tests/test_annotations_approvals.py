@@ -12,10 +12,12 @@ from app.services.journal_service import JournalService
 
 
 @pytest.mark.anyio
+@patch("app.services.comment_service.ClassroomRepository")
+@patch("app.services.comment_service.AssignmentRepository")
 @patch("app.services.comment_service.CommentRepository")
 @patch("app.services.comment_service.JournalRepository")
 @patch("app.services.comment_service.UserRepository")
-async def test_add_block_annotation_6_types(mock_user, mock_journal, mock_comment):
+async def test_add_block_annotation_6_types(mock_user, mock_journal, mock_comment, mock_asg, mock_class):
     """Verify teacher can create any of the 6 block annotation types."""
     comment_repo_inst = MagicMock()
     comment_repo_inst.create_comment = AsyncMock(
@@ -45,6 +47,14 @@ async def test_add_block_annotation_6_types(mock_user, mock_journal, mock_commen
     user_inst = MagicMock()
     user_inst.find_by_id = AsyncMock(return_value={"id": "teacher_123", "profile": {"name": "Prof. Smith"}})
     mock_user.return_value = user_inst
+
+    asg_inst = MagicMock()
+    asg_inst.find_by_id = AsyncMock(return_value={"id": "asg_123", "classroomId": "class_123"})
+    mock_asg.return_value = asg_inst
+
+    class_inst = MagicMock()
+    class_inst.find_by_id = AsyncMock(return_value={"id": "class_123", "teacherId": "teacher_123"})
+    mock_class.return_value = class_inst
 
     service = CommentService()
     req = CommentCreateRequest(
@@ -121,3 +131,77 @@ async def test_approve_journal_approval_record(
 
     assert result["status"] == "approved"
     assert result["marks"] == 9.5
+
+
+@pytest.mark.anyio
+@patch("app.services.comment_service.CommentRepository")
+@patch("app.services.comment_service.JournalRepository")
+async def test_apply_suggestion_table_preserves_structure(mock_journal, mock_comment):
+    """Verify that applying a suggestion to a table block preserves its headers and rows without schema destruction."""
+    comment_repo = MagicMock()
+    comment_repo.find_by_id = AsyncMock(
+        return_value={
+            "id": "c_sugg_1",
+            "journalId": "jour_table_1",
+            "blockId": "b_table_1",
+            "type": "Suggestion",
+            "content": "Verify reading 2.45V in column 2",
+            "suggestedContent": "Verify reading 2.45V in column 2",
+        }
+    )
+    comment_repo.resolve_comment = AsyncMock()
+    mock_comment.return_value = comment_repo
+
+    journal_repo = MagicMock()
+    journal_repo.find_by_id = AsyncMock(
+        return_value={
+            "id": "jour_table_1",
+            "studentId": "student_123",
+            "currentVersion": 2,
+            "blocks": [
+                {
+                    "id": "b_table_1",
+                    "type": "table",
+                    "content": {
+                        "headers": ["Trial", "Voltage (V)", "Current (mA)"],
+                        "rows": [["1", "1.20", "12.5"], ["2", "2.40", "25.0"]],
+                    },
+                }
+            ],
+        }
+    )
+    journal_repo.update_single_block_with_revision = AsyncMock(
+        return_value={
+            "id": "jour_table_1",
+            "currentVersion": 3,
+            "blocks": [
+                {
+                    "id": "b_table_1",
+                    "type": "table",
+                    "content": {
+                        "headers": ["Trial", "Voltage (V)", "Current (mA)"],
+                        "rows": [["1", "1.20", "12.5"], ["2", "2.40", "25.0"]],
+                        "teacherNote": "Verify reading 2.45V in column 2",
+                    },
+                }
+            ],
+        }
+    )
+    mock_journal.return_value = journal_repo
+
+    service = CommentService()
+    result = await service.apply_teacher_suggestion("c_sugg_1", "student_123")
+
+    # Verify that the table block preserved headers and rows
+    assert journal_repo.update_single_block_with_revision.called
+    call_args = journal_repo.update_single_block_with_revision.call_args[0]
+    # args: journal_id, block_id, new_content, current_rev
+    new_content = call_args[2]
+    assert "headers" in new_content
+    assert new_content["headers"] == ["Trial", "Voltage (V)", "Current (mA)"]
+    assert "rows" in new_content
+    assert len(new_content["rows"]) == 2
+    assert new_content["rows"][0] == ["1", "1.20", "12.5"]
+    assert new_content.get("teacherNote") == "Verify reading 2.45V in column 2"
+    assert comment_repo.resolve_comment.called
+

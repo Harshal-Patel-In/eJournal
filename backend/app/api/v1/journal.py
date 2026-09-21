@@ -15,6 +15,7 @@ from app.schemas.journal import (
     BatchBlockUpdateRequest,
     BlockOrderUpdateRequest,
     BlockUpdateResponse,
+    CheckpointCreateRequest,
 )
 from app.schemas.response import ApiResponse, success_response
 from app.services.journal_service import JournalService
@@ -235,8 +236,9 @@ async def list_annotations(
     comment_service: CommentService = Depends(),
 ):
     """List all teacher review annotations for a journal document."""
-    comments = await comment_service.list_journal_comments(journalId)
+    comments = await comment_service.list_journal_comments(journalId, user["id"], user["role"])
     return success_response(comments)
+
 
 
 @router.get("/{journalId}/versions", response_model=ApiResponse[list])
@@ -248,6 +250,20 @@ async def list_journal_versions(
     """Retrieve historical revision snapshots of a journal document."""
     versions = await journal_service.get_journal_versions(journalId, user["id"], user["role"])
     return success_response(versions)
+
+
+@router.get("/{journalId}/versions/{revisionNumber}", response_model=ApiResponse[dict])
+async def get_journal_version(
+    journalId: str,
+    revisionNumber: int,
+    user: dict = Depends(get_active_user),
+    journal_service: JournalService = Depends(),
+):
+    """Retrieve and reconstruct a specific historical revision snapshot."""
+    version = await journal_service.get_journal_version_by_revision(
+        journalId, revisionNumber, user["id"], user["role"]
+    )
+    return success_response(version)
 
 
 @router.post("/{journalId}/versions/{revisionNumber}/restore", response_model=ApiResponse[JournalResponse])
@@ -270,14 +286,16 @@ async def restore_journal_version(
 async def create_journal_checkpoint(
     journalId: str,
     request: Request,
+    payload: CheckpointCreateRequest | None = None,
     remarks: str | None = None,
     user: dict = Depends(RoleChecker(["student"])),
     journal_service: JournalService = Depends(),
 ):
     """Manually create an immutable revision snapshot milestone for current journal state (Student only)."""
     ip_address = request.client.host if request.client else None
+    note = (payload.remarks if payload and payload.remarks else remarks) or "Manual checkpoint snapshot"
     snapshot = await journal_service.create_checkpoint(
-        journalId, user["id"], remarks=remarks, ip_address=ip_address
+        journalId, user["id"], remarks=note, ip_address=ip_address
     )
     return success_response(snapshot)
 

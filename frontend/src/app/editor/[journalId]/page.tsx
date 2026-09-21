@@ -39,6 +39,7 @@ export default function EditorPage({ params }: PageProps) {
   const [showVersionDrawer, setShowVersionDrawer] = useState(false);
   const [activeAnnotationBlockId, setActiveAnnotationBlockId] = useState<string | null>(null);
   const [localRecoverySnapshot, setLocalRecoverySnapshot] = useState<any>(null);
+  const [highlightedRevNumber, setHighlightedRevNumber] = useState<number | null>(null);
 
   // Handle auto-initialization for /editor/new?assignmentId=...
   const createJournalMutation = useMutation({
@@ -125,7 +126,7 @@ export default function EditorPage({ params }: PageProps) {
   useEffect(() => {
     if (journal) {
       const serverRev = journal.currentVersion || 1;
-      init(journal.id, journal.title, journal.blocks, journal.status, serverRev);
+      init(journal.id, journal.title, journal.blocks, journal.status, serverRev, journal.activeRevisionNumber || 1);
 
       const snapshot = getLocalSnapshot(journal.id);
       if (snapshot && snapshot.savedAt && new Date(snapshot.savedAt) > new Date(journal.updatedAt)) {
@@ -207,8 +208,17 @@ export default function EditorPage({ params }: PageProps) {
 
   // Apply Teacher Suggestion Mutation
   const applySuggestionMutation = useMutation({
-    mutationFn: (commentId: string) => api.post(`/comments/${commentId}/apply-suggestion`),
-    onSuccess: () => {
+    mutationFn: (commentId: string) => api.post<any>(`/comments/${commentId}/apply-suggestion`),
+    onSuccess: (updatedJournal: any) => {
+      if (updatedJournal && updatedJournal.blocks) {
+        useDocumentStore.getState().init(
+          updatedJournal.id,
+          updatedJournal.title,
+          updatedJournal.blocks,
+          updatedJournal.status,
+          updatedJournal.currentVersion || clientRevision
+        );
+      }
       refetchJournal();
       refetchAnnotations();
       toast.success("Teacher suggestion applied to document block!", { title: "✨ Applied" });
@@ -250,19 +260,42 @@ export default function EditorPage({ params }: PageProps) {
     },
   });
 
+  // Manual Checkpoint Mutation
+  const createCheckpointMutation = useMutation({
+    mutationFn: (remarks: string) =>
+      api.post(`/journals/${journalId}/checkpoint`, { remarks }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["versions", journalId] });
+      toast.success("Document checkpoint saved to version timeline!", { title: "📌 Checkpoint Created" });
+    },
+    onError: (err: any) => {
+      toast.error(err.message || "Failed to create version checkpoint.");
+    },
+  });
+
   // Restore Version Mutation
   const restoreVersionMutation = useMutation({
     mutationFn: (revisionNumber: number) =>
-      api.post(`/journals/${journalId}/versions/${revisionNumber}/restore`),
+      api.post<any>(`/journals/${journalId}/versions/${revisionNumber}/restore`),
     onSuccess: (data: any) => {
+      if (data?.isAlreadyCurrent) {
+        setHighlightedRevNumber(data.identicalRevisionNumber || null);
+        toast.info(data.message || "Document is already identical to this revision snapshot.", {
+          title: "ℹ️ Already Current",
+        });
+        return;
+      }
+      setHighlightedRevNumber(null);
       if (data) {
         useDocumentStore.getState().init(
           data.id,
           data.title,
           data.blocks || [],
           data.status,
-          data.currentVersion || clientRevision + 1
+          data.currentVersion || clientRevision + 1,
+          data.activeRevisionNumber || 1
         );
+        clearLocalSnapshot(journalId);
       }
       refetchJournal();
       queryClient.invalidateQueries({ queryKey: ["versions", journalId] });
@@ -274,17 +307,48 @@ export default function EditorPage({ params }: PageProps) {
     },
   });
 
+  // Direct Restore & Submit Past Version Mutation
+  const restoreAndSubmitMutation = useMutation({
+    mutationFn: async (revisionNumber: number) => {
+      const restoreRes = await api.post<any>(`/journals/${journalId}/versions/${revisionNumber}/restore`);
+      if (restoreRes) {
+        useDocumentStore.getState().init(
+          restoreRes.id,
+          restoreRes.title,
+          restoreRes.blocks || [],
+          restoreRes.status,
+          restoreRes.currentVersion || clientRevision + 1,
+          restoreRes.activeRevisionNumber || 1
+        );
+        clearLocalSnapshot(journalId);
+      }
+      const submitRes = await api.post<any>(`/journals/${journalId}/submit`);
+      return submitRes;
+    },
+    onSuccess: (data: any) => {
+      useDocumentStore.getState().setStatus(data.status);
+      refetchJournal();
+      queryClient.invalidateQueries({ queryKey: ["versions", journalId] });
+      setShowVersionDrawer(false);
+      toast.success("Past version restored and handed in successfully!", { title: "🎉 Restored & Submitted" });
+    },
+    onError: (err: any) => {
+      toast.error(err.message || "Failed to restore and submit version.");
+    },
+  });
+
+  const isEditable = (status === "draft" || status === "changes_requested") && user?.role === "student";
   const saveMutationRef = useRef(saveMutation);
   saveMutationRef.current = saveMutation;
 
   // Auto-Save Debounce
   useEffect(() => {
-    if (!isDirty || isSaving || previewMode || !title || syncStatus === "conflict" || syncStatus === "offline") return;
+    if (!isEditable || !isDirty || isSaving || previewMode || !title || syncStatus === "conflict" || syncStatus === "offline") return;
     const timer = setTimeout(() => {
       saveMutationRef.current.mutate({ title, blocks, clientRevision });
     }, 2500);
     return () => clearTimeout(timer);
-  }, [title, blocks, isDirty, isSaving, previewMode, clientRevision, syncStatus]);
+  }, [title, blocks, isDirty, isSaving, previewMode, clientRevision, syncStatus, isEditable]);
 
   // Real-time network connectivity handling (RULE-INF06, Phase 5.5)
   useEffect(() => {
@@ -294,7 +358,7 @@ export default function EditorPage({ params }: PageProps) {
       const state = useDocumentStore.getState();
       state.setSyncStatus(state.isDirty ? "unsaved" : "synced");
       toast.success("Network connection restored.", { title: "🌐 Online" });
-      if (state.isDirty && !state.isSaving && state.title) {
+      if (state.isDirty && !state.isSaving && state.title && (state.status === "draft" || state.status === "changes_requested")) {
         saveMutationRef.current.mutate({
           title: state.title,
           blocks: state.blocks,
@@ -326,6 +390,26 @@ export default function EditorPage({ params }: PageProps) {
       window.removeEventListener("offline", handleOffline);
     };
   }, []);
+
+  // Immediate Save Flush on beforeunload or component unmount (eliminates data loss on tab close/switch)
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      const state = useDocumentStore.getState();
+      if (state.isDirty && !state.isSaving && state.title && !state.previewMode && user?.role === "student" && (state.status === "draft" || state.status === "changes_requested")) {
+        saveMutationRef.current.mutate({
+          title: state.title,
+          blocks: state.blocks,
+          clientRevision: state.clientRevision,
+        });
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      handleBeforeUnload();
+    };
+  }, [user]);
 
   const handleDragStart = () => {
     if (typeof document !== "undefined") {
@@ -381,7 +465,6 @@ export default function EditorPage({ params }: PageProps) {
   }
 
   const classroomId = assignment?.classroomId || "";
-  const isEditable = (status === "draft" || status === "changes_requested") && user?.role === "student";
   const isTeacher = user?.role === "teacher";
 
   return (
@@ -425,27 +508,38 @@ export default function EditorPage({ params }: PageProps) {
         isSubmitting={submitMutation.isPending}
         journalTitle={title}
         deadline={assignment?.deadline}
-        isLate={journal?.isLate}
+        isLate={Boolean(assignment?.deadline && new Date() > new Date(assignment.deadline))}
       />
 
-      {/* Version History Drawer */}
+      {/* Version History Studio Modal */}
       <VersionHistoryDrawer
         isOpen={showVersionDrawer}
-        onClose={() => setShowVersionDrawer(false)}
+        onClose={() => {
+          setShowVersionDrawer(false);
+          setHighlightedRevNumber(null);
+        }}
+        journalId={journalId}
         versions={versions || []}
         currentVersion={clientRevision}
         onRestoreVersion={(rev) => restoreVersionMutation.mutate(rev)}
+        onSubmitVersion={(rev) => restoreAndSubmitMutation.mutate(rev)}
+        onCreateCheckpoint={(remarks) => createCheckpointMutation.mutate(remarks)}
         isRestoring={restoreVersionMutation.isPending}
+        isSubmittingVersion={restoreAndSubmitMutation.isPending}
+        isCreatingCheckpoint={createCheckpointMutation.isPending}
         userRole={user?.role}
         journalStatus={status}
+        activeBlocks={blocks}
+        activeTitle={title}
+        highlightedRevNumber={highlightedRevNumber}
       />
 
       <div className="flex-1 flex w-full relative pt-16 print:pt-0">
         {/* Floating Toolbox (Students Only) */}
-        {!isTeacher && !previewMode && <FloatingToolbox />}
+        {!isTeacher && !previewMode && isEditable && <FloatingToolbox />}
 
         {/* Editor Main Canvas Wrapper */}
-        <main className="flex-1 w-full max-w-4xl mx-auto px-4 sm:px-6 lg:pl-20 xl:pl-24 py-8 flex flex-col gap-6 relative z-10 print:p-0 print:m-0 print:max-w-none print:w-full">
+        <main className="editor-content flex-1 w-full max-w-4xl mx-auto px-4 sm:px-6 lg:pl-20 xl:pl-24 py-8 flex flex-col gap-6 relative z-10 print:p-0 print:m-0 print:max-w-none print:w-full">
           {/* Academic Print-Only Single Journal Header */}
           <div className="hidden print:flex flex-col border-b-2 border-black pb-4 mb-4 select-none">
             <div className="flex justify-between items-start">
@@ -618,14 +712,19 @@ export default function EditorPage({ params }: PageProps) {
                 </div>
               )}
             </div>
-          ) : (status === "submitted" || journal?.isRevoked) && (
+          ) : (status === "submitted" || status === "late_submitted" || journal?.isRevoked) && (
             <div className="p-4 rounded-2xl border border-amber-500/30 bg-amber-500/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
               <div className="flex flex-col gap-1">
                 <span className="text-sm font-bold text-foreground flex items-center gap-2">
-                  🔒 {journal?.isRevoked ? "Submission Revoked" : "Handed In"}
+                  🔒 {journal?.isRevoked ? "Submission Revoked" : status === "late_submitted" ? "Late Handed In" : "Handed In"}
                   {journal?.isRevoked && (
                     <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-700">
                       Draft Revoked
+                    </span>
+                  )}
+                  {status === "late_submitted" && !journal?.isRevoked && (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/20 text-rose-700">
+                      Late Submission
                     </span>
                   )}
                 </span>
@@ -635,13 +734,13 @@ export default function EditorPage({ params }: PageProps) {
                     : "Handed in for evaluation. Student can unsubmit before deadline."}
                 </p>
               </div>
-              {status === "submitted" && !isTeacher && (
+              {(status === "submitted" || status === "late_submitted") && !isTeacher && (
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => unsubmitMutation.mutate()}
                   disabled={unsubmitMutation.isPending}
-                  className="text-xs font-semibold text-rose-600 border-rose-200"
+                  className="text-xs font-semibold text-rose-600 border-rose-200 cursor-pointer"
                 >
                   Undo Hand In
                 </Button>
@@ -690,6 +789,7 @@ export default function EditorPage({ params }: PageProps) {
                               <BlockWrapper
                                 id={block.id}
                                 index={idx}
+                                type={block.type}
                                 provided={providedDraggable}
                                 previewMode={previewMode || isTeacher || !isEditable}
                               >
@@ -697,7 +797,7 @@ export default function EditorPage({ params }: PageProps) {
                                   id={block.id}
                                   type={block.type}
                                   content={block.content}
-                                  previewMode={previewMode || isTeacher}
+                                  previewMode={previewMode || isTeacher || !isEditable}
                                 />
                               </BlockWrapper>
 
@@ -745,6 +845,8 @@ export default function EditorPage({ params }: PageProps) {
                                 annotations={blockAnns}
                                 isTeacher={isTeacher}
                                 currentUser={user}
+                                blockType={block.type}
+                                onInsertBlockBelow={() => addBlock(idx + 1, "paragraph", { text: "" })}
                                 onApplySuggestion={(commentId) => applySuggestionMutation.mutate(commentId)}
                                 onReplyQuestion={(annotationId, replyText) =>
                                   replyQuestionMutation.mutate({
@@ -795,6 +897,7 @@ export default function EditorPage({ params }: PageProps) {
               maxMarks={assignment?.maxMarks || 10}
               currentMarks={journal?.marks}
               currentRemarks={journal?.teacherRemarks}
+              blocks={blocks}
               onClose={() => setShowReviewDrawer(false)}
             />
           </aside>

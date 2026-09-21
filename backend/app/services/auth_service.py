@@ -4,7 +4,7 @@ RULE-BE04: All business logic MUST live inside service classes.
 RULE-SEC10: Audit logs created for sensitive events (login, register).
 """
 
-import random
+import secrets
 from datetime import datetime, timedelta, timezone
 
 from fastapi import status
@@ -28,8 +28,9 @@ class AuthService:
 
     @staticmethod
     def _generate_otp() -> str:
-        """Generate a cryptographically simple 6-digit OTP code."""
-        return str(random.randint(100000, 999999))
+        """Generate a cryptographically secure 6-digit OTP code (SEC-11)."""
+        return str(secrets.randbelow(900000) + 100000)
+
 
     async def register(self, request: UserRegisterRequest, ip_address: str | None = None) -> dict:
         """Register a new unverified user and send an OTP code."""
@@ -126,8 +127,20 @@ class AuthService:
 
         stored_otp = user.get("otp")
         expiry = user.get("otp_expires_at")
+        failed_attempts = user.get("otp_failed_attempts", 0)
+
+        # Brute force protection: lock after 5 failed attempts (SEC-05)
+        if failed_attempts >= 5:
+            # Clear invalid OTP so user must explicitly request a new one
+            await self.user_repo.reset_otp_credentials(user["id"], clear_all=True)
+            raise AppException(
+                code=ErrorCode.VALIDATION_ERROR,
+                message="Too many failed attempts. Verification code has been invalidated. Please request a new one.",
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
 
         if not stored_otp or stored_otp != otp_code:
+            await self.user_repo.record_otp_failure(user["id"])
             raise AppException(
                 code=ErrorCode.INVALID_OTP,
                 message="Verification code is invalid",
@@ -145,7 +158,7 @@ class AuthService:
                     status_code=status.HTTP_400_BAD_REQUEST,
                 )
 
-        # Verify and activate
+        # Verify and activate (RULE-AUTH04, SEC-05: verify_user clears OTP and resets failed attempts)
         await self.user_repo.verify_user(user["id"])
 
         # Create JWT access token
@@ -169,7 +182,7 @@ class AuthService:
         return access_token
 
     async def resend_otp(self, email: str) -> None:
-        """Regenerate verification code and resend email."""
+        """Regenerate verification code and resend email with rate limiting cooldown."""
         user = await self.user_repo.find_by_email(email)
         if not user:
             raise AppException(
@@ -185,11 +198,35 @@ class AuthService:
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
 
-        otp = self._generate_otp()
-        otp_expiry = datetime.now(timezone.utc) + timedelta(minutes=10)
+        # 30-second cooldown check to prevent mail quota exhaustion (SEC-05)
+        now = datetime.now(timezone.utc)
+        last_sent = user.get("otp_sent_at")
+        if last_sent:
+            last_sent_utc = last_sent.replace(tzinfo=timezone.utc) if last_sent.tzinfo is None else last_sent
+            if (now - last_sent_utc).total_seconds() < 30:
+                raise AppException(
+                    code=ErrorCode.VALIDATION_ERROR,
+                    message="Please wait 30 seconds before requesting another verification code",
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                )
 
-        await self.user_repo.update_otp(user["id"], otp, otp_expiry)
+        otp = self._generate_otp()
+        otp_expiry = now + timedelta(minutes=10)
+
+        await self.user_repo.update_by_id(
+            user["id"],
+            {
+                "$set": {
+                    "otp": otp,
+                    "otp_expires_at": otp_expiry,
+                    "otp_sent_at": now,
+                    "otp_failed_attempts": 0,
+                    "updatedAt": now,
+                }
+            }
+        )
         await send_otp_email(user["email"], otp)
+
 
     async def login(self, email: str, password: str, ip_address: str | None = None) -> tuple[str, dict]:
         """Validate credentials, check verification, and return token + user details."""

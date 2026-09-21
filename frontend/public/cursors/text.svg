@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+  <defs>
+    <filter id="txt-shadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0.5" dy="1.2" stdDeviation="1" flood-color="#000000" flood-opacity="0.32" />
+    </filter>
+  </defs>
+
+  <g filter="url(#txt-shadow)">
+    <!-- Outer Specular Halo (High Contrast on Dark Backgrounds) -->
+    <path d="M 8.2 4 L 15.8 4 M 12 4 L 12 20 M 8.2 20 L 15.8 20"
+          stroke="#FFFFFF"
+          stroke-width="3.2"
+          stroke-linecap="round"
+          stroke-linejoin="round" />
+    <!-- Inner Dark Core (High Contrast on Light Backgrounds) -->
+    <path d="M 8.2 4 L 15.8 4 M 12 4 L 12 20 M 8.2 20 L 15.8 20"
+          stroke="#18181B"
+          stroke-width="1.6"
+          stroke-linecap="round"
+          stroke-linejoin="round" />
+  </g>
+</svg>

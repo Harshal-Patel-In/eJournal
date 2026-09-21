@@ -10,6 +10,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pymongo.errors import PyMongoError
 
+from app.core.config import settings
 from app.core.constants import ErrorCode
 from app.schemas.response import error_response
 
@@ -55,7 +56,7 @@ def register_exception_handlers(app: FastAPI) -> None:
                 key="access_token",
                 httponly=True,
                 samesite="lax",
-                secure=False,
+                secure=settings.cookie_secure,
                 path="/",
             )
             

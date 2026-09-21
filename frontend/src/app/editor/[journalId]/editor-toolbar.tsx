@@ -39,6 +39,7 @@ export default function EditorToolbar({
     isSaving,
     syncStatus,
     clientRevision,
+    activeRevisionNumber,
     lastSavedAt,
     previewMode,
     togglePreview,
@@ -74,38 +75,69 @@ export default function EditorToolbar({
 
         {/* Right: Controls & Status Badges */}
         <div className="flex items-center gap-2.5 shrink-0">
-          {/* Phase 5 Enhanced Saving Status Indicator */}
-          <div className="hidden sm:flex items-center gap-1.5 text-xs text-muted-foreground px-3 py-1 glass-pill rounded-full select-none">
-            {syncStatus === "saving" || isSaving ? (
-              <>
-                <div className="size-2 rounded-full bg-blue-500 animate-pulse" />
-                <span className="text-[11px] font-medium">Saving... (Rev #{clientRevision})</span>
-              </>
-            ) : syncStatus === "conflict" ? (
-              <>
-                <div className="size-2 rounded-full bg-rose-500 animate-bounce" />
-                <span className="text-[11px] font-semibold text-rose-600 dark:text-rose-400">
-                  Revision Conflict (409)
+          {/* Milestone & Sync Status Indicators */}
+          <div className="hidden sm:flex items-center gap-2 select-none">
+            {/* Real-time Cloud Sync Pill */}
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground px-2.5 py-1 glass-pill rounded-full">
+              {syncStatus === "saving" || isSaving ? (
+                <>
+                  <div className="size-2 rounded-full bg-blue-500 animate-pulse" />
+                  <span className="text-[11px] font-medium">Saving...</span>
+                </>
+              ) : syncStatus === "conflict" ? (
+                <>
+                  <div className="size-2 rounded-full bg-rose-500 animate-bounce" />
+                  <span className="text-[11px] font-semibold text-rose-600 dark:text-rose-400">
+                    Conflict
+                  </span>
+                </>
+              ) : syncStatus === "offline" ? (
+                <>
+                  <div className="size-2 rounded-full bg-slate-400" />
+                  <span className="text-[11px] font-medium">Offline</span>
+                </>
+              ) : isDirty || syncStatus === "unsaved" ? (
+                <>
+                  <div className="size-2 rounded-full bg-amber-500 animate-pulse" />
+                  <span className="text-[11px] font-medium">Unsaved</span>
+                </>
+              ) : (
+                <>
+                  <div className="size-2 rounded-full bg-emerald-500" />
+                  <span
+                    className="text-[11px] font-medium"
+                    title={lastSavedAt ? `Saved at ${new Date(lastSavedAt).toLocaleTimeString()}` : "Synced to cloud"}
+                  >
+                    Saved
+                  </span>
+                </>
+              )}
+            </div>
+
+            {/* Academic Milestone Badge */}
+            <div className="flex items-center">
+              {status === "submitted" || status === "late_submitted" ? (
+                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider border ${
+                  status === "late_submitted"
+                    ? "bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/30"
+                    : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
+                }`}>
+                  {status === "late_submitted" ? "Late Submitted" : "Submitted"} (v{activeRevisionNumber || 1})
                 </span>
-              </>
-            ) : syncStatus === "offline" ? (
-              <>
-                <div className="size-2 rounded-full bg-slate-400" />
-                <span className="text-[11px] font-medium">Offline (Saved locally)</span>
-              </>
-            ) : isDirty || syncStatus === "unsaved" ? (
-              <>
-                <div className="size-2 rounded-full bg-amber-500 animate-pulse" />
-                <span className="text-[11px] font-medium">Unsaved changes</span>
-              </>
-            ) : (
-              <>
-                <div className="size-2 rounded-full bg-emerald-500" />
-                <span className="text-[11px] font-medium" title={lastSavedAt ? `Saved at ${new Date(lastSavedAt).toLocaleTimeString()}` : "Synced"}>
-                  Saved • Rev #{clientRevision} • Synced
+              ) : status === "changes_requested" ? (
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                  Changes Requested (v{activeRevisionNumber || 1})
                 </span>
-              </>
-            )}
+              ) : status === "approved" ? (
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border border-indigo-500/30">
+                  Approved
+                </span>
+              ) : (
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-muted text-muted-foreground border border-border/60">
+                  Draft (v{activeRevisionNumber || 1})
+                </span>
+              )}
+            </div>
           </div>
 
 
@@ -180,13 +212,14 @@ export default function EditorToolbar({
                   <Eye className="size-3.5" />
                   <span>Read Only</span>
                 </Button>
-              ) : previewMode && status === "submitted" ? (
+              ) : status === "submitted" || status === "late_submitted" ? (
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={onUnsubmit}
                   disabled={isUnsubmitting}
-                  className="gap-1.5 text-xs font-medium cursor-pointer text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/20 border-rose-200 rounded-xl h-8"
+                  className="gap-1.5 text-xs font-medium cursor-pointer text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/20 border-rose-200 rounded-xl h-8 active:scale-95 transition-all"
+                  title="Unsubmit this journal to resume drafting or make changes"
                 >
                   {isUnsubmitting ? (
                     <Loader2 className="size-3.5 animate-spin" />

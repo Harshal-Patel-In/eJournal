@@ -18,9 +18,9 @@ interface DocumentState {
   isSaving: boolean;
   previewMode: boolean;
 
-  // Phase 5 Concurrency & Sync Extensions
   clientRevision: number;
   serverRevision: number;
+  activeRevisionNumber: number;
   lastSavedAt: string | null;
   syncStatus: SyncStatus;
   dirtyBlockIds: string[];
@@ -30,9 +30,11 @@ interface DocumentState {
     title: string,
     blocks: JournalBlock[],
     status: string,
-    revision?: number
+    revision?: number,
+    activeRevisionNumber?: number
   ) => void;
   setStatus: (status: string) => void;
+  setActiveRevisionNumber: (activeRevisionNumber: number) => void;
   setTitle: (title: string) => void;
   addBlock: (index: number, type: string, content?: any) => void;
   updateBlock: (id: string, content: any) => void;
@@ -99,11 +101,12 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
 
   clientRevision: 1,
   serverRevision: 1,
+  activeRevisionNumber: 1,
   lastSavedAt: null,
   syncStatus: "synced",
   dirtyBlockIds: [],
 
-  init: (journalId, title, blocks, status, revision = 1) =>
+  init: (journalId, title, blocks, status, revision = 1, activeRevisionNumber = 1) =>
     set({
       journalId,
       title,
@@ -111,6 +114,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
       status,
       clientRevision: revision,
       serverRevision: revision,
+      activeRevisionNumber: activeRevisionNumber || 1,
       isDirty: false,
       isSaving: false,
       syncStatus: "synced",
@@ -122,6 +126,11 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
     set({
       status,
       previewMode: status !== "draft" && status !== "changes_requested",
+    }),
+
+  setActiveRevisionNumber: (activeRevisionNumber) =>
+    set({
+      activeRevisionNumber: activeRevisionNumber || 1,
     }),
 
   setTitle: (title) =>

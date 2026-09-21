@@ -6,7 +6,9 @@ RULE-AUTH01: Store JWT tokens in HTTP-only cookies.
 
 from fastapi import APIRouter, Depends, Request, Response, status
 
+from app.core.config import settings
 from app.dependencies.auth import get_current_user
+from app.dependencies.rate_limit import RateLimiter
 from app.schemas.auth import (
     UserLoginRequest,
     UserRegisterRequest,
@@ -23,6 +25,7 @@ router = APIRouter(prefix="/auth")
     "/register",
     status_code=status.HTTP_201_CREATED,
     response_model=ApiResponse[dict],
+    dependencies=[Depends(RateLimiter(max_requests=10, window_seconds=60, action="register"))],
 )
 async def register(
     request: Request,
@@ -35,7 +38,11 @@ async def register(
     return success_response(result)
 
 
-@router.post("/verify-otp", response_model=ApiResponse[dict])
+@router.post(
+    "/verify-otp",
+    response_model=ApiResponse[dict],
+    dependencies=[Depends(RateLimiter(max_requests=15, window_seconds=60, action="verify_otp"))],
+)
 async def verify_otp(
     request: Request,
     response: Response,
@@ -51,21 +58,25 @@ async def verify_otp(
         payload.email, payload.otp, ip_address=ip_address
     )
 
-    # Set cookie (RULE-AUTH01)
+    # Set cookie (RULE-AUTH01, SEC-06)
     response.set_cookie(
         key="access_token",
         value=access_token,
         httponly=True,
         max_age=30 * 60,  # 30 mins
         samesite="lax",
-        secure=False,  # Set to True in production over HTTPS
+        secure=settings.cookie_secure,
         path="/",
     )
 
     return success_response({"access_token": access_token, "token_type": "bearer"})
 
 
-@router.post("/resend-otp", response_model=ApiResponse[str])
+@router.post(
+    "/resend-otp",
+    response_model=ApiResponse[str],
+    dependencies=[Depends(RateLimiter(max_requests=5, window_seconds=60, action="resend_otp"))],
+)
 async def resend_otp(
     payload: UserResendOTPRequest, auth_service: AuthService = Depends()
 ):
@@ -74,7 +85,11 @@ async def resend_otp(
     return success_response("OTP code resent successfully")
 
 
-@router.post("/login", response_model=ApiResponse[dict])
+@router.post(
+    "/login",
+    response_model=ApiResponse[dict],
+    dependencies=[Depends(RateLimiter(max_requests=20, window_seconds=60, action="login"))],
+)
 async def login(
     request: Request,
     response: Response,
@@ -87,14 +102,14 @@ async def login(
         payload.email, payload.password, ip_address=ip_address
     )
 
-    # Set cookie (RULE-AUTH01)
+    # Set cookie (RULE-AUTH01, SEC-06)
     response.set_cookie(
         key="access_token",
         value=access_token,
         httponly=True,
         max_age=30 * 60,  # 30 mins
         samesite="lax",
-        secure=False,
+        secure=settings.cookie_secure,
         path="/",
     )
 
@@ -115,7 +130,7 @@ async def logout(response: Response):
         key="access_token",
         httponly=True,
         samesite="lax",
-        secure=False,
+        secure=settings.cookie_secure,
         path="/",
     )
     return success_response("Logged out successfully")

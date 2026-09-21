@@ -6,7 +6,7 @@ RULE-BE08: Connection config from env-based settings.
 """
 
 from pydantic_settings import BaseSettings
-from pydantic import Field
+from pydantic import Field, model_validator
 
 
 class Settings(BaseSettings):
@@ -64,12 +64,36 @@ class Settings(BaseSettings):
     CLOUDINARY_API_SECRET: str | None = Field(default=None, description="Cloudinary API secret")
 
 
+    @property
+    def is_production(self) -> bool:
+        return self.ENVIRONMENT.lower() == "production"
+
+    @property
+    def cookie_secure(self) -> bool:
+        """Enforce Secure flag on cookies in production over HTTPS (SEC-06)."""
+        return self.is_production
+
+
+    @model_validator(mode="after")
+    def validate_production_secrets(self) -> "Settings":
+        """Enforce production cryptographic secret integrity (SEC-04)."""
+        if self.is_production:
+            if (
+                self.JWT_SECRET_KEY == "change-this-to-a-secure-random-string"
+                or len(self.JWT_SECRET_KEY) < 32
+            ):
+                raise ValueError(
+                    "JWT_SECRET_KEY must be configured with a secure, random secret of at least 32 characters in production environments."
+                )
+        return self
+
     model_config = {
         "env_file": [".env", "../.env"],
         "env_file_encoding": "utf-8",
         "case_sensitive": True,
         "extra": "ignore",
     }
+
 
 
 settings = Settings()

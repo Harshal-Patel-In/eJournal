@@ -291,6 +291,42 @@
   color: #ffffff !important;
 }
 
+.glass-btn-indigo-solid {
+  background-image: linear-gradient(to bottom, rgba(79, 70, 229, 0.95), rgba(67, 56, 202, 0.98));
+  border: 1px solid rgba(255, 255, 255, 0.30);
+  color: #ffffff !important;
+}
+
+.dark .glass-btn-indigo-solid {
+  background-image: linear-gradient(to bottom, rgba(99, 102, 241, 0.92), rgba(79, 70, 229, 0.96));
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: #ffffff !important;
+}
+
+.glass-btn-blue-solid {
+  background-image: linear-gradient(to bottom, rgba(37, 99, 235, 0.95), rgba(29, 78, 216, 0.98));
+  border: 1px solid rgba(255, 255, 255, 0.30);
+  color: #ffffff !important;
+}
+
+.dark .glass-btn-blue-solid {
+  background-image: linear-gradient(to bottom, rgba(59, 130, 246, 0.92), rgba(37, 99, 235, 0.96));
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: #ffffff !important;
+}
+
+.glass-btn-destructive-solid {
+  background-image: linear-gradient(to bottom, rgba(225, 29, 72, 0.92), rgba(190, 18, 60, 0.96));
+  border: 1px solid rgba(255, 255, 255, 0.30);
+  color: #ffffff !important;
+}
+
+.dark .glass-btn-destructive-solid {
+  background-image: linear-gradient(to bottom, rgba(244, 63, 94, 0.92), rgba(225, 29, 72, 0.96));
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: #ffffff !important;
+}
+
 .glass-btn-destructive {
   background-image: linear-gradient(to bottom, rgba(244, 63, 94, 0.15), rgba(225, 29, 72, 0.10));
   border: 1px solid rgba(244, 63, 94, 0.35);
@@ -572,15 +608,21 @@ body::-webkit-scrollbar {
 
 
 
-  /* Document Writing & Typography: Protect Academic Text Selection & Formula Typing */
+  /* Document Writing & Typography: Precision Vector I-Beam Cursor (Apple / Academic Studio) */
   input:not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="checkbox"]):not([type="radio"]),
   textarea,
   [contenteditable="true"],
-  .editor-content,
+  .editor-content p,
+  .editor-content span.katex,
+  .editor-content .select-text,
+  .editor-content h1,
+  .editor-content h2,
+  .editor-content h3,
   .katex-display,
   code,
-  pre {
-    cursor: text !important;
+  pre,
+  .cursor-text {
+    cursor: url('/cursors/text.svg') 12 12, text !important;
   }
 
   /* Disabled States */
@@ -590,6 +632,106 @@ body::-webkit-scrollbar {
   :disabled {
     cursor: not-allowed !important;
   }
+}
+
+/* ==========================================================================
+   Liquid Glass Tooltip Calm Animation (Emil Kowalski / Apple HIG)
+   ========================================================================== */
+@keyframes liquid-tooltip-top {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -100%) translateY(3px) scale(0.98);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, -100%) translateY(0) scale(1);
+  }
+}
+
+@keyframes liquid-tooltip-bottom {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 0) translateY(-3px) scale(0.98);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, 0) translateY(0) scale(1);
+  }
+}
+
+.animate-liquid-tooltip-top {
+  animation: liquid-tooltip-top 140ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity;
+}
+
+.animate-liquid-tooltip-bottom {
+  animation: liquid-tooltip-bottom 140ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-liquid-tooltip-top {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: translate(-50%, -100%) !important;
+  }
+  .animate-liquid-tooltip-bottom {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: translate(-50%, 0) !important;
+  }
+}
+
+/* ==========================================================================
+   CodeMirror 6 & Fira Code Ligatures (Apple Studio Architecture)
+   ========================================================================== */
+.font-code,
+.cm-editor,
+.cm-scroller,
+.cm-content {
+  font-family: var(--font-code), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+  font-feature-settings: "liga" on, "calt" on !important;
+  font-variant-ligatures: normal !important;
+  tab-size: 4 !important;
+}
+
+.cm-editor {
+  background: transparent !important;
+  font-size: 13px !important;
+  line-height: 1.65 !important;
+}
+
+.cm-scroller {
+  overflow: auto !important;
+}
+
+.cm-focused {
+  outline: none !important;
+}
+
+.cm-gutters {
+  background: transparent !important;
+  border-right: 1px solid var(--border) !important;
+  color: var(--muted-foreground) !important;
+  opacity: 0.65;
+  user-select: none;
+}
+
+.cm-lineNumbers .cm-gutterElement {
+  padding: 0 10px 0 6px !important;
+  font-size: 11px !important;
+  font-family: var(--font-code), monospace !important;
+}
+
+.cm-activeLine {
+  background-color: rgba(125, 125, 125, 0.07) !important;
+}
+
+.cm-activeLineGutter {
+  background-color: transparent !important;
+  opacity: 1 !important;
+  font-weight: 700 !important;
+  color: var(--foreground) !important;
 }
 
 

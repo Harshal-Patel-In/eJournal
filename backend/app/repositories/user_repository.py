@@ -34,6 +34,21 @@ class UserRepository(BaseRepository):
             },
         )
 
+    async def record_otp_failure(self, user_id: str) -> bool:
+        """Increment failed OTP attempts count for brute-force protection (SEC-05)."""
+        return await self.update_by_id(
+            user_id,
+            {"$inc": {"otp_failed_attempts": 1}},
+        )
+
+    async def reset_otp_credentials(self, user_id: str, clear_all: bool = False) -> bool:
+        """Reset failed OTP counter and optionally clear OTP tokens."""
+        update_doc: dict = {"$set": {"otp_failed_attempts": 0, "updatedAt": datetime.now(timezone.utc)}}
+        if clear_all:
+            update_doc["$set"]["otp"] = None
+            update_doc["$set"]["otp_expires_at"] = None
+        return await self.update_by_id(user_id, update_doc)
+
     async def verify_user(self, user_id: str) -> bool:
         """Mark user account as verified and clear OTP credentials."""
         return await self.update_by_id(
@@ -41,6 +56,7 @@ class UserRepository(BaseRepository):
             {
                 "$set": {
                     "is_verified": True,
+                    "otp_failed_attempts": 0,
                     "updatedAt": datetime.now(timezone.utc),
                 },
                 "$unset": {

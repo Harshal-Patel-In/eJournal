@@ -32,6 +32,7 @@ interface ReviewDrawerProps {
   maxMarks?: number;
   currentMarks?: number;
   currentRemarks?: string;
+  blocks?: any[];
   onClose?: () => void;
 }
 
@@ -44,6 +45,7 @@ export default function ReviewDrawer({
   maxMarks = 10,
   currentMarks,
   currentRemarks,
+  blocks,
   onClose,
 }: ReviewDrawerProps) {
   const router = useRouter();
@@ -64,6 +66,87 @@ export default function ReviewDrawer({
     queryKey: ["comments", journalId],
     queryFn: () => api.get(`/comments/journal/${journalId}`),
   });
+
+  // Split comments into active block annotations vs removed block annotations and compute resolution progress
+  const {
+    activeComments,
+    removedBlockComments,
+    satisfactionRate,
+    satisfiedCount,
+    totalFeedback,
+    actionItemsRate,
+    addressedActionItems,
+    totalActionItems,
+  } = useMemo(() => {
+    if (!comments || comments.length === 0) {
+      return {
+        activeComments: [],
+        removedBlockComments: [],
+        satisfactionRate: 100,
+        satisfiedCount: 0,
+        totalFeedback: 0,
+        actionItemsRate: 100,
+        addressedActionItems: 0,
+        totalActionItems: 0,
+      };
+    }
+
+    const activeBlockIds = new Set((blocks || []).map((b: any) => b.id));
+    const active: any[] = [];
+    const removed: any[] = [];
+
+    // Filter root comments
+    const rootComments = comments.filter((c) => !c.parentCommentId);
+
+    for (const c of rootComments) {
+      if (c.blockId && !activeBlockIds.has(c.blockId)) {
+        removed.push(c);
+      } else {
+        active.push(c);
+      }
+    }
+
+    // 1. Overall Feedback Satisfaction:
+    // Praise / Informational comments (type == "Comment", "Approval", "Highlight") are satisfied by default
+    // Suggestions & Warnings are satisfied when resolved or appliedAction == "deleted".
+    const total = rootComments.length;
+    let satisfied = 0;
+    let actionItems = 0;
+    let actionItemsAddressed = 0;
+
+    for (const c of rootComments) {
+      const type = (c.type || "comment").toLowerCase();
+      const isResolved =
+        c.status === "resolved" ||
+        c.reviewStatus === "resolved" ||
+        c.appliedAction === "deleted";
+      const isInformational =
+        type === "comment" || type === "approval" || type === "highlight";
+
+      if (isInformational || isResolved) {
+        satisfied += 1;
+      }
+
+      if (type === "suggestion" || type === "warning" || type === "question") {
+        actionItems += 1;
+        const hasReplies = comments.some((child) => child.parentCommentId === c.id);
+        if (isResolved || (type === "question" && hasReplies)) {
+          actionItemsAddressed += 1;
+        }
+      }
+    }
+
+    return {
+      activeComments: active,
+      removedBlockComments: removed,
+      satisfactionRate: total > 0 ? Math.round((satisfied / total) * 100) : 100,
+      satisfiedCount: satisfied,
+      totalFeedback: total,
+      actionItemsRate: actionItems > 0 ? Math.round((actionItemsAddressed / actionItems) * 100) : 100,
+      addressedActionItems: actionItemsAddressed,
+      totalActionItems: actionItems,
+    };
+  }, [comments, blocks]);
 
   // 2. Fetch Classroom Submissions Queue
   const { data: allSubmissions } = useQuery<any[]>({
@@ -577,23 +660,61 @@ export default function ReviewDrawer({
         {/* Divider */}
         <div className="h-px bg-border/50" />
 
+        {/* Resolution Progress Box */}
+        {totalFeedback > 0 && (
+          <div className="p-3 rounded-2xl bg-muted/40 border border-border/70 flex flex-col gap-2 shadow-2xs">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                <Sparkles className="size-3.5 text-primary" />
+                Resolution Progress
+              </span>
+              <span className="text-xs font-extrabold text-primary font-mono">
+                {satisfactionRate}%
+              </span>
+            </div>
+
+            {/* Satisfaction progress bar */}
+            <div className="w-full h-2 rounded-full bg-muted overflow-hidden">
+              <div
+                className={`h-full transition-all duration-500 ${
+                  satisfactionRate >= 100
+                    ? "bg-emerald-500"
+                    : satisfactionRate >= 50
+                    ? "bg-primary"
+                    : "bg-amber-500"
+                }`}
+                style={{ width: `${satisfactionRate}%` }}
+              />
+            </div>
+
+            <div className="flex items-center justify-between text-[10px] text-muted-foreground font-medium pt-0.5">
+              <span>{satisfiedCount} of {totalFeedback} feedback satisfied</span>
+              {totalActionItems > 0 && (
+                <span className="font-semibold text-foreground/90">
+                  {addressedActionItems}/{totalActionItems} action items
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Block Annotations List */}
         <div className="flex flex-col gap-3">
           <span className="text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground/70 px-0.5">
-            Annotations ({comments?.length || 0})
+            Active Block Feedback ({activeComments.length})
           </span>
 
           {commentsLoading ? (
             <div className="flex justify-center p-6">
               <Loader2 className="size-4 animate-spin text-muted-foreground/50" />
             </div>
-          ) : !comments || comments.length === 0 ? (
-            <p className="text-[11px] text-muted-foreground/60 font-medium text-center py-6 px-3">
-              No annotations yet. Use the annotation toolbar on any block to add feedback.
+          ) : activeComments.length === 0 ? (
+            <p className="text-[11px] text-muted-foreground/60 font-medium text-center py-4 px-3">
+              No active block annotations.
             </p>
           ) : (
             <div className="flex flex-col gap-2">
-              {comments.map((c) => {
+              {activeComments.map((c) => {
                 const annTypeUpper = (c.type || "COMMENT").toUpperCase();
                 const badgeColors: Record<string, string> = {
                   HIGHLIGHT: "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-400/30",
@@ -606,16 +727,32 @@ export default function ReviewDrawer({
                   badgeColors[annTypeUpper] ||
                   "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-400/30";
 
+                const isResolved =
+                  c.status === "resolved" ||
+                  c.reviewStatus === "resolved" ||
+                  c.appliedAction === "deleted";
+
                 return (
                   <div
                     key={c.id}
-                    className="p-3 rounded-xl border border-border/50 bg-background/60 text-xs flex flex-col gap-1.5 hover:border-border/80 transition-all"
+                    className={`p-3 rounded-xl border text-xs flex flex-col gap-1.5 transition-all ${
+                      isResolved
+                        ? "bg-emerald-500/[0.04] border-emerald-500/30 opacity-80"
+                        : "border-border/50 bg-background/60 hover:border-border/80"
+                    }`}
                   >
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-foreground text-[11px]">{c.authorName}</span>
-                      <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded-md border ${badgeStyle}`}>
-                        {annTypeUpper}
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        {isResolved && (
+                          <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                            Resolved
+                          </span>
+                        )}
+                        <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded-md border ${badgeStyle}`}>
+                          {annTypeUpper}
+                        </span>
+                      </div>
                     </div>
                     <p className="text-muted-foreground font-medium leading-relaxed text-[11px]">
                       {c.content || c.message}
@@ -628,6 +765,42 @@ export default function ReviewDrawer({
                   </div>
                 );
               })}
+            </div>
+          )}
+
+          {/* Feedback on Removed Blocks Section */}
+          {removedBlockComments.length > 0 && (
+            <div className="flex flex-col gap-2 mt-3 pt-3 border-t border-border/50">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-extrabold uppercase tracking-widest text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
+                  <AlertCircle className="size-3" />
+                  Feedback on Removed Blocks ({removedBlockComments.length})
+                </span>
+                <span className="text-[9px] font-mono text-muted-foreground">Preserved Audit</span>
+              </div>
+              <div className="flex flex-col gap-2">
+                {removedBlockComments.map((c) => (
+                  <div
+                    key={c.id}
+                    className="p-2.5 rounded-xl border border-amber-500/30 bg-amber-500/5 text-xs flex flex-col gap-1.5"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-foreground text-[11px]">{c.authorName}</span>
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30">
+                        {c.appliedAction === "deleted" ? "Block Deleted (Resolved)" : "Block Removed"}
+                      </span>
+                    </div>
+                    <p className="text-muted-foreground text-[11px] leading-relaxed">
+                      {c.content || c.message}
+                    </p>
+                    {c.suggestedContent && (
+                      <div className="p-1.5 rounded bg-background/80 text-[10px] font-mono text-muted-foreground">
+                        Instruction: {JSON.stringify(c.suggestedContent.text || c.suggestedContent)}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>

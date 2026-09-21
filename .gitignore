@@ -56,4 +56,5 @@ npm-debug.log*
 coverage/
 
 .agents/
-
+brag-output
+documents/SECURITY_AUDIT_REPORT

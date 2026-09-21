@@ -75,13 +75,18 @@ class NotificationRepository(BaseRepository):
         return [self._to_str_id(doc) for doc in cursor]
 
     async def mark_as_read(self, notification_id: str) -> bool:
-        """Mark a notification as read."""
-        return await self.update_by_id(notification_id, {"$set": {"isRead": True}})
+        """Mark a notification as read and record readAt timestamp for 7-day TTL cleanup."""
+        now = datetime.now(timezone.utc)
+        return await self.update_by_id(
+            notification_id,
+            {"$set": {"isRead": True, "readAt": now, "updatedAt": now}},
+        )
 
     async def mark_all_as_read(self, user_id: str) -> bool:
-        """Mark all notifications for a user as read."""
+        """Mark all notifications for a user as read and record readAt timestamp for 7-day TTL cleanup."""
+        now = datetime.now(timezone.utc)
         result = self.collection.update_many(
             {"userId": user_id, "isRead": False},
-            {"$set": {"isRead": True}}
+            {"$set": {"isRead": True, "readAt": now, "updatedAt": now}},
         )
         return result.modified_count > 0

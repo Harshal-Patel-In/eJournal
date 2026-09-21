@@ -84,6 +84,8 @@ async def test_verify_otp_service(mock_audit_repo, mock_user_repo):
     }
     user_repo_instance.find_by_email = AsyncMock(return_value=mock_user)
     user_repo_instance.verify_user = AsyncMock(return_value=True)
+    user_repo_instance.record_otp_failure = AsyncMock(return_value=True)
+    user_repo_instance.reset_otp_credentials = AsyncMock(return_value=True)
     mock_user_repo.return_value = user_repo_instance
 
     audit_repo_instance = MagicMock()

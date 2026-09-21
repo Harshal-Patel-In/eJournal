@@ -67,6 +67,7 @@ class JournalResponse(BaseModel):
     title: str
     status: str
     currentVersion: int = Field(default=1, description="Current server revision counter")
+    activeRevisionNumber: int = Field(default=1, description="Academic revision milestone number")
     blocks: List[JournalBlock]
     marks: float | None = Field(default=None, description="Evaluation score awarded by teacher")
     teacherRemarks: str | None = Field(default=None, description="Teacher feedback remarks")
@@ -77,5 +78,12 @@ class JournalResponse(BaseModel):
     annotationCounts: Dict[str, int] | None = Field(default=None, description="Breakdown of block annotation counts by type")
     createdAt: datetime
     updatedAt: datetime
+
+
+class CheckpointCreateRequest(BaseModel):
+    """Payload to create a manual revision snapshot checkpoint."""
+
+    remarks: str | None = Field(default=None, description="Optional label or note describing the milestone")
+
 
 

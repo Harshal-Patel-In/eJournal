@@ -146,16 +146,23 @@ class AssignmentService:
                 else str(request.deadline)
             )
 
+            import html
+            safe_student_name = html.escape(str(student_name))
+            safe_classroom_name = html.escape(str(classroom.get("name", "")))
+            safe_title = html.escape(str(request.title))
+            safe_aim = html.escape(str(request.aim))
+            safe_deadline = html.escape(str(deadline_str))
+
             email_body = f"""
             <html>
                 <body style="font-family: sans-serif; padding: 20px; color: #171717;">
                     <h2 style="color: #212529;">New Practical Assignment Published</h2>
-                    <p>Hello <strong>{student_name}</strong>,</p>
-                    <p>Your instructor has published a new lab assignment in classroom <strong>{classroom['name']}</strong>:</p>
+                    <p>Hello <strong>{safe_student_name}</strong>,</p>
+                    <p>Your instructor has published a new lab assignment in classroom <strong>{safe_classroom_name}</strong>:</p>
                     <div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; margin: 20px 0; border: 1px solid #dee2e6;">
-                        <h3 style="margin-top: 0; color: #0d6efd;">Experiment #{request.experimentNumber}: {request.title}</h3>
-                        <p><strong>Aim:</strong> {request.aim}</p>
-                        <p><strong>Deadline:</strong> {deadline_str}</p>
+                        <h3 style="margin-top: 0; color: #0d6efd;">Experiment #{request.experimentNumber}: {safe_title}</h3>
+                        <p><strong>Aim:</strong> {safe_aim}</p>
+                        <p><strong>Deadline:</strong> {safe_deadline}</p>
                     </div>
                     <p>Please log in to your dashboard to start writing your journal report.</p>
                     <br/>

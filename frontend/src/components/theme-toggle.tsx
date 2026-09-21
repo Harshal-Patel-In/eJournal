@@ -40,13 +40,21 @@ export function ThemeToggle({ className }: { className?: string }) {
       variant="outline"
       size="icon"
       onClick={toggleTheme}
-      title={
+      data-tooltip={
         theme === "dark"
-          ? "Night Mode (Dark) — Click for System Theme"
+          ? "Night Mode (Dark)"
           : theme === "light"
-          ? "Light Mode — Click for Night Mode"
-          : "System Theme — Click for Light Mode"
+          ? "Light Mode"
+          : "System Theme"
       }
+      data-tooltip-subtext={
+        theme === "dark"
+          ? "Click for System Theme"
+          : theme === "light"
+          ? "Click for Night Mode"
+          : "Click for Light Mode"
+      }
+      data-tooltip-side="bottom"
       className={`size-8 rounded-full ${
         theme === "light"
           ? "glass-btn-amber"

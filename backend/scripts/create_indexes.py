@@ -23,6 +23,7 @@ def create_indexes():
         "assignments",
         "journals",
         "journal_versions",
+        "journal_block_versions",
         "comments",
         "approvals",
         "notifications",
@@ -83,6 +84,22 @@ def create_indexes():
     )
     print("  Index: journal_versions (3 indexes)")
 
+    # journal_block_versions: compound unique [journalId + blockId + revisionNumber], journalId + revisionNumber
+    db.journal_block_versions.create_index(
+        [
+            ("journalId", ASCENDING),
+            ("blockId", ASCENDING),
+            ("revisionNumber", DESCENDING),
+        ],
+        unique=True,
+        name="idx_block_versions_lookup_unique",
+    )
+    db.journal_block_versions.create_index(
+        [("journalId", ASCENDING), ("revisionNumber", DESCENDING)],
+        name="idx_block_versions_journal_rev",
+    )
+    print("  Index: journal_block_versions (2 indexes)")
+
     # comments: journalId + blockId, journalId + status, authorId
     db.comments.create_index(
         [("journalId", ASCENDING), ("blockId", ASCENDING)],
@@ -100,7 +117,7 @@ def create_indexes():
     db.approvals.create_index("teacherId", name="idx_approvals_teacherId")
     print("  Index: approvals (2 indexes)")
 
-    # notifications: userId + isRead, userId + createdAt
+    # notifications: userId + isRead, userId + createdAt, and 7-day TTL on readAt
     db.notifications.create_index(
         [("userId", ASCENDING), ("isRead", ASCENDING)],
         name="idx_notifications_user_read",
@@ -109,7 +126,24 @@ def create_indexes():
         [("userId", ASCENDING), ("createdAt", DESCENDING)],
         name="idx_notifications_user_createdAt",
     )
-    print("  Index: notifications (2 indexes)")
+    db.notifications.create_index(
+        "readAt",
+        expireAfterSeconds=7 * 86400,
+        name="ttl_notifications_readAt_7d",
+    )
+    print("  Index: notifications (3 indexes)")
+
+    # uploaded_assets: userId + isDeleted, and 3-day TTL on deletedAt
+    db.uploaded_assets.create_index(
+        [("userId", ASCENDING), ("isDeleted", ASCENDING)],
+        name="idx_assets_user_deleted",
+    )
+    db.uploaded_assets.create_index(
+        "deletedAt",
+        expireAfterSeconds=3 * 86400,
+        name="ttl_assets_deletedAt_3d",
+    )
+    print("  Index: uploaded_assets (2 indexes)")
 
     # audit_logs: entity + entityId, timestamp, userId
     db.audit_logs.create_index(

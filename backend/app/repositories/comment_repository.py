@@ -38,3 +38,31 @@ class CommentRepository(BaseRepository):
             atype = c.get("type", "Comment")
             counts[atype] = counts.get(atype, 0) + 1
         return counts
+
+    async def resolve_suggestions_for_deleted_blocks(
+        self, journal_id: str, deleted_block_ids: list[str]
+    ) -> int:
+        """Resolve suggestions on deleted blocks and mark other open comments as blockDeleted."""
+        if not deleted_block_ids:
+            return 0
+        now = datetime.now(timezone.utc)
+        # Suggestions on deleted blocks are marked resolved with appliedAction: "deleted"
+        query = {
+            "journalId": journal_id,
+            "blockId": {"$in": deleted_block_ids},
+            "type": {"$regex": "^suggestion$", "$options": "i"},
+            "status": {"$ne": "resolved"},
+        }
+        res = await self.update_many(
+            query,
+            {"$set": {"status": "resolved", "appliedAction": "deleted", "resolvedAt": now}},
+        )
+        # Other comments (warnings, questions) on deleted blocks get blockDeleted: True
+        other_query = {
+            "journalId": journal_id,
+            "blockId": {"$in": deleted_block_ids},
+            "type": {"$not": {"$regex": "^suggestion$", "$options": "i"}},
+            "status": {"$ne": "resolved"},
+        }
+        await self.update_many(other_query, {"$set": {"blockDeleted": True}})
+        return res

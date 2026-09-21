@@ -53,6 +53,7 @@ export function TableSpreadsheetModal({
   const [editingCell, setEditingCell] = useState<{ r: number; c: number } | null>(null);
   const [editingHeader, setEditingHeader] = useState<number | null>(null);
   const [activeColumnMenu, setActiveColumnMenu] = useState<number | null>(null);
+  const [columnMenuPos, setColumnMenuPos] = useState<{ top: number; right: number } | null>(null);
   const [formulaModalCol, setFormulaModalCol] = useState<number | null>(initialFormulaCol);
   const [columnFormulas, setColumnFormulas] = useState<Record<number, string>>(initialColumnFormulas);
   const [columnPrecision, setColumnPrecision] = useState<Record<number, string>>(initialColumnPrecision);
@@ -77,20 +78,37 @@ export function TableSpreadsheetModal({
   // Handle ESC key to close
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && isOpen && formulaModalCol === null) {
-        handleSaveAndClose();
+      if (e.key === "Escape") {
+        if (activeColumnMenu !== null) {
+          e.stopPropagation();
+          setActiveColumnMenu(null);
+          setColumnMenuPos(null);
+          return;
+        }
+        if (isOpen && formulaModalCol === null) {
+          handleSaveAndClose();
+        }
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, headers, rows, formulaModalCol]);
+  }, [isOpen, headers, rows, formulaModalCol, activeColumnMenu]);
 
-  // Close context menu on outside click
+  // Close context menu on outside click, scroll, or resize
   useEffect(() => {
-    const handleClickOutside = () => setActiveColumnMenu(null);
+    const handleDismissMenu = () => {
+      setActiveColumnMenu(null);
+      setColumnMenuPos(null);
+    };
     if (activeColumnMenu !== null) {
-      window.addEventListener("click", handleClickOutside);
-      return () => window.removeEventListener("click", handleClickOutside);
+      window.addEventListener("click", handleDismissMenu);
+      window.addEventListener("scroll", handleDismissMenu, true);
+      window.addEventListener("resize", handleDismissMenu);
+      return () => {
+        window.removeEventListener("click", handleDismissMenu);
+        window.removeEventListener("scroll", handleDismissMenu, true);
+        window.removeEventListener("resize", handleDismissMenu);
+      };
     }
   }, [activeColumnMenu]);
 
@@ -375,7 +393,17 @@ export function TableSpreadsheetModal({
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setActiveColumnMenu(isMenuOpen ? null : colIdx);
+                                if (isMenuOpen) {
+                                  setActiveColumnMenu(null);
+                                  setColumnMenuPos(null);
+                                } else {
+                                  const rect = e.currentTarget.getBoundingClientRect();
+                                  setColumnMenuPos({
+                                    top: rect.bottom + 4,
+                                    right: Math.max(8, window.innerWidth - rect.right),
+                                  });
+                                  setActiveColumnMenu(colIdx);
+                                }
                               }}
                               className="h-6 w-5 rounded-md flex items-center justify-center hover:bg-muted text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
                               title="Column actions"
@@ -383,67 +411,6 @@ export function TableSpreadsheetModal({
                               <ChevronDown className="size-3" />
                             </button>
                           </div>
-                        </div>
-                      )}
-
-                      {/* macOS Context Menu */}
-                      {isMenuOpen && (
-                        <div
-                          onClick={(e) => e.stopPropagation()}
-                          className="absolute right-2 top-full mt-1 w-48 bg-popover text-popover-foreground border border-border/80 rounded-2xl shadow-xl z-50 p-1.5 flex flex-col gap-0.5 animate-in fade-in-50 zoom-in-95 duration-100 text-left font-normal"
-                        >
-                          <button
-                            onClick={() => {
-                              setActiveColumnMenu(null);
-                              setFormulaModalCol(colIdx);
-                            }}
-                            className="flex items-center gap-2 px-2.5 py-1.5 text-xs rounded-xl hover:bg-primary/10 hover:text-primary transition-colors text-foreground font-semibold cursor-pointer w-full text-left"
-                          >
-                            <Calculator className="size-3.5 text-primary" />
-                            <span>Calculate Formula (fx)...</span>
-                          </button>
-
-                          <button
-                            onClick={() => {
-                              setActiveColumnMenu(null);
-                              setEditingHeader(colIdx);
-                            }}
-                            className="flex items-center gap-2 px-2.5 py-1.5 text-xs rounded-xl hover:bg-muted transition-colors text-foreground cursor-pointer w-full text-left"
-                          >
-                            <Edit3 className="size-3.5 text-muted-foreground" />
-                            <span>Rename Column</span>
-                          </button>
-
-                          <div className="h-px bg-border/60 my-0.5" />
-
-                          <button
-                            onClick={() => insertColumnAt(colIdx)}
-                            className="flex items-center gap-2 px-2.5 py-1.5 text-xs rounded-xl hover:bg-muted transition-colors text-foreground cursor-pointer w-full text-left"
-                          >
-                            <ArrowLeftToLine className="size-3.5 text-muted-foreground" />
-                            <span>Insert Column Left</span>
-                          </button>
-
-                          <button
-                            onClick={() => insertColumnAt(colIdx + 1)}
-                            className="flex items-center gap-2 px-2.5 py-1.5 text-xs rounded-xl hover:bg-muted transition-colors text-foreground cursor-pointer w-full text-left"
-                          >
-                            <ArrowRightToLine className="size-3.5 text-muted-foreground" />
-                            <span>Insert Column Right</span>
-                          </button>
-
-                          {headers.length > 1 && (
-                            <>
-                              <div className="h-px bg-border/60 my-0.5" />
-                              <button
-                                onClick={() => removeColumn(colIdx)}
-                                className="flex items-center gap-2 px-2.5 py-1.5 text-xs rounded-xl hover:bg-destructive/10 text-destructive transition-colors cursor-pointer w-full text-left font-semibold"
-                              >
-                                <Trash2 className="size-3.5" />
-                                <span>Delete Column</span>
-                              </button>
-                            </>
-                          )}
                         </div>
                       )}
                     </th>
@@ -543,6 +510,92 @@ export function TableSpreadsheetModal({
           <span>Press <kbd className="px-1.5 py-0.5 rounded bg-muted border border-border text-[10px] font-mono">Esc</kbd> to Save & Close</span>
         </div>
       </div>
+
+      {/* Portaled Column Actions Context Menu */}
+      {activeColumnMenu !== null && columnMenuPos !== null && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            position: "fixed",
+            top: `${columnMenuPos.top}px`,
+            right: `${columnMenuPos.right}px`,
+            zIndex: 100001,
+          }}
+          className="w-48 bg-popover/95 text-popover-foreground backdrop-blur-2xl border border-border/80 dark:border-white/12 rounded-2xl shadow-2xl p-1.5 flex flex-col gap-0.5 animate-in fade-in-50 zoom-in-95 duration-100 text-left font-normal select-none"
+        >
+          <button
+            onClick={() => {
+              const col = activeColumnMenu;
+              setActiveColumnMenu(null);
+              setColumnMenuPos(null);
+              setFormulaModalCol(col);
+            }}
+            className="flex items-center gap-2 px-2.5 py-1.5 text-xs rounded-xl hover:bg-primary/10 hover:text-primary transition-colors text-foreground font-semibold cursor-pointer w-full text-left"
+          >
+            <Calculator className="size-3.5 text-primary" />
+            <span>Calculate Formula (fx)...</span>
+          </button>
+
+          <button
+            onClick={() => {
+              const col = activeColumnMenu;
+              setActiveColumnMenu(null);
+              setColumnMenuPos(null);
+              setEditingHeader(col);
+            }}
+            className="flex items-center gap-2 px-2.5 py-1.5 text-xs rounded-xl hover:bg-muted transition-colors text-foreground cursor-pointer w-full text-left"
+          >
+            <Edit3 className="size-3.5 text-muted-foreground" />
+            <span>Rename Column</span>
+          </button>
+
+          <div className="h-px bg-border/60 my-0.5" />
+
+          <button
+            onClick={() => {
+              const col = activeColumnMenu;
+              setActiveColumnMenu(null);
+              setColumnMenuPos(null);
+              insertColumnAt(col);
+            }}
+            className="flex items-center gap-2 px-2.5 py-1.5 text-xs rounded-xl hover:bg-muted transition-colors text-foreground cursor-pointer w-full text-left"
+          >
+            <ArrowLeftToLine className="size-3.5 text-muted-foreground" />
+            <span>Insert Column Left</span>
+          </button>
+
+          <button
+            onClick={() => {
+              const col = activeColumnMenu;
+              setActiveColumnMenu(null);
+              setColumnMenuPos(null);
+              insertColumnAt(col + 1);
+            }}
+            className="flex items-center gap-2 px-2.5 py-1.5 text-xs rounded-xl hover:bg-muted transition-colors text-foreground cursor-pointer w-full text-left"
+          >
+            <ArrowRightToLine className="size-3.5 text-muted-foreground" />
+            <span>Insert Column Right</span>
+          </button>
+
+          {headers.length > 1 && (
+            <>
+              <div className="h-px bg-border/60 my-0.5" />
+              <button
+                onClick={() => {
+                  const col = activeColumnMenu;
+                  setActiveColumnMenu(null);
+                  setColumnMenuPos(null);
+                  removeColumn(col);
+                }}
+                className="flex items-center gap-2 px-2.5 py-1.5 text-xs rounded-xl hover:bg-destructive/10 text-destructive transition-colors cursor-pointer w-full text-left font-semibold"
+              >
+                <Trash2 className="size-3.5" />
+                <span>Delete Column</span>
+              </button>
+            </>
+          )}
+        </div>
+      )}
 
       {/* Table Formula Modal */}
       {formulaModalCol !== null && (
