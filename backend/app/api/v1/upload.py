@@ -167,7 +167,7 @@ async def upload_image(
             logger.error("Cloud storage upload failed: %s", str(e), exc_info=True)
             raise AppException(
                 code=ErrorCode.UPLOAD_FAILED,
-                message=f"Cloud storage upload failed: {str(e)}",
+                message="Image upload failed. Please verify your storage credentials.",
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
@@ -186,7 +186,7 @@ async def upload_image(
         logger.error("Failed to write upload to server disk: %s", str(e), exc_info=True)
         raise AppException(
             code=ErrorCode.INTERNAL_ERROR,
-            message=f"Server disk upload failed: {str(e)}. Please configure Cloudinary for cloud deployments.",
+            message="Server upload failed. Please configure cloud storage.",
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
 
