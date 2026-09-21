@@ -56,8 +56,8 @@ export default function EditorToolbar({
       {/* Left: Back Button & Journal Title */}
       <div className="flex items-center gap-3 flex-1 min-w-0 pr-4">
         <Link
-          href={`/classrooms/${classroomId}`}
-          title="Back to Classroom"
+          href={classroomId ? `/classrooms/${classroomId}` : "/dashboard"}
+          title={classroomId ? "Back to Classroom" : "Back to Dashboard"}
           className="flex items-center justify-center size-8 rounded-xl bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground active:scale-95 transition-all duration-200 cursor-pointer shrink-0"
         >
           <ArrowLeft className="size-4" />

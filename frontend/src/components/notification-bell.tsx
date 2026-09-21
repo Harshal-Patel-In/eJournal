@@ -262,7 +262,16 @@ export default function NotificationBell() {
       if (typeof window === "undefined" || !isMounted) return;
 
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-      const host = process.env.NEXT_PUBLIC_WS_HOST || "localhost:8000";
+      let defaultHost = "localhost:8000";
+      if (process.env.NEXT_PUBLIC_API_URL) {
+        try {
+          const url = new URL(process.env.NEXT_PUBLIC_API_URL, window.location.origin);
+          defaultHost = url.host;
+        } catch {
+          // Fallback to localhost if malformed
+        }
+      }
+      const host = process.env.NEXT_PUBLIC_WS_HOST || defaultHost;
       const wsUrl = `${protocol}//${host}/api/v1/notifications/ws`;
 
       try {

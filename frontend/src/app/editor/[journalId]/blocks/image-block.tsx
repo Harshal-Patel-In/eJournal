@@ -146,8 +146,18 @@ export default function ImageBlock({ id, content, previewMode }: ImageBlockProps
         const formData = new FormData();
         formData.append("file", file);
 
+        const clientToken =
+          typeof document !== "undefined"
+            ? document.cookie.match(/(?:^|; )access_token=([^;]*)/)?.[1]
+            : null;
+        const headers: Record<string, string> = {};
+        if (clientToken) {
+          headers["Authorization"] = `Bearer ${decodeURIComponent(clientToken)}`;
+        }
+
         const response = await fetch(`${API_BASE_URL}/uploads/images`, {
           method: "POST",
+          headers,
           body: formData,
           credentials: "include",
         });
