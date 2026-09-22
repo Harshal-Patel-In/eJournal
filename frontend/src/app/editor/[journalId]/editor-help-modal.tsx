@@ -429,7 +429,7 @@ export default function EditorHelpModal({ isOpen, onClose }: EditorHelpModalProp
                     <h4 className="font-bold text-foreground">Paragraph Block</h4>
                   </div>
                   <p className="text-xs text-muted-foreground leading-relaxed">
-                    Write lab procedures, theory, and explanations. Includes auto-expanding lines and built-in <strong>inline math</strong>: type <code>$formula$</code> (e.g. <code>$V = I \cdot R$</code>) to render live KaTeX math alongside your text!
+                    Write lab procedures, theory, and observations. Select any text to open the floating formatting toolbar (<strong>Bold</strong>, <em>Italic</em>, <code>Code</code>, Highlight, and Math) or use shortcuts (<code>Ctrl+B</code>, <code>Ctrl+I</code>). Type <code>$formula$</code> for live inline KaTeX math!
                   </p>
                 </div>
 
@@ -763,13 +763,49 @@ export default function EditorHelpModal({ isOpen, onClose }: EditorHelpModalProp
                       <td className="py-3 px-4 text-muted-foreground">Quickly inserts any block from inside text</td>
                     </tr>
                     <tr>
+                      <td className="py-3 px-4 font-semibold text-foreground">Bold Text</td>
+                      <td className="py-3 px-4">
+                        <kbd className="px-2 py-1 rounded bg-muted border border-border text-[11px] font-mono">
+                          Ctrl+B / Cmd+B
+                        </kbd>
+                      </td>
+                      <td className="py-3 px-4 text-muted-foreground">Toggles **bold** on selected text</td>
+                    </tr>
+                    <tr>
+                      <td className="py-3 px-4 font-semibold text-foreground">Italic Text</td>
+                      <td className="py-3 px-4">
+                        <kbd className="px-2 py-1 rounded bg-muted border border-border text-[11px] font-mono">
+                          Ctrl+I / Cmd+I
+                        </kbd>
+                      </td>
+                      <td className="py-3 px-4 text-muted-foreground">Toggles *italic* on selected text</td>
+                    </tr>
+                    <tr>
+                      <td className="py-3 px-4 font-semibold text-foreground">Inline Code</td>
+                      <td className="py-3 px-4">
+                        <kbd className="px-2 py-1 rounded bg-muted border border-border text-[11px] font-mono">
+                          Ctrl+E / Cmd+E
+                        </kbd>
+                      </td>
+                      <td className="py-3 px-4 text-muted-foreground">Toggles `code` on selected text</td>
+                    </tr>
+                    <tr>
+                      <td className="py-3 px-4 font-semibold text-foreground">Highlight Text</td>
+                      <td className="py-3 px-4">
+                        <kbd className="px-2 py-1 rounded bg-muted border border-border text-[11px] font-mono">
+                          Ctrl+Shift+H
+                        </kbd>
+                      </td>
+                      <td className="py-3 px-4 text-muted-foreground">Highlights text with academic amber mark</td>
+                    </tr>
+                    <tr>
                       <td className="py-3 px-4 font-semibold text-foreground">Inline Math</td>
                       <td className="py-3 px-4">
                         <kbd className="px-2 py-1 rounded bg-muted border border-border text-[11px] font-mono">
-                          $formula$
+                          Ctrl+Shift+M / $formula$
                         </kbd>
                       </td>
-                      <td className="py-3 px-4 text-muted-foreground">Renders inline math within paragraphs</td>
+                      <td className="py-3 px-4 text-muted-foreground">Renders inline KaTeX math within paragraphs</td>
                     </tr>
                     <tr>
                       <td className="py-3 px-4 font-semibold text-foreground">Close Modals / Menus</td>
