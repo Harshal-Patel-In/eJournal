@@ -39,7 +39,11 @@ export default function LoginPage() {
   });
 
   const mutation = useMutation({
-    mutationFn: (data: LoginFields) => api.post<{ access_token: string; user: { is_profile_complete: boolean } }>("/auth/login", data),
+    mutationFn: (data: LoginFields) =>
+      api.post<{
+        access_token: string;
+        user: { role: string; is_profile_complete: boolean; must_change_password?: boolean };
+      }>("/auth/login", data),
     onSuccess: (data) => {
       // Store the access token on the frontend domain so Vercel's middleware recognizes it
       if (typeof window !== "undefined" && data?.access_token) {
@@ -50,8 +54,16 @@ export default function LoginPage() {
       // Purge all stale cached queries from previous user sessions
       queryClient.clear();
 
-      if (data.user.is_profile_complete) {
-        router.push("/dashboard");
+      if (data.user.must_change_password) {
+        router.push("/auth/change-password");
+      } else if (data.user.is_profile_complete) {
+        // Dedicated Super Admin goes directly to /admin
+        // Faculty (even with admin access) and students are redirected FIRST to the Academic Workspace (/dashboard)
+        if (data.user.role === "admin") {
+          router.push("/admin");
+        } else {
+          router.push("/dashboard");
+        }
       } else {
         router.push("/profile/setup");
       }

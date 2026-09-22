@@ -7,8 +7,9 @@ RULE-AUTH01: Store JWT tokens in HTTP-only cookies.
 from fastapi import APIRouter, Depends, Request, Response, status
 
 from app.core.config import settings
-from app.dependencies.auth import get_current_user
+from app.dependencies.auth import get_active_user, get_current_user
 from app.dependencies.rate_limit import RateLimiter
+from app.schemas.admin import AdminPasswordChangeRequest
 from app.schemas.auth import (
     UserLoginRequest,
     UserRegisterRequest,
@@ -117,6 +118,9 @@ async def login(
         "id": user["id"],
         "email": user["email"],
         "role": user["role"],
+        "is_admin": bool(user.get("is_admin", False) or user.get("isAdmin", False) or user["role"] == "admin"),
+        "isAdmin": bool(user.get("is_admin", False) or user.get("isAdmin", False) or user["role"] == "admin"),
+        "must_change_password": bool(user.get("must_change_password", False)),
         "is_verified": user.get("is_verified", False),
         "is_profile_complete": user.get("is_profile_complete", False),
     }
@@ -134,3 +138,34 @@ async def logout(response: Response):
         path="/",
     )
     return success_response("Logged out successfully")
+
+
+@router.post("/change-password", response_model=ApiResponse[dict])
+async def change_password(
+    payload: AdminPasswordChangeRequest,
+    request: Request,
+    response: Response,
+    current_user: dict = Depends(get_active_user),
+    auth_service: AuthService = Depends(),
+):
+    """Change password for the authenticated user and refresh auth cookie."""
+    ip_address = request.client.host if request.client else None
+    result = await auth_service.change_password(
+        user=current_user,
+        current_password=payload.current_password,
+        new_password=payload.new_password,
+        ip_address=ip_address,
+    )
+
+    # Refresh cookie with clean token
+    response.set_cookie(
+        key="access_token",
+        value=result["access_token"],
+        httponly=True,
+        max_age=30 * 60,
+        samesite="none" if settings.is_production else "lax",
+        secure=True if settings.is_production else settings.cookie_secure,
+        path="/",
+    )
+
+    return success_response(result)

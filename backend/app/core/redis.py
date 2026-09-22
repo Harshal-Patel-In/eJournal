@@ -45,3 +45,9 @@ def get_redis() -> aioredis.Redis:
     if _redis_client is None:
         raise RuntimeError("Redis is not connected. Call connect_to_redis() first.")
     return _redis_client
+
+
+def get_redis_client() -> aioredis.Redis | None:
+    """Get the shared Redis client instance or None if offline."""
+    return _redis_client
+

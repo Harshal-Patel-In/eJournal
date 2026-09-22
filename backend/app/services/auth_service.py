@@ -246,14 +246,25 @@ class AuthService:
                 status_code=status.HTTP_403_FORBIDDEN,
             )
 
-        # Create access token
+        # Check account suspension
+        if user.get("status") == "suspended":
+            raise AppException(
+                code=ErrorCode.FORBIDDEN,
+                message="Account suspended by institutional administrator. Please contact your department.",
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+
+        # Create access token with role and password change flag
         access_token = create_jwt_token(
             data={
                 "sub": user["email"],
                 "role": user["role"],
+                "is_admin": user.get("is_admin", False) or user["role"] == "admin",
                 "is_profile_complete": user.get("is_profile_complete", False),
+                "must_change_password": user.get("must_change_password", False),
             }
         )
+
 
         # Log audit trail
         await self.audit_repo.log_event(
@@ -265,6 +276,57 @@ class AuthService:
         )
 
         return access_token, user
+
+    async def change_password(
+        self, user: dict, current_password: str, new_password: str, ip_address: str | None = None
+    ) -> dict:
+        """Change password for an authenticated user and clear must_change_password flag."""
+        if not verify_password(current_password, user.get("password_hash", "")):
+            raise AppException(
+                code=ErrorCode.INVALID_CREDENTIALS,
+                message="Current password verification failed",
+                status_code=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        if len(new_password) < 8:
+            raise AppException(
+                code=ErrorCode.VALIDATION_ERROR,
+                message="New password must be at least 8 characters long",
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        hashed = hash_password(new_password)
+
+        await self.user_repo.update_by_id(
+            user["id"],
+            {
+                "$set": {
+                    "password_hash": hashed,
+                    "must_change_password": False,
+                    "updatedAt": datetime.now(timezone.utc),
+                }
+            },
+        )
+
+        await self.audit_repo.log_event(
+            user_id=user["id"],
+            action="PASSWORD_CHANGED",
+            entity="users",
+            entity_id=user["id"],
+            ip_address=ip_address,
+        )
+
+        # Generate a fresh access token without the must_change_password flag
+        fresh_token = create_jwt_token(
+            data={
+                "sub": user["email"],
+                "role": user["role"],
+                "is_profile_complete": user.get("is_profile_complete", False),
+                "must_change_password": False,
+            }
+        )
+
+        return {"access_token": fresh_token, "message": "Password changed successfully."}
 
     async def update_profile(self, user: dict, update: ProfileUpdateRequest) -> dict:
         """Update user profile academic details and enforce profile locking rules."""

@@ -20,7 +20,6 @@ import { Button } from "@/components/ui/button";
 const registerSchema = zod.object({
   email: zod.string().email("Enter a valid institutional email"),
   password: zod.string().min(8, "Password must be at least 8 characters"),
-  role: zod.enum(["student", "teacher"]),
 });
 
 type RegisterFields = zod.infer<typeof registerSchema>;
@@ -32,20 +31,15 @@ export default function RegisterPage() {
   const {
     register,
     handleSubmit,
-    setValue,
     watch,
     formState: { errors },
   } = useForm<RegisterFields>({
     resolver: zodResolver(registerSchema),
-    defaultValues: {
-      role: "student",
-    },
   });
 
-  const activeRole = watch("role");
-
   const mutation = useMutation({
-    mutationFn: (data: RegisterFields) => api.post("/auth/register", data),
+    mutationFn: (data: RegisterFields) =>
+      api.post("/auth/register", { ...data, role: "student" }),
     onSuccess: (data: any) => {
       // Redirect to verification screen with email preloaded
       router.push(`/auth/verify?email=${encodeURIComponent(watch("email"))}`);
@@ -73,9 +67,9 @@ export default function RegisterPage() {
             alt="eJournal Logo"
             className="h-16 w-auto object-contain mb-2"
           />
-          <h2 className="text-2xl font-bold tracking-tight">Create Account</h2>
+          <h2 className="text-2xl font-bold tracking-tight">Student Registration</h2>
           <p className="text-sm text-muted-foreground">
-            Get started with eJournal
+            Create your student journal account
           </p>
         </div>
 
@@ -87,35 +81,12 @@ export default function RegisterPage() {
             </div>
           )}
 
-          {/* Role Segmented control (Apple HIG style) */}
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold text-muted-foreground">
-              Select Your Role
-            </label>
-            <div className="flex p-1 bg-secondary rounded-lg border border-border">
-              <button
-                type="button"
-                className={`flex-1 py-1.5 text-sm font-semibold rounded-md transition-all ${
-                  activeRole === "student"
-                    ? "bg-background text-primary shadow-sm"
-                    : "text-muted-foreground hover:text-primary"
-                }`}
-                onClick={() => setValue("role", "student")}
-              >
-                Student
-              </button>
-              <button
-                type="button"
-                className={`flex-1 py-1.5 text-sm font-semibold rounded-md transition-all ${
-                  activeRole === "teacher"
-                    ? "bg-background text-primary shadow-sm"
-                    : "text-muted-foreground hover:text-primary"
-                }`}
-                onClick={() => setValue("role", "teacher")}
-              >
-                Teacher
-              </button>
-            </div>
+          {/* Institutional Student Notice */}
+          <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 text-xs text-blue-700 dark:text-blue-300 flex items-start gap-2">
+            <span className="font-bold shrink-0">Note:</span>
+            <span>
+              Self-registration is available for students. Faculty and instructor accounts are provisioned exclusively by Institutional Administrators.
+            </span>
           </div>
 
           <div className="flex flex-col gap-1.5">

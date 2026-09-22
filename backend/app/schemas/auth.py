@@ -10,7 +10,7 @@ class UserRegisterRequest(BaseModel):
 
     email: EmailStr = Field(..., description="Institutional email address")
     password: str = Field(..., min_length=8, description="User password (min 8 chars)")
-    role: Literal["student", "teacher"] = Field(..., description="Role in the institution")
+    role: Literal["student"] = Field(default="student", description="Role in the institution (student only)")
 
 
 class UserVerifyRequest(BaseModel):
@@ -62,6 +62,8 @@ class UserMeResponse(BaseModel):
     id: str
     email: EmailStr
     role: str
+    is_admin: bool = False
+    isAdmin: bool = False
     is_verified: bool
     is_profile_complete: bool
     profile: UserProfileSchema

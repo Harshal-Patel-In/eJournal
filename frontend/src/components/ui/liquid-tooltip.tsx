@@ -52,6 +52,9 @@ export function LiquidTooltipProvider() {
       let el: HTMLElement | null = target;
       let depth = 0;
       while (el && depth < 5 && el !== document.body) {
+        if (el.hasAttribute("data-no-tooltip") || el.closest?.("[data-no-tooltip]")) {
+          return null;
+        }
         if (
           el.hasAttribute("data-tooltip") ||
           el.hasAttribute("title") ||

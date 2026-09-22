@@ -93,6 +93,14 @@ async def get_active_user(user: dict = Depends(get_current_user)) -> dict:
             message="Email address not verified",
             status_code=status.HTTP_401_UNAUTHORIZED,
         )
+
+    if user.get("status") == "suspended":
+        raise AppException(
+            code=ErrorCode.FORBIDDEN,
+            message="Account suspended by institutional administrator. Please contact your department.",
+            status_code=status.HTTP_403_FORBIDDEN,
+        )
+
     return user
 
 
@@ -114,16 +122,30 @@ class RoleChecker:
     """RBAC Dependency to validate that user roles align with route permissions.
 
     RULE-AUTH07: RBAC forces teacher vs student limits.
+    Supports dual institutional authority for faculty members with is_admin=True.
     """
 
     def __init__(self, allowed_roles: list[str]):
         self.allowed_roles = allowed_roles
 
     def __call__(self, user: dict = Depends(get_active_user)) -> dict:
-        if user["role"] not in self.allowed_roles:
-            raise AppException(
-                code=ErrorCode.FORBIDDEN,
-                message="Resource access forbidden for this user role",
-                status_code=status.HTTP_403_FORBIDDEN,
-            )
-        return user
+        user_role = user.get("role")
+        is_admin = user.get("is_admin", False) or user_role == "admin"
+
+        # If admin route, allow if user is admin or is_admin flag is true
+        if "admin" in self.allowed_roles and is_admin:
+            return user
+
+        # If teacher route, allow if teacher or dual admin
+        if "teacher" in self.allowed_roles and (user_role == "teacher" or (user_role == "admin" and is_admin)):
+            return user
+
+        if user_role in self.allowed_roles:
+            return user
+
+        raise AppException(
+            code=ErrorCode.FORBIDDEN,
+            message="Resource access forbidden for this user role",
+            status_code=status.HTTP_403_FORBIDDEN,
+        )
+

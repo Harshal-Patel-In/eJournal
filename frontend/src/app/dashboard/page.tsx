@@ -28,6 +28,7 @@ import {
   AlertCircle,
   CheckCircle2,
   Award,
+  ShieldAlert,
 } from "lucide-react";
 
 import { api } from "@/lib/api";
@@ -177,6 +178,19 @@ export default function DashboardPage() {
         <div className="flex items-center gap-3">
           <ThemeToggle />
           <NotificationBell />
+
+          {(user?.is_admin || user?.isAdmin || user?.role === "admin") && (
+            <Link href="/admin" title="Open Institutional Admin Command Center">
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 text-xs font-bold rounded-xl h-8 px-2.5 bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30 hover:bg-amber-500/20 cursor-pointer transition-all hover:scale-105 active:scale-95"
+              >
+                <ShieldAlert className="size-3.5 text-amber-500" />
+                <span className="hidden sm:inline font-bold">Admin Console</span>
+              </Button>
+            </Link>
+          )}
 
           <Link href="/profile" title="View & Edit Academic Profile">
             <Button

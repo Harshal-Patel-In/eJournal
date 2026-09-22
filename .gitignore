@@ -58,3 +58,4 @@ coverage/
 .agents/
 brag-output
 documents/SECURITY_AUDIT_REPORT
+documents/admin.md

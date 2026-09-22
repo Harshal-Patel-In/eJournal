@@ -1,9 +1,10 @@
 /**
- * Central Next.js authentication and profile lock routing middleware.
+ * Central Next.js authentication, RBAC, and profile lock routing middleware.
  *
- * RULE-AUTH02: Authentication centrally checked in Middleware.
+ * RULE-AUTH02: Authentication and RBAC centrally enforced in Middleware.
  * RULE-AUTH03: Redirect to login if no cookie present.
  * RULE-AUTH06: Redirect to setup if profile is incomplete.
+ * RULE-AUTH07: Non-admins blocked from /admin routes.
  */
 
 import { NextResponse } from "next/server";
@@ -27,8 +28,10 @@ export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Path classifications
+  const isChangePasswordRoute = pathname === "/auth/change-password";
   const isAuthRoute = pathname.startsWith("/auth");
   const isProfileSetupRoute = pathname === "/profile/setup";
+  const isAdminRoute = pathname.startsWith("/admin");
   const isStaticRoute =
     pathname.startsWith("/_next") ||
     pathname.includes(".") ||
@@ -60,19 +63,42 @@ export function middleware(request: NextRequest) {
     return response;
   }
 
+  const userRole = payload.role;
+  const isAdmin = payload.is_admin === true || userRole === "admin";
   const isProfileComplete = payload.is_profile_complete === true;
+  const mustChangePassword = payload.must_change_password === true;
 
-  // Redirect root `/` to dashboard or setup when authenticated
-  if (pathname === "/") {
-    if (isProfileComplete) {
-      return NextResponse.redirect(new URL("/dashboard", request.url));
-    } else {
-      return NextResponse.redirect(new URL("/profile/setup", request.url));
+  // 3. Mandatory password change lock (first-time login for admin or provisioned faculty)
+  if (mustChangePassword) {
+    if (!isChangePasswordRoute) {
+      return NextResponse.redirect(new URL("/auth/change-password", request.url));
     }
+    return NextResponse.next();
   }
 
-  // If user tries to visit auth pages when already logged in
-  if (isAuthRoute) {
+  // If password change is complete, prevent revisiting /auth/change-password
+  if (!mustChangePassword && isChangePasswordRoute) {
+    return NextResponse.redirect(
+      new URL(userRole === "admin" ? "/admin" : "/dashboard", request.url)
+    );
+  }
+
+  // 4. Strict Admin RBAC route protection (RULE-AUTH07: Allows admins and dual faculty-admins)
+  if (isAdminRoute && !isAdmin) {
+    return NextResponse.redirect(new URL("/dashboard", request.url));
+  }
+
+  // 5. Admin user navigation redirection (Dedicated admin automatically forwarded to /admin)
+  if (userRole === "admin") {
+    if (pathname === "/" || pathname === "/dashboard" || isAuthRoute) {
+      return NextResponse.redirect(new URL("/admin", request.url));
+    }
+    return NextResponse.next();
+  }
+
+
+  // 6. Regular student and teacher workflows
+  if (pathname === "/" || isAuthRoute) {
     if (isProfileComplete) {
       return NextResponse.redirect(new URL("/dashboard", request.url));
     } else {

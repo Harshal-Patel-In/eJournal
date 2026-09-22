@@ -21,8 +21,11 @@ from app.core.database import connect_to_mongodb, close_mongodb_connection
 from app.core.redis import connect_to_redis, close_redis_connection
 from app.core.logging import setup_logging
 from app.middleware.error_handler import register_exception_handlers
+import time
 
 logger = structlog.get_logger(__name__)
+APP_START_TIME = time.time()
+
 
 
 @asynccontextmanager
@@ -42,6 +45,41 @@ async def lifespan(app: FastAPI):
         logger.info("mongodb_indexes_verified")
     except Exception as e:
         logger.error("mongodb_indexes_verification_failed", error=str(e))
+
+    # Ensure default Super Administrator exists (documents/admin.md)
+    try:
+        from datetime import datetime, timezone
+        import os
+        from app.core.database import get_database
+        from app.utils.security import hash_password
+
+        db = get_database()
+        admin_email = os.getenv("ADMIN_EMAIL", "admin@ejournal.com").lower().strip()
+        existing_admin = db.users.find_one({"email": admin_email})
+        if not existing_admin:
+            initial_password = os.getenv("ADMIN_INITIAL_PASSWORD", "Admin@123456")
+            db.users.insert_one(
+                {
+                    "email": admin_email,
+                    "password_hash": hash_password(initial_password),
+                    "role": "admin",
+                    "is_verified": True,
+                    "is_profile_complete": True,
+                    "status": "active",
+                    "must_change_password": True,
+                    "profile": {
+                        "name": "Super Administrator",
+                        "department": "Administration",
+                        "designation": "System Administrator",
+                        "college": "Engineering & Technology Institute",
+                    },
+                    "createdAt": datetime.now(timezone.utc),
+                    "updatedAt": datetime.now(timezone.utc),
+                }
+            )
+            logger.info("super_admin_seeded", email=admin_email)
+    except Exception as e:
+        logger.error("super_admin_seed_failed", error=str(e))
 
     # Connect to Redis
     await connect_to_redis()

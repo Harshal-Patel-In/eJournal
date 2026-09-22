@@ -84,3 +84,9 @@ def get_collection(name: str):
     """Get a MongoDB collection by name."""
     db = get_database()
     return db[name]
+
+
+def get_mongo_client() -> MongoClient | None:
+    """Get the shared MongoClient instance if connected."""
+    return _client
+
