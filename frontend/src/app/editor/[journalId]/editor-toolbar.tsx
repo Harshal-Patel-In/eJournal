@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, Check, Eye, EyeOff, Save, Loader2, Send, Download, ChevronDown, RefreshCw, History, MessageSquare, ShieldCheck, Printer, Lock } from "lucide-react";
+import { ArrowLeft, Check, Eye, EyeOff, Save, Loader2, Send, Download, ChevronDown, RefreshCw, History, MessageSquare, ShieldCheck, Printer, Lock, HelpCircle } from "lucide-react";
 import { useDocumentStore } from "./use-document-store";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -17,6 +17,7 @@ interface EditorToolbarProps {
   onToggleVersionHistory?: () => void;
   onToggleReviewDrawer?: () => void;
   showReviewDrawer?: boolean;
+  onToggleHelp?: () => void;
   userRole?: string;
   canUnsubmit?: boolean;
 }
@@ -31,6 +32,7 @@ export default function EditorToolbar({
   onToggleVersionHistory,
   onToggleReviewDrawer,
   showReviewDrawer,
+  onToggleHelp,
   userRole,
   canUnsubmit = true,
 }: EditorToolbarProps) {
@@ -189,6 +191,19 @@ export default function EditorToolbar({
                 </Button>
               </Link>
 
+              {onToggleHelp && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onToggleHelp}
+                  className="gap-1.5 text-xs font-semibold rounded-xl h-8 active:scale-95 transition-all cursor-pointer text-blue-600 dark:text-blue-400 hover:bg-blue-500/10 border-blue-500/30"
+                  title="Editor Guide & Student Handbook (Shortcut: ?)"
+                >
+                  <HelpCircle className="size-3.5 text-blue-500" />
+                  <span className="hidden sm:inline">Guide</span>
+                </Button>
+              )}
+
               <ThemeToggle />
 
               <span className={`px-2.5 py-1 rounded-xl text-[10px] font-black uppercase tracking-wider border ${
@@ -288,6 +303,19 @@ export default function EditorToolbar({
                   <span>Export PDF</span>
                 </Button>
               </Link>
+
+              {onToggleHelp && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onToggleHelp}
+                  className="gap-1.5 text-xs font-semibold rounded-xl h-8 active:scale-95 transition-all cursor-pointer text-blue-600 dark:text-blue-400 hover:bg-blue-500/10 border-blue-500/30"
+                  title="Editor Guide & Student Handbook (Shortcut: ?)"
+                >
+                  <HelpCircle className="size-3.5 text-blue-500" />
+                  <span className="hidden sm:inline">Guide</span>
+                </Button>
+              )}
 
               <ThemeToggle />
 

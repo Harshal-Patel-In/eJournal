@@ -20,6 +20,7 @@ import { SubmitDialog } from "./submit-dialog";
 import { AnnotationToolbar, AnnotationType } from "@/components/editor/annotation-toolbar";
 import BlockAnnotations, { getDominantBorderColor } from "@/components/editor/block-annotations";
 import { VersionHistoryDrawer } from "@/components/editor/version-history-drawer";
+import EditorHelpModal from "./editor-help-modal";
 
 interface PageProps {
   params: Promise<{ journalId: string }>;
@@ -40,6 +41,7 @@ export default function EditorPage({ params }: PageProps) {
   const [activeAnnotationBlockId, setActiveAnnotationBlockId] = useState<string | null>(null);
   const [localRecoverySnapshot, setLocalRecoverySnapshot] = useState<any>(null);
   const [highlightedRevNumber, setHighlightedRevNumber] = useState<number | null>(null);
+  const [showHelpModal, setShowHelpModal] = useState(false);
 
   // Handle auto-initialization for /editor/new?assignmentId=...
   const createJournalMutation = useMutation({
@@ -86,6 +88,31 @@ export default function EditorPage({ params }: PageProps) {
 
   useEffect(() => {
     setMounted(true);
+  }, []);
+
+  // Global Keyboard shortcut listener for Help & Student Guide ('?' or 'F1')
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if user is currently typing in an input, textarea, contenteditable, or textbox
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.isContentEditable ||
+          target.getAttribute("role") === "textbox")
+      ) {
+        return;
+      }
+
+      if (e.key === "?" || e.key === "F1") {
+        e.preventDefault();
+        setShowHelpModal((prev) => !prev);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
   // 1. Fetch User Profile
@@ -486,6 +513,7 @@ export default function EditorPage({ params }: PageProps) {
         onToggleVersionHistory={() => setShowVersionDrawer(true)}
         onToggleReviewDrawer={() => setShowReviewDrawer(!showReviewDrawer)}
         showReviewDrawer={showReviewDrawer}
+        onToggleHelp={() => setShowHelpModal(true)}
         userRole={user?.role}
         canUnsubmit={canUnsubmit}
       />
@@ -539,6 +567,12 @@ export default function EditorPage({ params }: PageProps) {
         activeBlocks={blocks}
         activeTitle={title}
         highlightedRevNumber={highlightedRevNumber}
+      />
+
+      {/* Student Handbook & Interactive Editor Guide Modal */}
+      <EditorHelpModal
+        isOpen={showHelpModal}
+        onClose={() => setShowHelpModal(false)}
       />
 
       <div className="flex-1 flex w-full relative pt-16 print:pt-0">
