@@ -5,7 +5,7 @@ RULE-AUTH07: Strict RBAC enforcement.
 RULE-SEC10: Immutable security audit logging.
 """
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import secrets
 from typing import Any
 
@@ -641,6 +641,20 @@ class AdminService:
             str(c["_id"]): f"{c.get('name')} ({c.get('subjectCode')})" for c in classrooms_cursor
         }
 
+        # Batch lookup actual snapshot version count from journal_versions collection
+        journal_ids = [str(j["_id"]) for j in journals]
+        version_map: dict[str, int] = {}
+        if journal_ids:
+            try:
+                pipeline = [
+                    {"$match": {"journalId": {"$in": journal_ids}}},
+                    {"$group": {"_id": "$journalId", "count": {"$sum": 1}}},
+                ]
+                for agg in db.journal_versions.aggregate(pipeline):
+                    version_map[str(agg["_id"])] = agg["count"]
+            except Exception:
+                pass
+
         enriched = []
         for j in journals:
             jid = str(j["_id"])
@@ -650,6 +664,9 @@ class AdminService:
             )
             assignment_title = assignment_map.get(j.get("assignmentId"), "Practical")
             classroom_title = classroom_map.get(j.get("classroomId"), "Lab")
+
+            # True user milestone version (snapshot count or 1 for draft), NOT the internal auto-save OCC counter
+            milestone_version = version_map.get(jid, 1) if version_map.get(jid, 0) > 0 else 1
 
             enriched.append(
                 {
@@ -663,7 +680,7 @@ class AdminService:
                     "assignmentTitle": assignment_title,
                     "classroomTitle": classroom_title,
                     "marks": j.get("marks"),
-                    "currentVersion": j.get("currentVersion", 1),
+                    "currentVersion": milestone_version,
                     "updatedAt": j.get("updatedAt"),
                     "submittedAt": j.get("submittedAt"),
                 }
@@ -682,16 +699,9 @@ class AdminService:
         """Fetch immutable security audit trail with FIFO log cap enforcement."""
         db = get_database()
 
-        # Enforce 10,000 FIFO cap (RULE-SEC10)
-        total_logs = db.audit_logs.count_documents({})
-        if total_logs > 10000:
-            excess = total_logs - 10000
-            oldest_ids = [
-                d["_id"]
-                for d in db.audit_logs.find({}, {"_id": 1}).sort("timestamp", 1).limit(excess)
-            ]
-            if oldest_ids:
-                db.audit_logs.delete_many({"_id": {"$in": oldest_ids}})
+        # Enforce 5-day time-bounded retention policy: purge logs older than 5 days
+        cutoff = datetime.now(timezone.utc) - timedelta(days=5)
+        db.audit_logs.delete_many({"timestamp": {"$lt": cutoff}})
 
         query: dict[str, Any] = {}
         if action_filter and action_filter != "all":
@@ -709,6 +719,12 @@ class AdminService:
 
         enriched = []
         for l in logs:
+            ts = l.get("timestamp")
+            if isinstance(ts, datetime):
+                ts_str = ts.replace(tzinfo=timezone.utc).isoformat() if ts.tzinfo is None else ts.isoformat()
+            else:
+                ts_str = ts
+
             enriched.append(
                 {
                     "id": str(l["_id"]),
@@ -718,7 +734,7 @@ class AdminService:
                     "userId": l.get("userId"),
                     "userEmail": user_map.get(l.get("userId"), "System"),
                     "ipAddress": l.get("ipAddress") or "—",
-                    "timestamp": l.get("timestamp"),
+                    "timestamp": ts_str,
                 }
             )
 

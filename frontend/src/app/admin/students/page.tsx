@@ -17,6 +17,16 @@ import {
 import { api } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
+import { CustomSelect } from "@/components/ui/custom-select";
+
+const DEPARTMENT_OPTIONS = [
+  { value: "", label: "All Academic Departments" },
+  { value: "Computer Science", label: "Computer Science & Engineering" },
+  { value: "Information Technology", label: "Information Technology" },
+  { value: "Electrical", label: "Electrical & Electronics" },
+  { value: "Mechanical", label: "Mechanical Engineering" },
+  { value: "Civil", label: "Civil Engineering" },
+];
 
 export default function AdminStudentsPage() {
   const queryClient = useQueryClient();
@@ -126,18 +136,16 @@ export default function AdminStudentsPage() {
           />
         </div>
 
-        <select
+        <CustomSelect
           value={department}
-          onChange={(e) => setDepartment(e.target.value)}
-          className="rounded-2xl bg-card border border-border px-3 py-2 text-xs text-foreground focus:border-primary focus:outline-none"
-        >
-          <option value="">All Academic Departments</option>
-          <option value="Computer Science">Computer Science & Engineering</option>
-          <option value="Information Technology">Information Technology</option>
-          <option value="Electrical">Electrical & Electronics</option>
-          <option value="Mechanical">Mechanical Engineering</option>
-          <option value="Civil">Civil Engineering</option>
-        </select>
+          onChange={(val) => {
+            setDepartment(val);
+            setPage(1);
+          }}
+          options={DEPARTMENT_OPTIONS}
+          placeholder="All Academic Departments"
+          className="w-full sm:w-auto shrink-0"
+        />
       </div>
 
       {/* Students Table */}
@@ -211,51 +219,54 @@ export default function AdminStudentsPage() {
                           {isUnverified ? "Pending Verification" : isSuspended ? "Suspended" : "Active"}
                         </span>
                       </td>
-                      <td className="py-3.5 px-5 text-right space-x-1.5 whitespace-nowrap">
-                        {!isUnverified && (
+                      <td className="py-3.5 px-5 text-right whitespace-nowrap">
+                        <div className="flex items-center justify-end gap-1.5">
+                          {!isUnverified && (
+                            <Button
+                              variant="outline"
+                              color={isSuspended ? "emerald" : "amber"}
+                              size="sm"
+                              onClick={() =>
+                                statusMutation.mutate({
+                                  id: s.id,
+                                  newStatus: isSuspended ? "active" : "suspended",
+                                })
+                              }
+                              disabled={statusMutation.isPending}
+                              className="h-7 px-2.5 rounded-xl text-[11px] font-semibold cursor-pointer"
+                            >
+                              <span>{isSuspended ? "Reactivate" : "Suspend"}</span>
+                            </Button>
+                          )}
+
+                          {!isUnverified && (
+                            <Button
+                              variant="outline"
+                              color="neutral"
+                              size="sm"
+                              onClick={() => resetMutation.mutate(s.id)}
+                              disabled={resetMutation.isPending}
+                              className="h-7 px-2.5 rounded-xl text-[11px] font-semibold cursor-pointer"
+                              title="Reset Password"
+                            >
+                              <KeyRound className="size-3 mr-1" />
+                              <span>Reset</span>
+                            </Button>
+                          )}
+
                           <Button
                             variant="outline"
+                            color="rose"
                             size="sm"
-                            onClick={() =>
-                              statusMutation.mutate({
-                                id: s.id,
-                                newStatus: isSuspended ? "active" : "suspended",
-                              })
-                            }
-                            disabled={statusMutation.isPending}
-                            className={`rounded-xl text-[11px] font-semibold h-7 cursor-pointer ${
-                              isSuspended ? "text-emerald-600 border-emerald-500/30" : "text-amber-600 border-amber-500/30"
-                            }`}
+                            onClick={() => setDeleteConfirmUser(s)}
+                            disabled={deleteMutation.isPending}
+                            className="h-7 px-2.5 rounded-xl text-[11px] font-semibold cursor-pointer"
+                            title="Permanently Delete Student"
                           >
-                            {isSuspended ? "Reactivate" : "Suspend"}
+                            <Trash2 className="size-3 mr-1" />
+                            <span>Delete</span>
                           </Button>
-                        )}
-
-                        {!isUnverified && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => resetMutation.mutate(s.id)}
-                            disabled={resetMutation.isPending}
-                            className="rounded-xl text-[11px] font-semibold h-7 text-primary hover:bg-primary/10 cursor-pointer"
-                            title="Reset Password"
-                          >
-                            <KeyRound className="size-3 mr-1" />
-                            Reset
-                          </Button>
-                        )}
-
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setDeleteConfirmUser(s)}
-                          disabled={deleteMutation.isPending}
-                          className="rounded-xl text-[11px] font-semibold h-7 text-rose-600 hover:bg-rose-500/10 cursor-pointer"
-                          title="Permanently Delete Student"
-                        >
-                          <Trash2 className="size-3 mr-1" />
-                          Delete
-                        </Button>
+                        </div>
                       </td>
                     </tr>
                   );

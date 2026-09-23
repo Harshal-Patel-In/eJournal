@@ -24,6 +24,7 @@ import {
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
+import { formatRelativeTimeIST, formatDateTimeIST } from "@/lib/date";
 
 interface CategoryStack {
   id: string;
@@ -200,19 +201,7 @@ function getStudentName(notif: any): string {
 
 
 function formatRelativeTime(dateStr: string): string {
-  try {
-    const d = new Date(dateStr);
-    const now = new Date();
-    const diffSec = Math.floor((now.getTime() - d.getTime()) / 1000);
-
-    if (diffSec < 60) return "Just now";
-    if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
-    if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
-    if (diffSec < 604800) return `${Math.floor(diffSec / 86400)}d ago`;
-    return d.toLocaleDateString();
-  } catch {
-    return "";
-  }
+  return formatRelativeTimeIST(dateStr);
 }
 
 export default function NotificationBell() {
@@ -548,7 +537,10 @@ export default function NotificationBell() {
                 </span>
               )}
             </div>
-            <span className="text-[10px] text-zinc-400 dark:text-zinc-400 font-semibold shrink-0">
+            <span
+              className="text-[10px] text-zinc-400 dark:text-zinc-400 font-semibold shrink-0"
+              title={formatDateTimeIST(notif.createdAt)}
+            >
               {relTime}
             </span>
           </div>

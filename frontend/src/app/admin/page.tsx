@@ -19,6 +19,7 @@ import {
 import Link from "next/link";
 
 import { api } from "@/lib/api";
+import { formatTimeIST, formatDateTimeIST } from "@/lib/date";
 import { Button } from "@/components/ui/button";
 
 function getActionBadge(action: string) {
@@ -359,7 +360,7 @@ export default function AdminDashboardPage() {
               </div>
               <div>
                 <h3 className="text-sm font-bold text-foreground">Recent Security Audit Events</h3>
-                <p className="text-[11px] text-muted-foreground">Real-time platform audit stream (RULE-SEC10)</p>
+                <p className="text-[11px] text-muted-foreground">Real-time platform activity stream (last 5 days)</p>
               </div>
             </div>
             <Link href="/admin/audit-logs">
@@ -388,8 +389,11 @@ export default function AdminDashboardPage() {
                       </span>
                     )}
                   </div>
-                  <span className="text-[11px] text-muted-foreground shrink-0 font-medium">
-                    {new Date(event.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                  <span
+                    className="text-[11px] text-muted-foreground shrink-0 font-medium font-mono"
+                    title={formatDateTimeIST(event.timestamp)}
+                  >
+                    {formatTimeIST(event.timestamp, false)}
                   </span>
                 </div>
               ))

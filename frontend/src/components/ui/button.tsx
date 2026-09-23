@@ -10,16 +10,27 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          "glass-btn-blue hover:scale-[1.02] active:scale-[0.98] transition-all duration-200",
+          "hover:scale-[1.02] active:scale-[0.98] transition-all duration-200",
         outline:
-          "glass-btn-indigo hover:scale-[1.02] active:scale-[0.98] transition-all duration-200",
+          "border hover:scale-[1.02] active:scale-[0.98] transition-all duration-200",
         secondary:
-          "glass-btn-indigo hover:scale-[1.02] active:scale-[0.98] transition-all duration-200",
+          "hover:scale-[1.02] active:scale-[0.98] transition-all duration-200",
         ghost:
-          "bg-transparent shadow-none border-transparent hover:glass-btn-indigo hover:scale-[1.02] active:scale-[0.98] transition-all duration-200",
+          "bg-transparent shadow-none border-transparent hover:scale-[1.02] active:scale-[0.98] transition-all duration-200",
         destructive:
           "glass-btn-destructive hover:scale-[1.02] active:scale-[0.98] transition-all duration-200",
         link: "text-primary underline-offset-4 hover:underline !shadow-none !backdrop-filter-none",
+      },
+      color: {
+        default: "",
+        blue: "glass-btn-blue",
+        indigo: "glass-btn-indigo",
+        cyan: "glass-btn-cyan",
+        emerald: "glass-btn-emerald",
+        amber: "glass-btn-amber",
+        rose: "glass-btn-destructive",
+        violet: "glass-btn-violet",
+        neutral: "border-border/80 text-foreground/80 hover:text-foreground hover:bg-muted/50",
       },
       size: {
         default:
@@ -35,25 +46,97 @@ const buttonVariants = cva(
         "icon-lg": "size-9",
       },
     },
+    compoundVariants: [
+      // Backward compatibility defaults when no explicit color is set
+      {
+        variant: "default",
+        color: "default",
+        className: "glass-btn-blue",
+      },
+      {
+        variant: "outline",
+        color: "default",
+        className: "glass-btn-indigo",
+      },
+      {
+        variant: "secondary",
+        color: "default",
+        className: "glass-btn-indigo",
+      },
+      {
+        variant: "ghost",
+        color: "default",
+        className: "hover:glass-btn-indigo",
+      },
+      // Solid variant colored overrides
+      {
+        variant: "default",
+        color: "rose",
+        className: "glass-btn-destructive-solid",
+      },
+      {
+        variant: "default",
+        color: "emerald",
+        className: "glass-btn-emerald-solid",
+      },
+      {
+        variant: "default",
+        color: "indigo",
+        className: "glass-btn-indigo-solid",
+      },
+      {
+        variant: "default",
+        color: "blue",
+        className: "glass-btn-blue-solid",
+      },
+      // Ghost variant colored hover overrides
+      {
+        variant: "ghost",
+        color: "rose",
+        className: "text-rose-600 dark:text-rose-400 hover:glass-btn-destructive",
+      },
+      {
+        variant: "ghost",
+        color: "amber",
+        className: "text-amber-600 dark:text-amber-400 hover:glass-btn-amber",
+      },
+      {
+        variant: "ghost",
+        color: "emerald",
+        className: "text-emerald-600 dark:text-emerald-400 hover:glass-btn-emerald",
+      },
+      {
+        variant: "ghost",
+        color: "neutral",
+        className: "text-muted-foreground hover:text-foreground hover:bg-muted/40",
+      },
+      // Outline neutral variant
+      {
+        variant: "outline",
+        color: "neutral",
+        className: "border-border/80 text-foreground/80 hover:text-foreground hover:bg-muted/50 hover:border-border",
+      },
+    ],
     defaultVariants: {
       variant: "default",
+      color: "default",
       size: "default",
     },
   }
 )
 
 export interface ButtonProps
-  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
+  extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, "color">,
     VariantProps<typeof buttonVariants> {
   asChild?: boolean
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, asChild = false, ...props }, ref) => {
+  ({ className, variant, color, size, asChild = false, ...props }, ref) => {
     const Comp = asChild ? Slot : "button"
     return (
       <Comp
-        className={cn(buttonVariants({ variant, size, className }))}
+        className={cn(buttonVariants({ variant, color, size, className }))}
         ref={ref}
         {...props}
       />

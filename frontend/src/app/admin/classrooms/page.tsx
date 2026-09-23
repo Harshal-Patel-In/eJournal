@@ -19,6 +19,7 @@ import {
 import { api } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
+import { CustomSelect } from "@/components/ui/custom-select";
 
 export default function AdminClassroomsPage() {
   const queryClient = useQueryClient();
@@ -216,18 +217,19 @@ export default function AdminClassroomsPage() {
             <form onSubmit={handleReassignSubmit} className="space-y-4">
               <div className="space-y-1">
                 <label className="text-xs font-semibold text-foreground">Select New Faculty Member</label>
-                <select
+                <CustomSelect
                   value={selectedTeacherId}
-                  onChange={(e) => setSelectedTeacherId(e.target.value)}
-                  className="w-full rounded-xl border border-border bg-background px-3 py-2 text-xs text-foreground focus:border-primary focus:outline-none"
-                >
-                  <option value="">-- Choose Verified Professor --</option>
-                  {facultyData?.users?.map((f: any) => (
-                    <option key={f.id} value={f.id}>
-                      {f.profile?.name || f.email} ({f.profile?.department || "Faculty"})
-                    </option>
-                  ))}
-                </select>
+                  onChange={(val) => setSelectedTeacherId(val)}
+                  options={[
+                    { value: "", label: "-- Choose Verified Professor --" },
+                    ...(facultyData?.users?.map((f: any) => ({
+                      value: f.id,
+                      label: `${f.profile?.name || f.email} (${f.profile?.department || "Faculty"})`,
+                    })) || []),
+                  ]}
+                  placeholder="-- Choose Verified Professor --"
+                  className="w-full"
+                />
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-2 border-t border-border/60">

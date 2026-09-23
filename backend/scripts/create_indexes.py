@@ -154,8 +154,13 @@ def create_indexes():
         [("timestamp", DESCENDING)],
         name="idx_audit_timestamp",
     )
+    db.audit_logs.create_index(
+        [("timestamp", ASCENDING)],
+        expireAfterSeconds=5 * 86400,
+        name="idx_audit_ttl_5days",
+    )
     db.audit_logs.create_index("userId", name="idx_audit_userId")
-    print("  Index: audit_logs (3 indexes)")
+    print("  Index: audit_logs (4 indexes with 5-day TTL)")
 
     client.close()
     print("All indexes created successfully.")

@@ -8,6 +8,7 @@ import { Loader2, Plus, MessageSquare, History, CheckCircle2, Sparkles, AlertTri
 
 import { api } from "@/lib/api";
 import { toast } from "@/lib/toast";
+import { formatDateIST, formatTimeIST, formatDateTimeIST } from "@/lib/date";
 import { Button } from "@/components/ui/button";
 import { useDocumentStore, getLocalSnapshot, clearLocalSnapshot } from "./use-document-store";
 import EditorToolbar from "./editor-toolbar";
@@ -609,7 +610,7 @@ export default function EditorPage({ params }: PageProps) {
               <span>•</span>
               <span>Roll No: <strong>{user?.rollNumber || "—"}</strong></span>
               <span>•</span>
-              <span>Date: <strong>{new Date().toLocaleDateString()}</strong></span>
+              <span>Date: <strong>{formatDateIST(new Date())}</strong></span>
             </div>
           </div>
 
@@ -621,7 +622,7 @@ export default function EditorPage({ params }: PageProps) {
                 <span className="text-sm font-bold text-foreground">💾 Unsaved Offline Draft Recovered</span>
                 {localRecoverySnapshot.savedAt && (
                   <span className="text-xs text-muted-foreground hidden sm:inline">
-                    (Saved locally at {new Date(localRecoverySnapshot.savedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })})
+                    (Saved locally at {formatTimeIST(localRecoverySnapshot.savedAt, false)})
                   </span>
                 )}
               </div>
@@ -673,7 +674,7 @@ export default function EditorPage({ params }: PageProps) {
                     </div>
                     {journal?.approvedAt && (
                       <span className="text-[11px] text-muted-foreground/80 font-medium">
-                        Evaluated on {new Date(journal.approvedAt).toLocaleDateString()} at {new Date(journal.approvedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                        Evaluated on {formatDateTimeIST(journal.approvedAt, false)}
                       </span>
                     )}
                   </div>

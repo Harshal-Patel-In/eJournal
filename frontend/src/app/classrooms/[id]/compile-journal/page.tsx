@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { ArrowLeft, Printer, BookOpen, FileText, GraduationCap, ShieldCheck, CheckCircle2, Loader2 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { formatDateIST } from "@/lib/date";
 import { Button } from "@/components/ui/button";
 import BlockRenderer from "@/app/editor/[journalId]/block-renderer";
 
@@ -381,7 +382,7 @@ export default function CompileJournalPage({ params }: PageProps) {
                   </strong>
 
                   <span className="font-bold text-zinc-600">Date of Compilation:</span>
-                  <span className="text-zinc-950 font-medium">{new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</span>
+                  <span className="text-zinc-950 font-medium font-mono">{formatDateIST(new Date())}</span>
                 </div>
               </div>
 
@@ -475,11 +476,11 @@ export default function CompileJournalPage({ params }: PageProps) {
                           : "Draft";
 
                       const perfDate = item.assignment.createdAt
-                        ? new Date(item.assignment.createdAt).toLocaleDateString()
+                        ? formatDateIST(item.assignment.createdAt)
                         : "—";
 
                       const subDate = item.journal?.submittedAt
-                        ? new Date(item.journal.submittedAt).toLocaleDateString()
+                        ? formatDateIST(item.journal.submittedAt)
                         : "—";
 
                       return (
@@ -592,10 +593,8 @@ export default function CompileJournalPage({ params }: PageProps) {
                     </div>
                     <div>
                       <span className="text-[10px] font-bold uppercase text-zinc-500 block">Submission Date</span>
-                      <span className="text-zinc-950 font-medium">
-                        {item.journal?.submittedAt
-                          ? new Date(item.journal.submittedAt).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })
-                          : new Date().toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}
+                      <span className="text-zinc-950 font-medium font-mono">
+                        {formatDateIST(item.journal?.submittedAt || new Date())}
                       </span>
                     </div>
                   </div>

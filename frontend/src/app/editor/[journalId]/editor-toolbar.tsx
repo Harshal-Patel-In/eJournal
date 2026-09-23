@@ -6,6 +6,7 @@ import { useDocumentStore } from "./use-document-store";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useState } from "react";
+import { formatTimeIST } from "@/lib/date";
 
 interface EditorToolbarProps {
   onSave: () => void;
@@ -110,7 +111,7 @@ export default function EditorToolbar({
                   <div className="size-2 rounded-full bg-emerald-500" />
                   <span
                     className="text-[11px] font-medium"
-                    title={lastSavedAt ? `Saved at ${new Date(lastSavedAt).toLocaleTimeString()}` : "Synced to cloud"}
+                    title={lastSavedAt ? `Saved at ${formatTimeIST(lastSavedAt)}` : "Synced to cloud"}
                   >
                     Saved
                   </span>

@@ -45,6 +45,7 @@ import * as zod from "zod";
 
 import { api } from "@/lib/api";
 import { toast } from "@/lib/toast";
+import { formatDateIST, formatDateTimeIST } from "@/lib/date";
 import { Button } from "@/components/ui/button";
 import { GlassDropdown } from "@/components/ui/glass-dropdown";
 import NotificationBell from "@/components/notification-bell";
@@ -389,7 +390,7 @@ export default function ClassroomPage({ params }: PageProps) {
                 </span>
               )}
               <span className="flex items-center gap-1">
-                <Calendar className="size-3 text-muted-foreground/70" /> Deadline: {new Date(asg.deadline).toLocaleDateString()}
+                <Calendar className="size-3 text-muted-foreground/70" /> Deadline: {formatDateIST(asg.deadline)}
               </span>
             </div>
           </div>
@@ -806,7 +807,7 @@ export default function ClassroomPage({ params }: PageProps) {
                         <div className="flex flex-col">
                           <span className="text-sm font-bold text-foreground">{ann.authorName}</span>
                           <span className="text-[11px] text-muted-foreground">
-                            {new Date(ann.createdAt).toLocaleDateString()} at {new Date(ann.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            {formatDateTimeIST(ann.createdAt, false)}
                           </span>
                         </div>
                       </div>
@@ -1054,7 +1055,7 @@ export default function ClassroomPage({ params }: PageProps) {
                         )}
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        {sub.assignmentTitle} • {sub.submittedAt ? `Handed in ${new Date(sub.submittedAt).toLocaleDateString()}` : "In Progress"}
+                        {sub.assignmentTitle} • {sub.submittedAt ? `Handed in ${formatDateIST(sub.submittedAt)}` : "In Progress"}
                       </p>
                     </div>
 
@@ -1125,7 +1126,7 @@ export default function ClassroomPage({ params }: PageProps) {
                         {member.name || member.email}
                       </h4>
                       <p className="text-xs text-muted-foreground">
-                        Enrollment: {member.enrollmentNumber} • Joined {new Date(member.joinedAt).toLocaleDateString()}
+                        Enrollment: {member.enrollmentNumber} • Joined {formatDateIST(member.joinedAt)}
                       </p>
                     </div>
                   </div>

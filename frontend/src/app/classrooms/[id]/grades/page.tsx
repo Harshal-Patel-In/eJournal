@@ -41,6 +41,7 @@ import {
 } from "lucide-react";
 
 import { api } from "@/lib/api";
+import { formatDateIST } from "@/lib/date";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { GlassDropdown, DropdownOption } from "@/components/ui/glass-dropdown";
@@ -431,7 +432,7 @@ export default function ClassroomGradesPage({ params }: PageProps) {
             className={`inline-flex items-center gap-1 rounded-full font-extrabold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 hover:scale-105 transition-transform cursor-pointer ${
               isCompactDensity ? "px-2 py-0.5 text-[10px]" : "px-2.5 py-1 text-[11px]"
             }`}
-            title={`Approved: ${marks}/${asg.maxMarks}${g.approvedAt ? ` on ${new Date(g.approvedAt).toLocaleDateString()}` : ""}`}
+            title={`Approved: ${marks}/${asg.maxMarks}${g.approvedAt ? ` on ${formatDateIST(g.approvedAt)}` : ""}`}
           >
             <Check className="size-3" />
             <span>{marks}/{asg.maxMarks}</span>
@@ -1299,7 +1300,7 @@ export default function ClassroomGradesPage({ params }: PageProps) {
                         </span>
                         <div className="flex items-center justify-between text-[10px] text-muted-foreground">
                           <span>
-                            {sub.submittedAt ? `Submitted: ${new Date(sub.submittedAt).toLocaleDateString()}` : "Status: Draft in progress"}
+                            {sub.submittedAt ? `Submitted: ${formatDateIST(sub.submittedAt)}` : "Status: Draft in progress"}
                           </span>
                           <span>Max Marks: {sub.maxMarks || 10}</span>
                         </div>

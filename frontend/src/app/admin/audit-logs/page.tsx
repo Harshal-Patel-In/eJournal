@@ -15,7 +15,9 @@ import {
 } from "lucide-react";
 
 import { api } from "@/lib/api";
+import { formatDateTimeIST } from "@/lib/date";
 import { Button } from "@/components/ui/button";
+import { CustomSelect } from "@/components/ui/custom-select";
 
 const ACTION_OPTIONS = [
   { value: "all", label: "All Audit Actions" },
@@ -130,9 +132,9 @@ export default function AdminAuditLogsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-border/60">
         <div>
-          <h1 className="text-2xl font-black tracking-tight text-foreground">Security Audit Trail (RULE-SEC10)</h1>
+          <h1 className="text-2xl font-black tracking-tight text-foreground">Security Audit Trail</h1>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Immutable system compliance log with client IP tracking and automatic FIFO cap
+            Track institutional activity, authentication events, and administrative actions over the past 5 days
           </p>
         </div>
 
@@ -155,29 +157,25 @@ export default function AdminAuditLogsPage() {
             <ShieldCheck className="size-5" />
           </div>
           <div>
-            <h4 className="text-xs font-bold text-foreground">FIFO Capped Compliance Storage</h4>
+            <h4 className="text-xs font-bold text-foreground">5-Day Security Retention Policy</h4>
             <p className="text-[11px] text-muted-foreground leading-relaxed">
-              Logs record actor identification, target resource, and client IP addresses. Retains the latest 10,000 events automatically.
+              Logs record actor identification, target resource, and client IP addresses. Automatically retains events from the last 5 days.
             </p>
           </div>
         </div>
 
         {/* Action Filter */}
         <div className="w-full sm:w-auto">
-          <select
+          <CustomSelect
             value={actionFilter}
-            onChange={(e) => {
-              setActionFilter(e.target.value);
+            onChange={(val) => {
+              setActionFilter(val);
               setPage(1);
             }}
-            className="w-full sm:w-64 rounded-2xl bg-muted/40 border border-border px-3 py-2 text-xs text-foreground focus:border-primary focus:outline-none"
-          >
-            {ACTION_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
+            options={ACTION_OPTIONS}
+            placeholder="All Audit Actions"
+            className="w-full sm:w-64"
+          />
         </div>
       </div>
 
@@ -232,8 +230,8 @@ export default function AdminAuditLogsPage() {
                         {log.ipAddress}
                       </span>
                     </td>
-                    <td className="py-3 px-5 text-right font-mono text-[11px] text-muted-foreground">
-                      {log.timestamp ? new Date(log.timestamp).toLocaleString() : "—"}
+                    <td className="py-3 px-5 text-right font-mono text-[11px] text-muted-foreground whitespace-nowrap">
+                      {formatDateTimeIST(log.timestamp)}
                     </td>
                   </tr>
                 ))

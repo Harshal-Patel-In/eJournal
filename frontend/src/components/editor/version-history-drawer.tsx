@@ -38,6 +38,7 @@ import {
   Filter,
 } from "lucide-react";
 import { api } from "@/lib/api";
+import { formatDateTimeIST } from "@/lib/date";
 import { Button } from "@/components/ui/button";
 import BlockRenderer from "@/app/editor/[journalId]/block-renderer";
 
@@ -410,9 +411,7 @@ export function VersionHistoryDrawer({
                   {isViewingDraft
                     ? "Live / Current"
                     : selectedMeta?.createdAt
-                    ? `${new Date(selectedMeta.createdAt).toLocaleDateString()} at ${new Date(
-                        selectedMeta.createdAt
-                      ).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
+                    ? formatDateTimeIST(selectedMeta.createdAt, false)
                     : "—"}
                 </span>
               </div>
@@ -697,11 +696,7 @@ export function VersionHistoryDrawer({
                       <div className="flex items-center justify-between text-[11px] text-muted-foreground mb-1.5 font-mono">
                         <span className="flex items-center gap-1">
                           <Clock className="size-3" />
-                          {new Date(ver.createdAt).toLocaleDateString()}{" "}
-                          {new Date(ver.createdAt).toLocaleTimeString([], {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
+                          {formatDateTimeIST(ver.createdAt, false)}
                         </span>
                         <span className="capitalize text-[10px] font-semibold text-foreground/80">
                           {ver.trigger || ver.status}

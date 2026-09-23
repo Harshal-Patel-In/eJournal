@@ -22,7 +22,26 @@ import {
 
 import { api } from "@/lib/api";
 import { toast } from "@/lib/toast";
+import { formatDateIST } from "@/lib/date";
 import { Button } from "@/components/ui/button";
+import { CustomSelect } from "@/components/ui/custom-select";
+
+const DEPARTMENT_OPTIONS = [
+  { value: "", label: "All Academic Departments" },
+  { value: "Computer Science", label: "Computer Science & Engineering" },
+  { value: "Information Technology", label: "Information Technology" },
+  { value: "Electrical", label: "Electrical & Electronics" },
+  { value: "Mechanical", label: "Mechanical Engineering" },
+  { value: "Civil", label: "Civil Engineering" },
+];
+
+const DESIGNATION_OPTIONS = [
+  { value: "Assistant Professor", label: "Assistant Professor" },
+  { value: "Associate Professor", label: "Associate Professor" },
+  { value: "Professor", label: "Professor" },
+  { value: "Head of Department", label: "Head of Department" },
+  { value: "Lab Instructor", label: "Lab Instructor" },
+];
 
 export default function AdminFacultyPage() {
   const queryClient = useQueryClient();
@@ -212,18 +231,16 @@ export default function AdminFacultyPage() {
           />
         </div>
 
-        <select
+        <CustomSelect
           value={department}
-          onChange={(e) => setDepartment(e.target.value)}
-          className="rounded-2xl bg-card border border-border px-3 py-2 text-xs text-foreground focus:border-primary focus:outline-none"
-        >
-          <option value="">All Academic Departments</option>
-          <option value="Computer Science">Computer Science & Engineering</option>
-          <option value="Information Technology">Information Technology</option>
-          <option value="Electrical">Electrical & Electronics</option>
-          <option value="Mechanical">Mechanical Engineering</option>
-          <option value="Civil">Civil Engineering</option>
-        </select>
+          onChange={(val) => {
+            setDepartment(val);
+            setPage(1);
+          }}
+          options={DEPARTMENT_OPTIONS}
+          placeholder="All Academic Departments"
+          className="w-full sm:w-auto shrink-0"
+        />
       </div>
 
       {/* Faculty Directory Table */}
@@ -304,20 +321,21 @@ export default function AdminFacultyPage() {
                           )}
                         </div>
                       </td>
-                      <td className="py-3.5 px-4 text-muted-foreground text-[11px]">
-                        {f.createdAt ? new Date(f.createdAt).toLocaleDateString() : "—"}
+                      <td className="py-3.5 px-4 text-muted-foreground text-[11px] whitespace-nowrap">
+                        {formatDateIST(f.createdAt)}
                       </td>
-                      <td className="py-3.5 px-5 text-right space-x-1.5 whitespace-nowrap">
+                      <td className="py-3.5 px-5 text-right whitespace-nowrap">
                         {isSelf ? (
                           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[10px] font-semibold text-muted-foreground/80 bg-muted/30 border border-border/40 select-none">
                             Active Session
                           </span>
                         ) : (
-                          <>
+                          <div className="flex items-center justify-end gap-1.5">
                             {/* Grant / Revoke Admin Authority (Super Admin ONLY) */}
                             {isSuperAdmin && (
                               <Button
                                 variant="outline"
+                                color={isTargetAdmin ? "amber" : "neutral"}
                                 size="sm"
                                 onClick={() =>
                                   adminRoleMutation.mutate({
@@ -326,15 +344,11 @@ export default function AdminFacultyPage() {
                                   })
                                 }
                                 disabled={adminRoleMutation.isPending}
-                                className={`rounded-xl text-[11px] font-semibold h-7 cursor-pointer ${
-                                  isTargetAdmin
-                                    ? "border-amber-500/30 text-amber-600 bg-amber-500/5 hover:bg-amber-500/15"
-                                    : "text-muted-foreground hover:text-amber-600 hover:border-amber-500/30"
-                                }`}
+                                className="h-7 px-2.5 rounded-xl text-[11px] font-semibold cursor-pointer"
                                 title={isTargetAdmin ? "Revoke Administrative Authority" : "Grant Administrative Authority"}
                               >
                                 <Crown className={`size-3 mr-1 ${isTargetAdmin ? "text-amber-500 fill-amber-500/20" : ""}`} />
-                                {isTargetAdmin ? "Revoke Admin" : "Make Admin"}
+                                <span>{isTargetAdmin ? "Revoke Admin" : "Make Admin"}</span>
                               </Button>
                             )}
 
@@ -348,6 +362,7 @@ export default function AdminFacultyPage() {
                               <>
                                 <Button
                                   variant="outline"
+                                  color={isSuspended ? "emerald" : "amber"}
                                   size="sm"
                                   onClick={() =>
                                     statusMutation.mutate({
@@ -356,39 +371,39 @@ export default function AdminFacultyPage() {
                                     })
                                   }
                                   disabled={statusMutation.isPending}
-                                  className={`rounded-xl text-[11px] font-semibold h-7 cursor-pointer ${
-                                    isSuspended ? "text-emerald-600 border-emerald-500/30" : "text-amber-600 border-amber-500/30"
-                                  }`}
+                                  className="h-7 px-2.5 rounded-xl text-[11px] font-semibold cursor-pointer"
                                 >
-                                  {isSuspended ? "Reactivate" : "Suspend"}
+                                  <span>{isSuspended ? "Reactivate" : "Suspend"}</span>
                                 </Button>
 
                                 <Button
-                                  variant="ghost"
+                                  variant="outline"
+                                  color="neutral"
                                   size="sm"
                                   onClick={() => resetMutation.mutate(f.id)}
                                   disabled={resetMutation.isPending}
-                                  className="rounded-xl text-[11px] font-semibold h-7 text-primary hover:bg-primary/10 cursor-pointer"
+                                  className="h-7 px-2.5 rounded-xl text-[11px] font-semibold cursor-pointer"
                                   title="Reset Password"
                                 >
                                   <KeyRound className="size-3 mr-1" />
-                                  Reset
+                                  <span>Reset</span>
                                 </Button>
 
                                 <Button
-                                  variant="ghost"
+                                  variant="outline"
+                                  color="rose"
                                   size="sm"
                                   onClick={() => setDeleteConfirmUser(f)}
                                   disabled={deleteMutation.isPending}
-                                  className="rounded-xl text-[11px] font-semibold h-7 text-rose-600 hover:bg-rose-500/10 hover:text-rose-700 cursor-pointer"
+                                  className="h-7 px-2.5 rounded-xl text-[11px] font-semibold cursor-pointer"
                                   title="Delete Faculty Account"
                                 >
                                   <Trash2 className="size-3 mr-1" />
-                                  Delete
+                                  <span>Delete</span>
                                 </Button>
                               </>
                             )}
-                          </>
+                          </div>
                         )}
                       </td>
                     </tr>
@@ -495,17 +510,13 @@ export default function AdminFacultyPage() {
 
                   <div className="space-y-1">
                     <label className="text-xs font-semibold text-foreground">Designation</label>
-                    <select
+                    <CustomSelect
                       value={designation}
-                      onChange={(e) => setDesignation(e.target.value)}
-                      className="w-full rounded-xl border border-border bg-background px-3 py-2 text-xs text-foreground focus:border-primary focus:outline-none"
-                    >
-                      <option value="Assistant Professor">Assistant Professor</option>
-                      <option value="Associate Professor">Associate Professor</option>
-                      <option value="Professor">Professor</option>
-                      <option value="Head of Department">Head of Department</option>
-                      <option value="Lab Instructor">Lab Instructor</option>
-                    </select>
+                      onChange={(val) => setDesignation(val)}
+                      options={DESIGNATION_OPTIONS}
+                      placeholder="Select Designation..."
+                      className="w-full"
+                    />
                   </div>
                 </div>
 
