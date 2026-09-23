@@ -47,7 +47,7 @@ const buttonVariants = cva(
       },
     },
     compoundVariants: [
-      // Backward compatibility defaults when no explicit color is set
+       // Backward compatibility defaults when no explicit color is set
       {
         variant: "default",
         color: "default",

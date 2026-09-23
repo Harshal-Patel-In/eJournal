@@ -270,7 +270,58 @@ export default function NotificationBell() {
           try {
             const data = JSON.parse(event.data);
             if (data.type === "NEW_NOTIFICATION") {
+              const notif = data.notification || {};
+              const notifType = (notif.type || "").toLowerCase();
+              const metadata = notif.metadata || {};
+              const classroomId = metadata.classroomId;
+
+              // 1. Always invalidate the notifications list & badge counter
               queryClient.invalidateQueries({ queryKey: ["notifications"] });
+
+              // 2. Real-Time Domain Invalidation for Active Pages:
+              if (notifType === "assignment") {
+                if (classroomId) {
+                  queryClient.invalidateQueries({ queryKey: ["assignments", classroomId] });
+                  queryClient.invalidateQueries({ queryKey: ["classroom", classroomId] });
+                  queryClient.invalidateQueries({ queryKey: ["gradebook", classroomId] });
+                }
+                queryClient.invalidateQueries({ queryKey: ["assignments"] });
+              } else if (notifType === "announcement") {
+                if (classroomId) {
+                  queryClient.invalidateQueries({ queryKey: ["announcements", classroomId] });
+                  queryClient.invalidateQueries({ queryKey: ["classroom", classroomId] });
+                }
+                queryClient.invalidateQueries({ queryKey: ["announcements"] });
+              } else if (
+                notifType === "submission" ||
+                notifType === "changes_requested" ||
+                notifType === "approval" ||
+                notifType === "approved" ||
+                notifType === "graded"
+              ) {
+                if (classroomId) {
+                  queryClient.invalidateQueries({ queryKey: ["submissions", classroomId] });
+                  queryClient.invalidateQueries({ queryKey: ["my-submissions", classroomId] });
+                  queryClient.invalidateQueries({ queryKey: ["gradebook", classroomId] });
+                  queryClient.invalidateQueries({ queryKey: ["classroom", classroomId] });
+                }
+                queryClient.invalidateQueries({ queryKey: ["journals"] });
+                queryClient.invalidateQueries({ queryKey: ["student-journals"] });
+                const targetJournalId = metadata.entityId || metadata.journalId;
+                if (targetJournalId) {
+                  queryClient.invalidateQueries({ queryKey: ["journal", targetJournalId] });
+                }
+              } else if (notifType === "comment" || notifType === "annotation") {
+                const targetJournalId = metadata.entityId || metadata.journalId;
+                if (targetJournalId) {
+                  queryClient.invalidateQueries({ queryKey: ["annotations", targetJournalId] });
+                }
+              } else {
+                if (classroomId) {
+                  queryClient.invalidateQueries({ queryKey: ["classroom", classroomId] });
+                }
+              }
+
               setBellPulsing(true);
               setTimeout(() => setBellPulsing(false), 2500);
 
