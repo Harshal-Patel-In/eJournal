@@ -154,6 +154,15 @@ def create_indexes():
         [("timestamp", DESCENDING)],
         name="idx_audit_timestamp",
     )
+    # Drop any conflicting legacy TTL indexes on timestamp (e.g. ttl_audit_logs_3d)
+    try:
+        existing_indexes = db.audit_logs.index_information()
+        for idx_name, idx_info in existing_indexes.items():
+            if idx_name != "idx_audit_ttl_5days" and idx_info.get("key") == [("timestamp", 1)]:
+                db.audit_logs.drop_index(idx_name)
+    except Exception:
+        pass
+
     db.audit_logs.create_index(
         [("timestamp", ASCENDING)],
         expireAfterSeconds=5 * 86400,

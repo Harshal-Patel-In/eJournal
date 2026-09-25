@@ -175,26 +175,46 @@ class AdminService:
         role: str | None = None,
         search: str | None = None,
         department: str | None = None,
+        status_filter: str | None = None,
         skip: int = 0,
         limit: int = 20,
     ) -> dict:
         """Paginated search across the university user directory."""
-        query: dict[str, Any] = {}
+        conditions: list[dict[str, Any]] = []
 
         if role and role in ["student", "teacher", "admin"]:
-            query["role"] = role
+            conditions.append({"role": role})
 
         if department:
-            query["profile.department"] = {"$regex": department, "$options": "i"}
+            conditions.append({"profile.department": {"$regex": department, "$options": "i"}})
+
+        if status_filter:
+            if status_filter == "pending_setup":
+                conditions.append({
+                    "$or": [
+                        {"is_profile_complete": False},
+                        {"profile.enrollmentNumber": {"$exists": False}},
+                        {"profile.enrollmentNumber": ""},
+                        {"profile.enrollmentNumber": None},
+                    ]
+                })
+            elif status_filter == "unverified":
+                conditions.append({"is_verified": False})
+            elif status_filter in ["active", "suspended"]:
+                conditions.append({"status": status_filter})
 
         if search:
             escaped_search = search.strip()
-            query["$or"] = [
-                {"email": {"$regex": escaped_search, "$options": "i"}},
-                {"profile.name": {"$regex": escaped_search, "$options": "i"}},
-                {"profile.enrollmentNumber": {"$regex": escaped_search, "$options": "i"}},
-                {"profile.facultyId": {"$regex": escaped_search, "$options": "i"}},
-            ]
+            conditions.append({
+                "$or": [
+                    {"email": {"$regex": escaped_search, "$options": "i"}},
+                    {"profile.name": {"$regex": escaped_search, "$options": "i"}},
+                    {"profile.enrollmentNumber": {"$regex": escaped_search, "$options": "i"}},
+                    {"profile.facultyId": {"$regex": escaped_search, "$options": "i"}},
+                ]
+            })
+
+        query = {"$and": conditions} if conditions else {}
 
         total = await self.user_repo.count(query)
         users = await self.user_repo.find_many(

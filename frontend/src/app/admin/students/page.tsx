@@ -12,26 +12,34 @@ import {
   RefreshCw,
   Trash2,
   AlertTriangle,
+  AlertCircle,
+  Clock,
 } from "lucide-react";
 
 import { api } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
 import { CustomSelect } from "@/components/ui/custom-select";
+import { CHARUSAT_DEPARTMENTS } from "@/lib/academic-constants";
 
 const DEPARTMENT_OPTIONS = [
   { value: "", label: "All Academic Departments" },
-  { value: "Computer Science", label: "Computer Science & Engineering" },
-  { value: "Information Technology", label: "Information Technology" },
-  { value: "Electrical", label: "Electrical & Electronics" },
-  { value: "Mechanical", label: "Mechanical Engineering" },
-  { value: "Civil", label: "Civil Engineering" },
+  ...CHARUSAT_DEPARTMENTS,
+];
+
+const STATUS_OPTIONS = [
+  { value: "", label: "All Account Statuses" },
+  { value: "active", label: "Active" },
+  { value: "pending_setup", label: "Setup Pending (Incomplete Profile)" },
+  { value: "unverified", label: "Unverified (Pending OTP)" },
+  { value: "suspended", label: "Suspended" },
 ];
 
 export default function AdminStudentsPage() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [department, setDepartment] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
   const [page, setPage] = useState(1);
   const [showResetModal, setShowResetModal] = useState<any>(null);
   const [deleteConfirmUser, setDeleteConfirmUser] = useState<any>(null);
@@ -39,7 +47,7 @@ export default function AdminStudentsPage() {
 
   // Fetch students
   const { data, isLoading, refetch, isRefetching } = useQuery<any>({
-    queryKey: ["admin-students", search, department, page],
+    queryKey: ["admin-students", search, department, statusFilter, page],
     queryFn: () => {
       const params = new URLSearchParams({
         role: "student",
@@ -48,6 +56,7 @@ export default function AdminStudentsPage() {
       });
       if (search) params.set("search", search);
       if (department) params.set("department", department);
+      if (statusFilter) params.set("status", statusFilter);
       return api.get(`/admin/users?${params.toString()}`);
     },
   });
@@ -123,29 +132,45 @@ export default function AdminStudentsPage() {
         </Button>
       </div>
 
-      {/* Search & Department Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
+      {/* Search, Department & Status Filters */}
+      <div className="flex flex-col lg:flex-row gap-3">
         <div className="relative flex-1">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
           <input
             type="text"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
             placeholder="Search by student name, email, or enrollment / roll number..."
             className="w-full pl-10 pr-4 py-2 rounded-2xl bg-card border border-border text-xs text-foreground placeholder:text-muted-foreground/60 focus:border-primary focus:outline-none"
           />
         </div>
 
-        <CustomSelect
-          value={department}
-          onChange={(val) => {
-            setDepartment(val);
-            setPage(1);
-          }}
-          options={DEPARTMENT_OPTIONS}
-          placeholder="All Academic Departments"
-          className="w-full sm:w-auto shrink-0"
-        />
+        <div className="flex flex-col sm:flex-row gap-3">
+          <CustomSelect
+            value={department}
+            onChange={(val) => {
+              setDepartment(val);
+              setPage(1);
+            }}
+            options={DEPARTMENT_OPTIONS}
+            placeholder="All Academic Departments"
+            className="w-full sm:w-60 shrink-0"
+          />
+
+          <CustomSelect
+            value={statusFilter}
+            onChange={(val) => {
+              setStatusFilter(val);
+              setPage(1);
+            }}
+            options={STATUS_OPTIONS}
+            placeholder="All Account Statuses"
+            className="w-full sm:w-56 shrink-0"
+          />
+        </div>
       </div>
 
       {/* Students Table */}
@@ -180,8 +205,14 @@ export default function AdminStudentsPage() {
                   const isSuspended = s.status === "suspended";
                   const isUnverified = s.is_verified === false;
                   const profile = s.profile || {};
+                  const isPendingSetup = !isUnverified && (!profile.enrollmentNumber || s.is_profile_complete === false);
                   return (
-                    <tr key={s.id} className="hover:bg-muted/20 transition-colors">
+                    <tr
+                      key={s.id}
+                      className={`hover:bg-muted/20 transition-colors ${
+                        isPendingSetup ? "bg-amber-500/[0.03] dark:bg-amber-500/[0.04]" : ""
+                      }`}
+                    >
                       <td className="py-3.5 px-5">
                         <div className="flex flex-col">
                           <span className="font-bold text-foreground text-xs">{profile.name || "Enrolled Student"}</span>
@@ -191,10 +222,25 @@ export default function AdminStudentsPage() {
                               Unverified registration (No OTP submitted)
                             </span>
                           )}
+                          {isPendingSetup && (
+                            <span className="inline-flex items-center gap-1 text-[10px] text-amber-600 dark:text-amber-400 font-semibold mt-0.5">
+                              <AlertCircle className="size-3 shrink-0" />
+                              Academic onboarding incomplete
+                            </span>
+                          )}
                         </div>
                       </td>
                       <td className="py-3.5 px-4 font-mono text-xs font-semibold text-foreground">
-                        {profile.enrollmentNumber || profile.rollNumber || (isUnverified ? "—" : "Pending Setup")}
+                        {isUnverified ? (
+                          <span className="text-muted-foreground font-normal">—</span>
+                        ) : isPendingSetup ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/25">
+                            <AlertCircle className="size-3 shrink-0" />
+                            Pending Setup
+                          </span>
+                        ) : (
+                          profile.enrollmentNumber || profile.rollNumber || "—"
+                        )}
                       </td>
                       <td className="py-3.5 px-4">
                         <div className="flex flex-col">
@@ -207,17 +253,25 @@ export default function AdminStudentsPage() {
                         </div>
                       </td>
                       <td className="py-3.5 px-4">
-                        <span
-                          className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase border ${
-                            isUnverified
-                              ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/25"
-                              : isSuspended
-                              ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20"
-                              : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
-                          }`}
-                        >
-                          {isUnverified ? "Pending Verification" : isSuspended ? "Suspended" : "Active"}
-                        </span>
+                        {isUnverified ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase border bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/25">
+                            <Clock className="size-3" />
+                            Pending Verification
+                          </span>
+                        ) : isSuspended ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase border bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20">
+                            Suspended
+                          </span>
+                        ) : isPendingSetup ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase border bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30">
+                            <Clock className="size-3" />
+                            Setup Pending
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase border bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20">
+                            Active
+                          </span>
+                        )}
                       </td>
                       <td className="py-3.5 px-5 text-right whitespace-nowrap">
                         <div className="flex items-center justify-end gap-1.5">
@@ -275,6 +329,40 @@ export default function AdminStudentsPage() {
             </tbody>
           </table>
         </div>
+
+        {/* Table Pagination Footer */}
+        {data && data.total > 0 && (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-5 py-3.5 border-t border-border/80 bg-muted/20 text-xs">
+            <span className="text-muted-foreground">
+              Showing page <strong className="text-foreground">{data.page || page}</strong> of{" "}
+              <strong className="text-foreground">{data.totalPages || 1}</strong>{" "}
+              <span className="text-muted-foreground/80">({data.total} registered {data.total === 1 ? "student" : "students"})</span>
+            </span>
+
+            {data.totalPages > 1 && (
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page <= 1 || isLoading}
+                  className="h-7 px-3 rounded-xl text-xs font-semibold cursor-pointer"
+                >
+                  Previous
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage((p) => Math.min(data.totalPages, p + 1))}
+                  disabled={page >= data.totalPages || isLoading}
+                  className="h-7 px-3 rounded-xl text-xs font-semibold cursor-pointer"
+                >
+                  Next
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Temporary Password Modal */}

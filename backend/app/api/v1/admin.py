@@ -37,6 +37,7 @@ async def list_users(
     role: str | None = Query(None, description="Filter by role (student | teacher | admin)"),
     search: str | None = Query(None, description="Multi-field keyword search"),
     department: str | None = Query(None, description="Filter by department"),
+    status: str | None = Query(None, description="Filter by status (active | suspended | pending_setup | unverified)"),
     page: int = Query(1, ge=1, description="Page number"),
     limit: int = Query(20, ge=1, le=100, description="Items per page"),
     admin_user: dict = Depends(RoleChecker(["admin"])),
@@ -45,7 +46,7 @@ async def list_users(
     """Search and browse users across the campus directory."""
     skip = (page - 1) * limit
     data = await admin_service.list_users(
-        role=role, search=search, department=department, skip=skip, limit=limit
+        role=role, search=search, department=department, status_filter=status, skip=skip, limit=limit
     )
     return success_response(data)
 

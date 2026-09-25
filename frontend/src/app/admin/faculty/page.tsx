@@ -25,14 +25,11 @@ import { toast } from "@/lib/toast";
 import { formatDateIST } from "@/lib/date";
 import { Button } from "@/components/ui/button";
 import { CustomSelect } from "@/components/ui/custom-select";
+import { CHARUSAT_DEPARTMENTS } from "@/lib/academic-constants";
 
 const DEPARTMENT_OPTIONS = [
   { value: "", label: "All Academic Departments" },
-  { value: "Computer Science", label: "Computer Science & Engineering" },
-  { value: "Information Technology", label: "Information Technology" },
-  { value: "Electrical", label: "Electrical & Electronics" },
-  { value: "Mechanical", label: "Mechanical Engineering" },
-  { value: "Civil", label: "Civil Engineering" },
+  ...CHARUSAT_DEPARTMENTS,
 ];
 
 const DESIGNATION_OPTIONS = [
@@ -497,14 +494,13 @@ export default function AdminFacultyPage() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                   <div className="space-y-1">
-                    <label className="text-xs font-semibold text-foreground">Department</label>
-                    <input
-                      type="text"
-                      required
+                    <label className="text-xs font-semibold text-foreground">Department *</label>
+                    <CustomSelect
                       value={deptInput}
-                      onChange={(e) => setDeptInput(e.target.value)}
-                      placeholder="Computer Science & Engineering"
-                      className="w-full rounded-xl border border-border bg-background px-3 py-2 text-xs text-foreground focus:border-primary focus:outline-none"
+                      onChange={(val) => setDeptInput(val)}
+                      options={CHARUSAT_DEPARTMENTS}
+                      placeholder="Select Academic Department..."
+                      className="w-full"
                     />
                   </div>
 

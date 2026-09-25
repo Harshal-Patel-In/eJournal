@@ -17,6 +17,24 @@ from app.utils.security import create_jwt_token
 router = APIRouter(prefix="/profile")
 
 
+@router.get("/check-enrollment", response_model=ApiResponse[dict])
+async def check_enrollment_availability(
+    enrollmentNumber: str,
+    user: dict = Depends(get_active_user),
+    auth_service: AuthService = Depends(),
+):
+    """Check whether an enrollment number is available or claimed by another student."""
+    is_available = await auth_service.check_enrollment_available(user["id"], enrollmentNumber)
+    clean_enr = enrollmentNumber.strip().upper()
+    return success_response(
+        {
+            "enrollmentNumber": clean_enr,
+            "isAvailable": is_available,
+            "message": "Available" if is_available else "This enrollment number is already registered by another student.",
+        }
+    )
+
+
 @router.get("", response_model=ApiResponse[UserMeResponse])
 async def get_profile(user: dict = Depends(get_active_user)):
     """Fetch current user's profile and account registration details."""

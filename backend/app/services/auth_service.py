@@ -4,10 +4,14 @@ RULE-BE04: All business logic MUST live inside service classes.
 RULE-SEC10: Audit logs created for sensitive events (login, register).
 """
 
+import re
 import secrets
 from datetime import datetime, timedelta, timezone
 
+from bson import ObjectId
 from fastapi import status
+
+from app.core.database import get_database
 
 from app.core.constants import ErrorCode
 from app.middleware.error_handler import AppException
@@ -328,11 +332,64 @@ class AuthService:
 
         return {"access_token": fresh_token, "message": "Password changed successfully."}
 
+    async def check_enrollment_available(self, current_user_id: str, enrollment_number: str) -> bool:
+        """Check if an enrollment number is available or claimed by another student."""
+        clean_num = enrollment_number.strip().upper()
+        if not clean_num:
+            return True
+        db = get_database()
+        query: dict = {
+            "profile.enrollmentNumber": clean_num,
+        }
+        if ObjectId.is_valid(current_user_id):
+            query["_id"] = {"$ne": ObjectId(current_user_id)}
+        existing = db.users.find_one(query)
+        return existing is None
+
     async def update_profile(self, user: dict, update: ProfileUpdateRequest) -> dict:
         """Update user profile academic details and enforce profile locking rules."""
         profile_dict = update.model_dump(exclude_unset=True)
         if not profile_dict:
             return user
+
+        # Student specific formatting and validations
+        if user["role"] == "student":
+            if "enrollmentNumber" in profile_dict and profile_dict["enrollmentNumber"]:
+                clean_enr = str(profile_dict["enrollmentNumber"]).strip().upper()
+                if not re.match(r"^[A-Z0-9]+$", clean_enr):
+                    raise AppException(
+                        code=ErrorCode.VALIDATION_ERROR,
+                        message="Enrollment number must be alphanumeric (letters and numbers only)",
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                    )
+                # Check uniqueness across students
+                if not await self.check_enrollment_available(user["id"], clean_enr):
+                    raise AppException(
+                        code=ErrorCode.VALIDATION_ERROR,
+                        message="This enrollment number is already registered by another student",
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                    )
+                profile_dict["enrollmentNumber"] = clean_enr
+
+            if "division" in profile_dict and profile_dict["division"]:
+                clean_div = str(profile_dict["division"]).strip()
+                if not re.match(r"^\d+$", clean_div):
+                    raise AppException(
+                        code=ErrorCode.VALIDATION_ERROR,
+                        message="Division must contain only numeric digits (e.g. 1, 2, 3)",
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                    )
+                profile_dict["division"] = clean_div
+
+            if "batch" in profile_dict and profile_dict["batch"]:
+                clean_batch = str(profile_dict["batch"]).strip().upper()
+                if not re.match(r"^[A-Z0-9]+$", clean_batch):
+                    raise AppException(
+                        code=ErrorCode.VALIDATION_ERROR,
+                        message="Batch must be uppercase alphanumeric (e.g. A1, B2)",
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                    )
+                profile_dict["batch"] = clean_batch
 
         # Construct merged profile dictionary to validate completeness
         current_profile = user.get("profile", {})
