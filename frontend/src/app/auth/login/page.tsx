@@ -7,13 +7,14 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as zod from "zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { ShieldAlert, X, GraduationCap, Building2, KeyRound } from "lucide-react";
 
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -29,6 +30,19 @@ export default function LoginPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [showForgotPasswordModal, setShowForgotPasswordModal] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setShowForgotPasswordModal(false);
+      }
+    };
+    if (showForgotPasswordModal) {
+      window.addEventListener("keydown", handleKeyDown);
+    }
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [showForgotPasswordModal]);
 
   const {
     register,
@@ -128,11 +142,7 @@ export default function LoginPage() {
               </label>
               <button
                 type="button"
-                onClick={() =>
-                  alert(
-                    "For security reasons on the PDPIS institutional platform, please contact your department coordinator to request a password reset."
-                  )
-                }
+                onClick={() => setShowForgotPasswordModal(true)}
                 className="text-xs font-semibold text-primary hover:underline bg-transparent border-0 p-0 cursor-pointer"
               >
                 Forgot Password?
@@ -162,6 +172,100 @@ export default function LoginPage() {
           </Link>
         </div>
       </div>
+
+      {/* Custom Institutional Password Reset Security Modal */}
+      {showForgotPasswordModal && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="forgot-password-title"
+          className="fixed inset-0 z-50 bg-black/60 dark:bg-black/80 backdrop-blur-xl flex items-center justify-center p-4 animate-in fade-in duration-200"
+          onClick={() => setShowForgotPasswordModal(false)}
+        >
+          <div
+            className="relative w-full max-w-lg rounded-3xl bg-gradient-to-b from-white/95 via-white/90 to-white/85 dark:from-zinc-900/95 dark:via-zinc-900/90 dark:to-zinc-950/90 backdrop-blur-2xl backdrop-saturate-180 border border-white/80 dark:border-white/15 ring-1 ring-black/5 dark:ring-white/10 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.2),_inset_0_1px_1px_0_rgba(255,255,255,0.95)] dark:shadow-[0_25px_60px_-15px_rgba(0,0,0,0.8),_inset_0_1px_1px_0_rgba(255,255,255,0.18)] p-6 sm:p-7 space-y-6 animate-in zoom-in-95 duration-200 ease-out"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Close Button */}
+            <button
+              type="button"
+              onClick={() => setShowForgotPasswordModal(false)}
+              className="absolute top-5 right-5 p-2 rounded-2xl text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/10 active:scale-95 transition-all duration-150 cursor-pointer"
+              aria-label="Close dialog"
+            >
+              <X className="size-4" />
+            </button>
+
+            {/* Header: Shield + Titles */}
+            <div className="flex items-start gap-4 pr-8">
+              <div className="size-12 rounded-2xl bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/25 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 shadow-[0_2px_12px_rgba(245,158,11,0.15)]">
+                <ShieldAlert className="size-6" />
+              </div>
+              <div className="space-y-1">
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wide uppercase bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20">
+                  CHARUSAT Security Protocol
+                </div>
+                <h3 id="forgot-password-title" className="text-lg font-bold text-foreground tracking-tight">
+                  Institutional Password Recovery
+                </h3>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Automated self-service resets are restricted to protect university academic records and evaluations.
+                </p>
+              </div>
+            </div>
+
+            {/* Recovery Pathway Rows */}
+            <div className="space-y-2.5">
+              <div className="flex items-start gap-3 p-3.5 rounded-2xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/5 dark:border-white/10 hover:border-black/10 dark:hover:border-white/15 transition-colors">
+                <div className="size-8 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 mt-0.5">
+                  <GraduationCap className="size-4" />
+                </div>
+                <div className="text-xs space-y-0.5">
+                  <span className="font-bold text-foreground block">Enrolled Students</span>
+                  <p className="text-muted-foreground leading-relaxed text-[11px]">
+                    Contact your <strong className="text-foreground font-semibold">Class Counselor</strong> or <strong className="text-foreground font-semibold">Department Coordinator</strong> at your constituent institute (CSPIT, DEPSTAR, PDPIAS, RPCP, CMPICA, ARIP, MTIN, CIPS, I2IM) with your University Enrollment Number.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3 p-3.5 rounded-2xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/5 dark:border-white/10 hover:border-black/10 dark:hover:border-white/15 transition-colors">
+                <div className="size-8 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0 mt-0.5">
+                  <Building2 className="size-4" />
+                </div>
+                <div className="text-xs space-y-0.5">
+                  <span className="font-bold text-foreground block">Faculty & Instructors</span>
+                  <p className="text-muted-foreground leading-relaxed text-[11px]">
+                    Reach out to your <strong className="text-foreground font-semibold">Head of Department (HOD)</strong> or the <strong className="text-foreground font-semibold">Campus System Administrator</strong> for identity re-authorization.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3 p-3.5 rounded-2xl bg-emerald-500/[0.04] dark:bg-emerald-500/[0.06] border border-emerald-500/20">
+                <div className="size-8 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 mt-0.5">
+                  <KeyRound className="size-4" />
+                </div>
+                <div className="text-xs space-y-0.5">
+                  <span className="font-bold text-foreground block">Instant Verification & Issuance</span>
+                  <p className="text-muted-foreground leading-relaxed text-[11px]">
+                    Upon administrative verification, a secure temporary login credential will be dispatched directly to your registered institutional email.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Action Button */}
+            <div className="pt-1">
+              <button
+                type="button"
+                onClick={() => setShowForgotPasswordModal(false)}
+                className="w-full h-11 rounded-2xl bg-gradient-to-b from-blue-500/15 via-blue-500/10 to-blue-600/15 hover:from-blue-500/25 hover:via-blue-500/20 hover:to-blue-600/25 dark:from-blue-500/25 dark:via-blue-500/20 dark:to-blue-600/30 dark:hover:from-blue-500/35 dark:hover:to-blue-600/40 text-blue-600 dark:text-blue-400 border border-blue-500/30 dark:border-blue-400/35 font-bold text-xs tracking-tight backdrop-blur-md shadow-[inset_0_1px_1px_rgba(255,255,255,0.7),_0_2px_10px_rgba(37,99,235,0.12)] dark:shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),_0_4px_16px_rgba(37,99,235,0.25)] hover:scale-[1.01] active:scale-[0.98] transition-all duration-150 cursor-pointer flex items-center justify-center gap-2"
+              >
+                <span>Understood</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

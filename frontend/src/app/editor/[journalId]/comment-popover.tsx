@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { MessageSquare, Check, Sparkles, Send, X, Loader2 } from "lucide-react";
 import { api } from "@/lib/api";
+import { toast } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
 
 interface CommentPopoverProps {
@@ -35,7 +36,7 @@ export default function CommentPopover({
       setSuggestedText("");
     },
     onError: (err: any) => {
-      alert(err.message || "Failed to post comment");
+      toast.error(err.message || "Failed to post comment");
     },
   });
 
@@ -45,10 +46,10 @@ export default function CommentPopover({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["journal", journalId] });
       queryClient.invalidateQueries({ queryKey: ["comments", journalId] });
-      alert("✨ Teacher suggestion applied to document block!");
+      toast.success("Teacher suggestion applied to document block!", { title: "Suggestion Applied" });
     },
     onError: (err: any) => {
-      alert(err.message || "Failed to apply suggestion");
+      toast.error(err.message || "Failed to apply suggestion");
     },
   });
 
