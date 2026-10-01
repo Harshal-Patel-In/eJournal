@@ -36,21 +36,21 @@ class AssetRepository(BaseRepository):
             "createdAt": now,
             "updatedAt": now,
         }
-        result = self.collection.insert_one(doc)
+        result = await self.collection.insert_one(doc)
         doc["_id"] = result.inserted_id
         return self._to_str_id(doc)
 
     async def find_by_url(self, user_id: str, url: str) -> dict | None:
         """Find an asset by its URL for a specific user."""
-        doc = self.collection.find_one({"userId": user_id, "url": url})
+        doc = await self.collection.find_one({"userId": user_id, "url": url})
         return self._to_str_id(doc)
 
     async def move_to_trash(self, user_id: str, url: str) -> dict | None:
         """Move an asset to the recycle bin by setting isDeleted=True and deletedAt=now."""
         now = datetime.now(timezone.utc)
-        doc = self.collection.find_one({"userId": user_id, "url": url})
+        doc = await self.collection.find_one({"userId": user_id, "url": url})
         if doc:
-            self.collection.update_one(
+            await self.collection.update_one(
                 {"_id": doc["_id"]},
                 {"$set": {"isDeleted": True, "deletedAt": now, "updatedAt": now}},
             )
@@ -71,7 +71,7 @@ class AssetRepository(BaseRepository):
                 "createdAt": now,
                 "updatedAt": now,
             }
-            res = self.collection.insert_one(new_doc)
+            res = await self.collection.insert_one(new_doc)
             new_doc["_id"] = res.inserted_id
             return self._to_str_id(new_doc)
 
@@ -80,10 +80,10 @@ class AssetRepository(BaseRepository):
         if not ObjectId.is_valid(asset_id):
             return None
         now = datetime.now(timezone.utc)
-        doc = self.collection.find_one({"_id": ObjectId(asset_id), "userId": user_id})
+        doc = await self.collection.find_one({"_id": ObjectId(asset_id), "userId": user_id})
         if not doc:
             return None
-        self.collection.update_one(
+        await self.collection.update_one(
             {"_id": doc["_id"]},
             {"$set": {"isDeleted": False, "deletedAt": None, "updatedAt": now}},
         )
@@ -100,9 +100,10 @@ class AssetRepository(BaseRepository):
             "deletedAt": {"$gte": cutoff},
         }).sort([("deletedAt", -1)])
 
+        raw_docs = await cursor.to_list(length=200)
         docs = []
         now = datetime.now(timezone.utc)
-        for d in cursor:
+        for d in raw_docs:
             item = self._to_str_id(d)
             if item and item.get("deletedAt"):
                 deleted_at = item["deletedAt"]
@@ -123,14 +124,15 @@ class AssetRepository(BaseRepository):
             "isDeleted": True,
             "deletedAt": {"$lt": cutoff},
         })
-        return [self._to_str_id(d) for d in cursor]
+        raw_docs = await cursor.to_list(length=1000)
+        return [self._to_str_id(d) for d in raw_docs]
 
     async def delete_permanently(self, user_id: str, asset_id: str) -> dict | None:
         """Delete an asset permanently from the database and return its metadata for cloud cleanup."""
         if not ObjectId.is_valid(asset_id):
             return None
-        doc = self.collection.find_one({"_id": ObjectId(asset_id), "userId": user_id})
+        doc = await self.collection.find_one({"_id": ObjectId(asset_id), "userId": user_id})
         if not doc:
             return None
-        self.collection.delete_one({"_id": doc["_id"]})
+        await self.collection.delete_one({"_id": doc["_id"]})
         return self._to_str_id(doc)

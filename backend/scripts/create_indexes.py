@@ -4,13 +4,22 @@ RULE-DB03: Every collection MUST have appropriate indexes.
 Run: uv run python -m scripts.create_indexes
 """
 
+try:
+    import dns.resolver
+
+    dns.resolver.default_resolver = dns.resolver.Resolver(configure=False)
+    dns.resolver.default_resolver.nameservers = ["8.8.8.8", "1.1.1.1"]
+except Exception:
+    pass
+
+import certifi
 from pymongo import MongoClient, ASCENDING, DESCENDING
 from app.core.config import settings
 
 
 def create_indexes():
     """Create all required MongoDB indexes as defined in architecture."""
-    client = MongoClient(settings.MONGODB_URI)
+    client = MongoClient(settings.MONGODB_URI, tlsCAFile=certifi.where())
     db = client[settings.MONGODB_DATABASE]
 
     print(f"Creating indexes on database: {settings.MONGODB_DATABASE}")
@@ -51,22 +60,56 @@ def create_indexes():
         unique=True,
         name="idx_memberships_classroom_student_unique",
     )
-    print("  Index: classroom_memberships.classroomId+studentId (compound unique)")
+    # Student reverse lookup for student dashboard (RULE-DB03: Avoid full-collection scan)
+    db.classroom_memberships.create_index(
+        [("studentId", ASCENDING), ("status", ASCENDING)],
+        name="idx_memberships_student_status",
+    )
+    print("  Index: classroom_memberships (compound unique + student reverse lookup)")
 
-    # assignments: classroomId
+    # assignments: classroomId & dueDate
     db.assignments.create_index(
         "classroomId", name="idx_assignments_classroomId"
     )
-    print("  Index: assignments.classroomId")
-
-    # journals: compound assignmentId + studentId, studentId, status
-    db.journals.create_index(
-        [("assignmentId", ASCENDING), ("studentId", ASCENDING)],
-        name="idx_journals_assignment_student",
+    db.assignments.create_index(
+        [("classroomId", ASCENDING), ("dueDate", ASCENDING)],
+        name="idx_assignments_classroom_due",
     )
+    print("  Index: assignments.classroomId & dueDate")
+
+    # journals: Unique studentId + assignmentId (guarantees exactly 1 draft per student per assignment)
+    try:
+        db.journals.create_index(
+            [("studentId", ASCENDING), ("assignmentId", ASCENDING)],
+            unique=True,
+            name="idx_journals_student_assignment_unique",
+        )
+    except Exception as e:
+        print(f"  Warning creating unique student-assignment index: {e}")
+
     db.journals.create_index("studentId", name="idx_journals_studentId")
     db.journals.create_index("status", name="idx_journals_status")
-    print("  Index: journals.assignmentId+studentId, studentId, status")
+
+    # Compound indexes for status filtering + sorted by date (Teacher Gradebook & Student Views)
+    db.journals.create_index(
+        [("assignmentId", ASCENDING), ("status", ASCENDING), ("updatedAt", DESCENDING)],
+        name="idx_journals_assignment_status_updated",
+    )
+    db.journals.create_index(
+        [("studentId", ASCENDING), ("status", ASCENDING), ("updatedAt", DESCENDING)],
+        name="idx_journals_student_status_updated",
+    )
+
+    # Optimistic concurrency and block sub-document matching
+    db.journals.create_index(
+        [("_id", ASCENDING), ("currentVersion", ASCENDING)],
+        name="idx_journals_id_currentVersion",
+    )
+    db.journals.create_index(
+        [("_id", ASCENDING), ("blocks.id", ASCENDING)],
+        name="idx_journals_id_blockId",
+    )
+    print("  Index: journals (student unique, status filtering, concurrency & block matching)")
 
     # journal_versions: unique journalId + revisionNumber, journalId + createdAt
     db.journal_versions.create_index(
@@ -100,7 +143,15 @@ def create_indexes():
     )
     print("  Index: journal_block_versions (2 indexes)")
 
-    # comments: journalId + blockId, journalId + status, authorId
+    # comments: journalId + blockId, chronological thread retrieval, status, authorId
+    db.comments.create_index(
+        [("journalId", ASCENDING), ("blockId", ASCENDING), ("createdAt", ASCENDING)],
+        name="idx_comments_journal_block_created",
+    )
+    db.comments.create_index(
+        [("journalId", ASCENDING), ("createdAt", ASCENDING)],
+        name="idx_comments_journal_created",
+    )
     db.comments.create_index(
         [("journalId", ASCENDING), ("blockId", ASCENDING)],
         name="idx_comments_journal_block",
@@ -110,7 +161,7 @@ def create_indexes():
         name="idx_comments_journal_status",
     )
     db.comments.create_index("authorId", name="idx_comments_authorId")
-    print("  Index: comments (3 indexes)")
+    print("  Index: comments (5 indexes)")
 
     # approvals: journalId, teacherId
     db.approvals.create_index("journalId", name="idx_approvals_journalId")

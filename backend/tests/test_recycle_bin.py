@@ -20,7 +20,7 @@ async def test_asset_repository_trash_lifecycle(mock_get_collection):
 
     # Mock create_asset
     test_id = ObjectId()
-    mock_coll.insert_one.return_value = MagicMock(inserted_id=test_id)
+    mock_coll.insert_one = AsyncMock(return_value=MagicMock(inserted_id=test_id))
     created = await repo.create_asset(
         user_id="user_123",
         url="https://example.com/sample.png",
@@ -34,13 +34,16 @@ async def test_asset_repository_trash_lifecycle(mock_get_collection):
     assert created["deletedAt"] is None
 
     # Mock move_to_trash
-    mock_coll.find_one.return_value = {
-        "_id": test_id,
-        "userId": "user_123",
-        "url": "https://example.com/sample.png",
-        "isDeleted": False,
-        "deletedAt": None,
-    }
+    mock_coll.find_one = AsyncMock(
+        return_value={
+            "_id": test_id,
+            "userId": "user_123",
+            "url": "https://example.com/sample.png",
+            "isDeleted": False,
+            "deletedAt": None,
+        }
+    )
+    mock_coll.update_one = AsyncMock(return_value=MagicMock(modified_count=1))
 
     trashed = await repo.move_to_trash("user_123", "https://example.com/sample.png")
     assert trashed is not None
@@ -48,12 +51,14 @@ async def test_asset_repository_trash_lifecycle(mock_get_collection):
     assert trashed["deletedAt"] is not None
 
     # Mock restore_from_trash
-    mock_coll.find_one.return_value = {
-        "_id": test_id,
-        "userId": "user_123",
-        "isDeleted": True,
-        "deletedAt": datetime.now(timezone.utc),
-    }
+    mock_coll.find_one = AsyncMock(
+        return_value={
+            "_id": test_id,
+            "userId": "user_123",
+            "isDeleted": True,
+            "deletedAt": datetime.now(timezone.utc),
+        }
+    )
     restored = await repo.restore_from_trash("user_123", str(test_id))
     assert restored is not None
     assert restored["isDeleted"] is False

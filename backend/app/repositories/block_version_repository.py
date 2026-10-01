@@ -46,7 +46,7 @@ class BlockVersionRepository(BaseRepository):
                 UpdateOne(filter_query, {"$set": doc}, upsert=True)
             )
 
-        result = self.collection.bulk_write(operations, ordered=False)
+        result = await self.collection.bulk_write(operations, ordered=False)
         return result.upserted_count + result.inserted_count
 
     async def get_blocks_for_revision(
@@ -91,7 +91,7 @@ class BlockVersionRepository(BaseRepository):
         ]
 
         cursor = self.collection.aggregate(pipeline)
-        docs = list(cursor)
+        docs = await cursor.to_list(length=None)
         return [self._to_str_id(d) for d in docs]
 
     async def explain_reconstruction_query(
@@ -128,7 +128,7 @@ class BlockVersionRepository(BaseRepository):
             },
         ]
 
-        # PyMongo command for explain
+        # PyMongo/Motor command for explain
         db = self.collection.database
         explain_cmd = {
             "explain": {
@@ -138,18 +138,19 @@ class BlockVersionRepository(BaseRepository):
             },
             "verbosity": "executionStats",
         }
-        return db.command(explain_cmd)
+        return await db.command(explain_cmd)
 
     async def find_deltas_for_revision(
         self, journal_id: str, revision_number: int
     ) -> list[dict]:
         """Fetch all block deltas created at a specific revision number."""
-        docs = self.collection.find(
+        cursor = self.collection.find(
             {"journalId": journal_id, "revisionNumber": revision_number}
         )
+        docs = await cursor.to_list(length=None)
         return [self._to_str_id(d) for d in docs]
 
     async def delete_by_journal_id(self, journal_id: str) -> int:
         """Remove all block versions for a journal (used in cleanup/testing)."""
-        result = self.collection.delete_many({"journalId": journal_id})
+        result = await self.collection.delete_many({"journalId": journal_id})
         return result.deleted_count

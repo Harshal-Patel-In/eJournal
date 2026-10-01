@@ -17,7 +17,7 @@ class JournalRepository(BaseRepository):
         self, student_id: str, assignment_id: str
     ) -> dict | None:
         """Find a journal submitted by a specific student for an assignment."""
-        doc = self.collection.find_one(
+        doc = await self.collection.find_one(
             {"studentId": student_id, "assignmentId": assignment_id}
         )
         return self._to_str_id(doc)
@@ -59,7 +59,101 @@ class JournalRepository(BaseRepository):
             },
             "$inc": {"currentVersion": 1},
         }
-        result = self.collection.find_one_and_update(
+        result = await self.collection.find_one_and_update(
+            query, update, return_document=True
+        )
+        return self._to_str_id(result)
+
+    async def update_blocks_delta_with_revision(
+        self,
+        journal_id: str,
+        dirty_blocks: list[dict],
+        expected_revision: int,
+        title: str | None = None,
+    ) -> dict | None:
+        """Atomically update only specified dirty blocks with optimistic revision checking using array_filters."""
+        now = datetime.now(timezone.utc)
+        iso_now = now.isoformat().replace("+00:00", "Z")
+        query = {
+            "_id": self._to_object_id(journal_id),
+            "$or": [
+                {"currentVersion": expected_revision},
+                {"currentVersion": {"$exists": False}},
+            ],
+        }
+        set_fields = {"updatedAt": now}
+        if title is not None:
+            set_fields["title"] = title
+
+        array_filters = []
+        for i, item in enumerate(dirty_blocks):
+            elem_key = f"elem{i}"
+            set_fields[f"blocks.$[{elem_key}].content"] = item["content"]
+            set_fields[f"blocks.$[{elem_key}].metadata.updatedAt"] = iso_now
+            array_filters.append({f"{elem_key}.id": item["id"]})
+
+        update = {
+            "$set": set_fields,
+            "$inc": {"currentVersion": 1},
+        }
+
+        if array_filters:
+            result = await self.collection.find_one_and_update(
+                query, update, array_filters=array_filters, return_document=True
+            )
+        else:
+            result = await self.collection.find_one_and_update(
+                query, update, return_document=True
+            )
+        return self._to_str_id(result)
+
+    async def insert_block_with_revision(
+        self, journal_id: str, index: int, block_dict: dict, expected_revision: int
+    ) -> dict | None:
+        """Atomically insert a new block at a specific array index with optimistic revision checking."""
+        now = datetime.now(timezone.utc)
+        query = {
+            "_id": self._to_object_id(journal_id),
+            "$or": [
+                {"currentVersion": expected_revision},
+                {"currentVersion": {"$exists": False}},
+            ],
+        }
+        update = {
+            "$push": {
+                "blocks": {
+                    "$each": [block_dict],
+                    "$position": max(0, index),
+                }
+            },
+            "$set": {"updatedAt": now},
+            "$inc": {"currentVersion": 1},
+        }
+        result = await self.collection.find_one_and_update(
+            query, update, return_document=True
+        )
+        return self._to_str_id(result)
+
+    async def delete_block_with_revision(
+        self, journal_id: str, block_id: str, expected_revision: int
+    ) -> dict | None:
+        """Atomically remove a block by ID with optimistic revision checking."""
+        now = datetime.now(timezone.utc)
+        query = {
+            "_id": self._to_object_id(journal_id),
+            "$or": [
+                {"currentVersion": expected_revision},
+                {"currentVersion": {"$exists": False}},
+            ],
+        }
+        update = {
+            "$pull": {
+                "blocks": {"id": block_id}
+            },
+            "$set": {"updatedAt": now},
+            "$inc": {"currentVersion": 1},
+        }
+        result = await self.collection.find_one_and_update(
             query, update, return_document=True
         )
         return self._to_str_id(result)
@@ -91,7 +185,7 @@ class JournalRepository(BaseRepository):
             "$set": set_fields,
             "$inc": {"currentVersion": 1},
         }
-        result = self.collection.find_one_and_update(
+        result = await self.collection.find_one_and_update(
             query, update, return_document=True
         )
         return self._to_str_id(result)

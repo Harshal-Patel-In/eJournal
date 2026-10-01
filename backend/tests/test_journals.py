@@ -586,5 +586,164 @@ async def test_restore_version_deduplication_indicator(mock_version, mock_journa
     assert "Document is already in the exact state" in result.get("message", "")
 
 
+@pytest.mark.anyio
+@patch("app.services.journal_service.JournalRepository")
+@patch("app.services.journal_service.AuditLogRepository")
+async def test_update_blocks_delta_success(mock_audit, mock_journal):
+    """Test updating targeted blocks via Pure Delta Operations Protocol."""
+    journal_repo = MagicMock()
+    journal_repo.find_by_id = AsyncMock(
+        return_value={
+            "id": "jour_dop_1",
+            "studentId": "student_123",
+            "status": "draft",
+            "currentVersion": 5,
+        }
+    )
+    journal_repo.update_blocks_delta_with_revision = AsyncMock(
+        return_value={
+            "id": "jour_dop_1",
+            "currentVersion": 6,
+            "blocks": [
+                {"id": "b1", "type": "paragraph", "content": {"text": "Updated b1"}},
+                {"id": "b2", "type": "paragraph", "content": {"text": "Updated b2"}},
+            ],
+        }
+    )
+    mock_journal.return_value = journal_repo
+
+    audit_repo = MagicMock()
+    audit_repo.log_event = AsyncMock()
+    mock_audit.return_value = audit_repo
+
+    from app.schemas.journal import DeltaBlockUpdateRequest, DeltaBlockItem
+
+    service = JournalService()
+    payload = DeltaBlockUpdateRequest(
+        clientRevision=5,
+        blocks=[
+            DeltaBlockItem(id="b1", content={"text": "Updated b1"}),
+            DeltaBlockItem(id="b2", content={"text": "Updated b2"}),
+        ],
+    )
+
+    result = await service.update_blocks_delta("jour_dop_1", "student_123", payload)
+    assert result["serverRevision"] == 6
+    assert journal_repo.update_blocks_delta_with_revision.called
+    assert audit_repo.log_event.called
+
+
+@pytest.mark.anyio
+@patch("app.services.journal_service.JournalRepository")
+async def test_update_blocks_delta_conflict(mock_journal):
+    """Test delta update fails with revision conflict if client revision is behind."""
+    journal_repo = MagicMock()
+    journal_repo.find_by_id = AsyncMock(
+        return_value={
+            "id": "jour_dop_2",
+            "studentId": "student_123",
+            "status": "draft",
+            "currentVersion": 10,
+        }
+    )
+    mock_journal.return_value = journal_repo
+
+    from app.schemas.journal import DeltaBlockUpdateRequest, DeltaBlockItem
+
+    service = JournalService()
+    payload = DeltaBlockUpdateRequest(
+        clientRevision=8,
+        blocks=[DeltaBlockItem(id="b1", content={"text": "Stale edit"})],
+    )
+
+    with pytest.raises(AppException) as exc_info:
+        await service.update_blocks_delta("jour_dop_2", "student_123", payload)
+    assert exc_info.value.code == ErrorCode.REVISION_CONFLICT
+
+
+@pytest.mark.anyio
+@patch("app.services.journal_service.JournalRepository")
+@patch("app.services.journal_service.AuditLogRepository")
+async def test_insert_block_success(mock_audit, mock_journal):
+    """Test inserting a new block at specific index via DOP."""
+    journal_repo = MagicMock()
+    journal_repo.find_by_id = AsyncMock(
+        return_value={
+            "id": "jour_dop_3",
+            "studentId": "student_123",
+            "status": "draft",
+            "currentVersion": 2,
+        }
+    )
+    journal_repo.insert_block_with_revision = AsyncMock(
+        return_value={
+            "id": "jour_dop_3",
+            "currentVersion": 3,
+            "blocks": [{"id": "new_b", "type": "paragraph"}],
+        }
+    )
+    mock_journal.return_value = journal_repo
+
+    audit_repo = MagicMock()
+    audit_repo.log_event = AsyncMock()
+    mock_audit.return_value = audit_repo
+
+    from app.schemas.journal import BlockInsertRequest, JournalBlock
+
+    service = JournalService()
+    payload = BlockInsertRequest(
+        clientRevision=2,
+        index=1,
+        block=JournalBlock(id="new_b", type="paragraph", content={"text": "New block"}),
+    )
+
+    result = await service.insert_block("jour_dop_3", "student_123", payload)
+    assert result["serverRevision"] == 3
+    assert journal_repo.insert_block_with_revision.called
+
+
+@pytest.mark.anyio
+@patch("app.services.journal_service.CommentRepository")
+@patch("app.services.journal_service.JournalRepository")
+@patch("app.services.journal_service.AuditLogRepository")
+async def test_delete_block_success(mock_audit, mock_journal, mock_comment):
+    """Test deleting a block via DOP."""
+    journal_repo = MagicMock()
+    journal_repo.find_by_id = AsyncMock(
+        return_value={
+            "id": "jour_dop_4",
+            "studentId": "student_123",
+            "status": "draft",
+            "currentVersion": 4,
+        }
+    )
+    journal_repo.delete_block_with_revision = AsyncMock(
+        return_value={
+            "id": "jour_dop_4",
+            "currentVersion": 5,
+            "blocks": [],
+        }
+    )
+    mock_journal.return_value = journal_repo
+
+    comment_repo = MagicMock()
+    comment_repo.resolve_suggestions_for_deleted_blocks = AsyncMock()
+    mock_comment.return_value = comment_repo
+
+    audit_repo = MagicMock()
+    audit_repo.log_event = AsyncMock()
+    mock_audit.return_value = audit_repo
+
+    service = JournalService()
+    result = await service.delete_block(
+        journal_id="jour_dop_4",
+        student_id="student_123",
+        block_id="del_b1",
+        client_revision=4,
+    )
+    assert result["serverRevision"] == 5
+    assert journal_repo.delete_block_with_revision.called
+
+
 
 

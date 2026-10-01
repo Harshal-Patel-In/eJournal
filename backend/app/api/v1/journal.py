@@ -16,6 +16,9 @@ from app.schemas.journal import (
     BlockOrderUpdateRequest,
     BlockUpdateResponse,
     CheckpointCreateRequest,
+    DeltaBlockUpdateRequest,
+    BlockInsertRequest,
+    BlockDeleteRequest,
 )
 from app.schemas.response import ApiResponse, success_response
 from app.services.journal_service import JournalService
@@ -89,6 +92,55 @@ async def save_journal(
         journalId, user["id"], payload, ip_address=ip_address
     )
     return success_response(journal)
+
+
+@router.patch("/{journalId}/blocks/delta", response_model=ApiResponse[BlockUpdateResponse])
+async def update_blocks_delta(
+    journalId: str,
+    payload: DeltaBlockUpdateRequest,
+    request: Request,
+    user: dict = Depends(RoleChecker(["student"])),
+    journal_service: JournalService = Depends(),
+):
+    """Incremental delta update for multiple modified blocks (Student only)."""
+    ip_address = request.client.host if request.client else None
+    result = await journal_service.update_blocks_delta(
+        journalId, user["id"], payload, ip_address=ip_address
+    )
+    return success_response(result)
+
+
+@router.post("/{journalId}/blocks", response_model=ApiResponse[BlockUpdateResponse])
+async def insert_block(
+    journalId: str,
+    payload: BlockInsertRequest,
+    request: Request,
+    user: dict = Depends(RoleChecker(["student"])),
+    journal_service: JournalService = Depends(),
+):
+    """Atomically insert a new block at a specific position (Student only)."""
+    ip_address = request.client.host if request.client else None
+    result = await journal_service.insert_block(
+        journalId, user["id"], payload, ip_address=ip_address
+    )
+    return success_response(result)
+
+
+@router.delete("/{journalId}/blocks/{blockId}", response_model=ApiResponse[BlockUpdateResponse])
+async def delete_block(
+    journalId: str,
+    blockId: str,
+    clientRevision: int,
+    request: Request,
+    user: dict = Depends(RoleChecker(["student"])),
+    journal_service: JournalService = Depends(),
+):
+    """Atomically delete a block by ID with revision checking (Student only)."""
+    ip_address = request.client.host if request.client else None
+    result = await journal_service.delete_block(
+        journalId, user["id"], blockId, clientRevision, ip_address=ip_address
+    )
+    return success_response(result)
 
 
 @router.patch("/{journalId}/blocks/{blockId}", response_model=ApiResponse[BlockUpdateResponse])

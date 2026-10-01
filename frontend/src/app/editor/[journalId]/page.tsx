@@ -76,6 +76,9 @@ export default function EditorPage({ params }: PageProps) {
     syncStatus,
     clientRevision,
     previewMode,
+    dirtyBlockIds,
+    isOrderDirty,
+    isTitleDirty,
     init,
     moveBlock,
     addBlock,
@@ -170,14 +173,66 @@ export default function EditorPage({ params }: PageProps) {
     }
   }, [user, previewMode, togglePreview]);
 
-  // Save Mutation
+  // Smart Delta Auto-Save Mutation
   const saveMutation = useMutation({
-    mutationFn: (data: { title: string; blocks: any[]; clientRevision: number }) =>
-      api.patch(`/journals/${journalId}/blocks`, data),
+    mutationFn: async (data: {
+      title?: string;
+      blocks?: any[];
+      clientRevision: number;
+      dirtyBlockIds?: string[];
+      isOrderDirty?: boolean;
+      isTitleDirty?: boolean;
+    }) => {
+      const dirtyIds = data.dirtyBlockIds || [];
+      const blocks = data.blocks || [];
+      const titleToSave = data.isTitleDirty ? data.title : undefined;
+
+      // Strategy 1: Only block order changed (Drag & Drop or up/down reordering)
+      if (data.isOrderDirty && dirtyIds.length === 0 && !data.isTitleDirty) {
+        return await api.put<any>(`/journals/${journalId}/block-order`, {
+          blockOrder: blocks.map((b: any) => b.id),
+          clientRevision: data.clientRevision,
+        });
+      }
+
+      // Strategy 2: Single block content edit (90% of user typing)
+      if (dirtyIds.length === 1 && !data.isTitleDirty && !data.isOrderDirty) {
+        const singleId = dirtyIds[0];
+        const targetBlock = blocks.find((b: any) => b.id === singleId);
+        if (targetBlock) {
+          return await api.patch<any>(`/journals/${journalId}/blocks/${singleId}`, {
+            content: targetBlock.content,
+            clientRevision: data.clientRevision,
+          });
+        }
+      }
+
+      // Strategy 3: Multi-block delta (2 to 15 dirty blocks)
+      if (dirtyIds.length > 1 && dirtyIds.length <= 15 && !data.isOrderDirty) {
+        const dirtyBlocksList = blocks
+          .filter((b: any) => dirtyIds.includes(b.id))
+          .map((b: any) => ({ id: b.id, content: b.content }));
+
+        return await api.patch<any>(`/journals/${journalId}/blocks/delta`, {
+          title: titleToSave,
+          dirtyBlocks: dirtyBlocksList,
+          clientRevision: data.clientRevision,
+        });
+      }
+
+      // Strategy 4: Fallback batch sync (Large paste, structural reorder with text edits, etc.)
+      return await api.patch<any>(`/journals/${journalId}/blocks`, {
+        title: data.title,
+        blocks: blocks,
+        clientRevision: data.clientRevision,
+      });
+    },
     onMutate: () => setSaving(true),
     onSuccess: (data: any) => {
       setSaving(false);
-      setRevision(data.currentVersion || clientRevision + 1, data.updatedAt);
+      const nextRev = data.serverRevision || data.currentVersion || clientRevision + 1;
+      const savedAt = data.savedAt || data.updatedAt;
+      setRevision(nextRev, savedAt);
       setShowConflictDialog(false);
     },
     onError: (err: any) => {
@@ -373,10 +428,18 @@ export default function EditorPage({ params }: PageProps) {
   useEffect(() => {
     if (!isEditable || !isDirty || isSaving || previewMode || !title || syncStatus === "conflict" || syncStatus === "offline") return;
     const timer = setTimeout(() => {
-      saveMutationRef.current.mutate({ title, blocks, clientRevision });
+      const state = useDocumentStore.getState();
+      saveMutationRef.current.mutate({
+        title: state.title,
+        blocks: state.blocks,
+        clientRevision: state.clientRevision,
+        dirtyBlockIds: state.dirtyBlockIds,
+        isOrderDirty: state.isOrderDirty,
+        isTitleDirty: state.isTitleDirty,
+      });
     }, 2500);
     return () => clearTimeout(timer);
-  }, [title, blocks, isDirty, isSaving, previewMode, clientRevision, syncStatus, isEditable]);
+  }, [title, blocks, isDirty, isSaving, previewMode, clientRevision, syncStatus, isEditable, dirtyBlockIds, isOrderDirty, isTitleDirty]);
 
   // Real-time network connectivity handling (RULE-INF06, Phase 5.5)
   useEffect(() => {
@@ -391,6 +454,9 @@ export default function EditorPage({ params }: PageProps) {
           title: state.title,
           blocks: state.blocks,
           clientRevision: state.clientRevision,
+          dirtyBlockIds: state.dirtyBlockIds,
+          isOrderDirty: state.isOrderDirty,
+          isTitleDirty: state.isTitleDirty,
         });
       }
     };
@@ -428,6 +494,9 @@ export default function EditorPage({ params }: PageProps) {
           title: state.title,
           blocks: state.blocks,
           clientRevision: state.clientRevision,
+          dirtyBlockIds: state.dirtyBlockIds,
+          isOrderDirty: state.isOrderDirty,
+          isTitleDirty: state.isTitleDirty,
         });
       }
     };

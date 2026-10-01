@@ -25,6 +25,9 @@ from app.schemas.journal import (
     SingleBlockUpdateRequest,
     BatchBlockUpdateRequest,
     BlockOrderUpdateRequest,
+    DeltaBlockUpdateRequest,
+    BlockInsertRequest,
+    BlockDeleteRequest,
 )
 from app.schemas.comment import RequestChangesRequest, ApproveJournalRequest
 
@@ -305,6 +308,137 @@ class JournalService:
         await self.audit_repo.log_event(
             user_id=student_id,
             action="BLOCK_UPDATED",
+            entity="journals",
+            entity_id=journal_id,
+            ip_address=ip_address,
+        )
+
+        return {
+            "journalId": journal_id,
+            "serverRevision": updated_journal.get("currentVersion", current_ver + 1),
+            "savedAt": updated_journal.get("updatedAt"),
+        }
+
+    async def update_blocks_delta(
+        self,
+        journal_id: str,
+        student_id: str,
+        request: DeltaBlockUpdateRequest,
+        ip_address: str | None = None,
+    ) -> dict:
+        """Incremental update for multiple dirty blocks with optimistic concurrency control."""
+        journal = await self._validate_journal_ownership_and_state(journal_id, student_id)
+
+        current_ver = journal.get("currentVersion", 1)
+        if request.clientRevision != current_ver:
+            raise AppException(
+                code=ErrorCode.REVISION_CONFLICT,
+                message=f"Document version conflict (server is revision {current_ver}, client sent {request.clientRevision}). Reload latest version or resolve conflict.",
+                status_code=status.HTTP_409_CONFLICT,
+            )
+
+        dirty_blocks = [b.model_dump() for b in request.dirtyBlocks]
+        updated_journal = await self.journal_repo.update_blocks_delta_with_revision(
+            journal_id, dirty_blocks, request.clientRevision, title=request.title
+        )
+        if not updated_journal:
+            raise AppException(
+                code=ErrorCode.REVISION_CONFLICT,
+                message="Document revision mismatch during delta sync",
+                status_code=status.HTTP_409_CONFLICT,
+            )
+
+        await self.audit_repo.log_event(
+            user_id=student_id,
+            action="BLOCKS_DELTA_UPDATED",
+            entity="journals",
+            entity_id=journal_id,
+            ip_address=ip_address,
+        )
+
+        return {
+            "journalId": journal_id,
+            "serverRevision": updated_journal.get("currentVersion", current_ver + 1),
+            "savedAt": updated_journal.get("updatedAt"),
+        }
+
+    async def insert_block(
+        self,
+        journal_id: str,
+        student_id: str,
+        request: BlockInsertRequest,
+        ip_address: str | None = None,
+    ) -> dict:
+        """Atomically insert a new block at a specific position with optimistic concurrency control."""
+        journal = await self._validate_journal_ownership_and_state(journal_id, student_id)
+
+        current_ver = journal.get("currentVersion", 1)
+        if request.clientRevision != current_ver:
+            raise AppException(
+                code=ErrorCode.REVISION_CONFLICT,
+                message=f"Document version conflict (server is revision {current_ver}, client sent {request.clientRevision}).",
+                status_code=status.HTTP_409_CONFLICT,
+            )
+
+        block_dict = request.block.model_dump()
+        updated_journal = await self.journal_repo.insert_block_with_revision(
+            journal_id, request.index, block_dict, request.clientRevision
+        )
+        if not updated_journal:
+            raise AppException(
+                code=ErrorCode.REVISION_CONFLICT,
+                message="Document revision mismatch during block insertion",
+                status_code=status.HTTP_409_CONFLICT,
+            )
+
+        await self.audit_repo.log_event(
+            user_id=student_id,
+            action="BLOCK_INSERTED",
+            entity="journals",
+            entity_id=journal_id,
+            ip_address=ip_address,
+        )
+
+        return {
+            "journalId": journal_id,
+            "serverRevision": updated_journal.get("currentVersion", current_ver + 1),
+            "savedAt": updated_journal.get("updatedAt"),
+        }
+
+    async def delete_block(
+        self,
+        journal_id: str,
+        student_id: str,
+        block_id: str,
+        client_revision: int,
+        ip_address: str | None = None,
+    ) -> dict:
+        """Atomically delete a block with optimistic concurrency control."""
+        journal = await self._validate_journal_ownership_and_state(journal_id, student_id)
+
+        current_ver = journal.get("currentVersion", 1)
+        if client_revision != current_ver:
+            raise AppException(
+                code=ErrorCode.REVISION_CONFLICT,
+                message=f"Document version conflict (server is revision {current_ver}, client sent {client_revision}).",
+                status_code=status.HTTP_409_CONFLICT,
+            )
+
+        updated_journal = await self.journal_repo.delete_block_with_revision(
+            journal_id, block_id, client_revision
+        )
+        if not updated_journal:
+            raise AppException(
+                code=ErrorCode.REVISION_CONFLICT,
+                message="Document revision mismatch during block deletion",
+                status_code=status.HTTP_409_CONFLICT,
+            )
+
+        await self.comment_repo.resolve_suggestions_for_deleted_blocks(journal_id, [block_id])
+
+        await self.audit_repo.log_event(
+            user_id=student_id,
+            action="BLOCK_DELETED",
             entity="journals",
             entity_id=journal_id,
             ip_address=ip_address,

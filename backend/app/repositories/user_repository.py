@@ -16,7 +16,7 @@ class UserRepository(BaseRepository):
 
     async def find_by_email(self, email: str) -> dict | None:
         """Look up user by unique email."""
-        doc = self.collection.find_one({"email": email.lower().strip()})
+        doc = await self.collection.find_one({"email": email.lower().strip()})
         return self._to_str_id(doc)
 
     async def update_otp(

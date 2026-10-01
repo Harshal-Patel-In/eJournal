@@ -15,13 +15,14 @@ class AssignmentRepository(BaseRepository):
     async def find_by_classroom_id(self, classroom_id: str) -> list[dict]:
         """List assignments published for a specific classroom."""
         cursor = self.collection.find({"classroomId": classroom_id})
-        return [self._to_str_id(doc) for doc in cursor]
+        docs = await cursor.to_list(length=200)
+        return [self._to_str_id(doc) for doc in docs]
 
     async def is_assignment_exists(
         self, classroom_id: str, experiment_number: int
     ) -> bool:
         """Check if an assignment with the same experiment number exists in the classroom."""
-        count = self.collection.count_documents(
+        count = await self.collection.count_documents(
             {"classroomId": classroom_id, "experimentNumber": experiment_number}
         )
         return count > 0

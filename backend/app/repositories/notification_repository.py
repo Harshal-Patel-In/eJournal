@@ -64,7 +64,7 @@ class NotificationRepository(BaseRepository):
             }
             for uid in user_ids
         ]
-        result = self.collection.insert_many(docs)
+        result = await self.collection.insert_many(docs)
         for i, doc in enumerate(docs):
             doc["id"] = str(result.inserted_ids[i])
         return docs
@@ -72,7 +72,8 @@ class NotificationRepository(BaseRepository):
     async def find_by_user_id(self, user_id: str, limit: int = 50) -> list[dict]:
         """Fetch notifications for a user, sorted by most recent first."""
         cursor = self.collection.find({"userId": user_id}).sort([("createdAt", -1)]).limit(limit)
-        return [self._to_str_id(doc) for doc in cursor]
+        docs = await cursor.to_list(length=limit)
+        return [self._to_str_id(doc) for doc in docs]
 
     async def mark_as_read(self, notification_id: str) -> bool:
         """Mark a notification as read and record readAt timestamp for 7-day TTL cleanup."""
@@ -85,7 +86,7 @@ class NotificationRepository(BaseRepository):
     async def mark_all_as_read(self, user_id: str) -> bool:
         """Mark all notifications for a user as read and record readAt timestamp for 7-day TTL cleanup."""
         now = datetime.now(timezone.utc)
-        result = self.collection.update_many(
+        result = await self.collection.update_many(
             {"userId": user_id, "isRead": False},
             {"$set": {"isRead": True, "readAt": now, "updatedAt": now}},
         )

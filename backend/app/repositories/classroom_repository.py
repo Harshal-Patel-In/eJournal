@@ -14,15 +14,16 @@ class ClassroomRepository(BaseRepository):
 
     async def find_by_join_code(self, join_code: str) -> dict | None:
         """Find classroom by unique join code."""
-        doc = self.collection.find_one({"joinCode": join_code.upper().strip()})
+        doc = await self.collection.find_one({"joinCode": join_code.upper().strip()})
         return self._to_str_id(doc)
 
     async def find_by_teacher_id(self, teacher_id: str) -> list[dict]:
         """List classrooms created by a teacher."""
         cursor = self.collection.find({"teacherId": teacher_id})
-        return [self._to_str_id(doc) for doc in cursor]
+        docs = await cursor.to_list(length=100)
+        return [self._to_str_id(doc) for doc in docs]
 
     async def is_join_code_exists(self, join_code: str) -> bool:
         """Check if a join code is already assigned to a classroom."""
-        count = self.collection.count_documents({"joinCode": join_code.upper().strip()})
+        count = await self.collection.count_documents({"joinCode": join_code.upper().strip()})
         return count > 0

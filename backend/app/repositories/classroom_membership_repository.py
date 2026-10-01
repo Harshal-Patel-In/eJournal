@@ -25,7 +25,7 @@ class ClassroomMembershipRepository(BaseRepository):
 
     async def is_member(self, classroom_id: str, student_id: str) -> bool:
         """Check if student is enrolled in the classroom."""
-        count = self.collection.count_documents(
+        count = await self.collection.count_documents(
             {"classroomId": classroom_id, "studentId": student_id}
         )
         return count > 0
@@ -33,12 +33,14 @@ class ClassroomMembershipRepository(BaseRepository):
     async def find_by_student_id(self, student_id: str) -> list[dict]:
         """List memberships for a student."""
         cursor = self.collection.find({"studentId": student_id})
-        return [self._to_str_id(doc) for doc in cursor]
+        docs = await cursor.to_list(length=100)
+        return [self._to_str_id(doc) for doc in docs]
 
     async def find_members_by_classroom_id(self, classroom_id: str) -> list[dict]:
         """List all memberships in a classroom."""
         cursor = self.collection.find({"classroomId": classroom_id})
-        return [self._to_str_id(doc) for doc in cursor]
+        docs = await cursor.to_list(length=1000)
+        return [self._to_str_id(doc) for doc in docs]
 
     async def remove_member(self, classroom_id: str, student_id: str) -> bool:
         """Remove student from classroom."""

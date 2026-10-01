@@ -35,6 +35,35 @@ class SingleBlockUpdateRequest(BaseModel):
     clientRevision: int = Field(..., description="Expected client revision before mutation")
 
 
+class DeltaBlockItem(BaseModel):
+    """Payload representing a single modified block in a delta sync."""
+
+    id: str = Field(..., description="Unique block ID")
+    content: Dict[str, Any] = Field(default_factory=dict, description="Updated block content attributes")
+
+
+class DeltaBlockUpdateRequest(BaseModel):
+    """Payload for multi-block delta sync containing only modified blocks."""
+
+    title: str | None = Field(default=None, description="Updated journal title if changed")
+    dirtyBlocks: List[DeltaBlockItem] = Field(default_factory=list, description="Array of only modified blocks")
+    clientRevision: int = Field(..., description="Expected client revision before mutation")
+
+
+class BlockInsertRequest(BaseModel):
+    """Payload for inserting a new block at a specific position."""
+
+    index: int = Field(default=0, ge=0, description="0-indexed position to insert the block")
+    block: JournalBlock = Field(..., description="The block object to insert")
+    clientRevision: int = Field(..., description="Expected client revision before mutation")
+
+
+class BlockDeleteRequest(BaseModel):
+    """Payload for deleting an existing block."""
+
+    clientRevision: int = Field(..., description="Expected client revision before mutation")
+
+
 class BatchBlockUpdateRequest(BaseModel):
     """Payload for batch block update with optional title update."""
 
