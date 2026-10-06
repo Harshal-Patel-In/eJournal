@@ -295,13 +295,23 @@ class JournalService:
                 status_code=status.HTTP_409_CONFLICT,
             )
 
+        # Distinguish between non-existent block (404) vs concurrency revision conflict (409)
+        existing_blocks = journal.get("blocks", [])
+        block_exists = any(b.get("id") == block_id for b in existing_blocks if isinstance(b, dict))
+        if not block_exists:
+            raise AppException(
+                code=ErrorCode.NOT_FOUND,
+                message=f"Block {block_id} not found in journal. Sync full document to register new blocks.",
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+
         updated_journal = await self.journal_repo.update_single_block_with_revision(
             journal_id, block_id, request.content, request.clientRevision
         )
         if not updated_journal:
             raise AppException(
                 code=ErrorCode.REVISION_CONFLICT,
-                message="Document revision mismatch or block not found",
+                message="Document revision mismatch during block update",
                 status_code=status.HTTP_409_CONFLICT,
             )
 
@@ -338,6 +348,17 @@ class JournalService:
             )
 
         dirty_blocks = [b.model_dump() for b in request.dirtyBlocks]
+
+        # Verify all targeted blocks actually exist in the current journal state
+        existing_block_ids = {b.get("id") for b in journal.get("blocks", []) if isinstance(b, dict)}
+        for b in dirty_blocks:
+            if b.get("id") not in existing_block_ids:
+                raise AppException(
+                    code=ErrorCode.NOT_FOUND,
+                    message=f"Block {b.get('id')} not found in journal. Sync full document to register new blocks.",
+                    status_code=status.HTTP_404_NOT_FOUND,
+                )
+
         updated_journal = await self.journal_repo.update_blocks_delta_with_revision(
             journal_id, dirty_blocks, request.clientRevision, title=request.title
         )

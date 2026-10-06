@@ -24,6 +24,8 @@ interface DocumentState {
   lastSavedAt: string | null;
   syncStatus: SyncStatus;
   dirtyBlockIds: string[];
+  serverBlockIds: string[];
+  isStructureDirty: boolean;
   isOrderDirty: boolean;
   isTitleDirty: boolean;
 
@@ -107,6 +109,8 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
   lastSavedAt: null,
   syncStatus: "synced",
   dirtyBlockIds: [],
+  serverBlockIds: [],
+  isStructureDirty: false,
   isOrderDirty: false,
   isTitleDirty: false,
 
@@ -123,6 +127,8 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
       isSaving: false,
       syncStatus: "synced",
       dirtyBlockIds: [],
+      serverBlockIds: (blocks || []).map((b) => b.id),
+      isStructureDirty: false,
       isOrderDirty: false,
       isTitleDirty: false,
       previewMode: status !== "draft" && status !== "changes_requested",
@@ -167,6 +173,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
       return {
         blocks: updated,
         isDirty: true,
+        isStructureDirty: true,
         syncStatus: "unsaved",
         dirtyBlockIds: Array.from(new Set([...state.dirtyBlockIds, newBlock.id])),
       };
@@ -200,8 +207,9 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
       return {
         blocks: updated,
         isDirty: true,
+        isStructureDirty: true,
         syncStatus: "unsaved",
-        dirtyBlockIds: Array.from(new Set([...state.dirtyBlockIds, id])),
+        dirtyBlockIds: state.dirtyBlockIds.filter((bid) => bid !== id),
       };
     }),
 
@@ -227,6 +235,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
       return {
         blocks: updated,
         isDirty: true,
+        isStructureDirty: true,
         syncStatus: "unsaved",
         dirtyBlockIds: Array.from(new Set([...state.dirtyBlockIds, duplicatedBlock.id])),
       };
@@ -266,7 +275,6 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
   setSyncStatus: (syncStatus) =>
     set((state) => (state.syncStatus === syncStatus ? state : { syncStatus })),
 
-
   setRevision: (serverRevision, savedAt) =>
     set((state) => {
       clearLocalSnapshot(state.journalId);
@@ -278,6 +286,8 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
         isSaving: false,
         syncStatus: "synced",
         dirtyBlockIds: [],
+        serverBlockIds: state.blocks.map((b) => b.id),
+        isStructureDirty: false,
         isOrderDirty: false,
         isTitleDirty: false,
       };
@@ -288,6 +298,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
       title,
       blocks,
       isDirty: true,
+      isStructureDirty: true,
       syncStatus: "unsaved",
     })),
 

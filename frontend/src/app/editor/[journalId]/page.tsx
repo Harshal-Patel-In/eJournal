@@ -77,6 +77,8 @@ export default function EditorPage({ params }: PageProps) {
     clientRevision,
     previewMode,
     dirtyBlockIds,
+    serverBlockIds,
+    isStructureDirty,
     isOrderDirty,
     isTitleDirty,
     init,
@@ -180,47 +182,80 @@ export default function EditorPage({ params }: PageProps) {
       blocks?: any[];
       clientRevision: number;
       dirtyBlockIds?: string[];
+      serverBlockIds?: string[];
+      isStructureDirty?: boolean;
       isOrderDirty?: boolean;
       isTitleDirty?: boolean;
     }) => {
       const dirtyIds = data.dirtyBlockIds || [];
       const blocks = data.blocks || [];
       const titleToSave = data.isTitleDirty ? data.title : undefined;
+      const knownServerIds = data.serverBlockIds || [];
 
-      // Strategy 1: Only block order changed (Drag & Drop or up/down reordering)
-      if (data.isOrderDirty && dirtyIds.length === 0 && !data.isTitleDirty) {
-        return await api.put<any>(`/journals/${journalId}/block-order`, {
-          blockOrder: blocks.map((b: any) => b.id),
-          clientRevision: data.clientRevision,
-        });
-      }
+      // If document structure changed (blocks added, deleted, duplicated) OR any dirty block is NOT on the server:
+      // We MUST use Strategy 4 (Full batch sync) to safely sync the entire blocks array in MongoDB.
+      const hasUnknownBlocks = dirtyIds.some((id) => !knownServerIds.includes(id));
+      const isStructural = Boolean(data.isStructureDirty || hasUnknownBlocks);
 
-      // Strategy 2: Single block content edit (90% of user typing)
-      if (dirtyIds.length === 1 && !data.isTitleDirty && !data.isOrderDirty) {
-        const singleId = dirtyIds[0];
-        const targetBlock = blocks.find((b: any) => b.id === singleId);
-        if (targetBlock) {
-          return await api.patch<any>(`/journals/${journalId}/blocks/${singleId}`, {
-            content: targetBlock.content,
+      if (!isStructural) {
+        // Strategy 1: Only block order changed (Drag & Drop or up/down reordering)
+        if (data.isOrderDirty && dirtyIds.length === 0 && !data.isTitleDirty) {
+          return await api.put<any>(`/journals/${journalId}/block-order`, {
+            blockOrder: blocks.map((b: any) => b.id),
             clientRevision: data.clientRevision,
           });
         }
+
+        // Strategy 2: Single block content edit (90% of user typing)
+        if (dirtyIds.length === 1 && !data.isTitleDirty && !data.isOrderDirty) {
+          const singleId = dirtyIds[0];
+          const targetBlock = blocks.find((b: any) => b.id === singleId);
+          if (targetBlock) {
+            try {
+              return await api.patch<any>(`/journals/${journalId}/blocks/${singleId}`, {
+                content: targetBlock.content,
+                clientRevision: data.clientRevision,
+              });
+            } catch (err: any) {
+              // Self-healing: If block was somehow not found on server, fallback to full sync
+              if (err.status === 404 || err.message?.includes("not found")) {
+                return await api.patch<any>(`/journals/${journalId}/blocks`, {
+                  title: data.title,
+                  blocks: blocks,
+                  clientRevision: data.clientRevision,
+                });
+              }
+              throw err;
+            }
+          }
+        }
+
+        // Strategy 3: Multi-block delta (2 to 15 dirty blocks)
+        if (dirtyIds.length > 1 && dirtyIds.length <= 15 && !data.isOrderDirty) {
+          const dirtyBlocksList = blocks
+            .filter((b: any) => dirtyIds.includes(b.id))
+            .map((b: any) => ({ id: b.id, content: b.content }));
+
+          try {
+            return await api.patch<any>(`/journals/${journalId}/blocks/delta`, {
+              title: titleToSave,
+              dirtyBlocks: dirtyBlocksList,
+              clientRevision: data.clientRevision,
+            });
+          } catch (err: any) {
+            if (err.status === 404 || err.message?.includes("not found")) {
+              return await api.patch<any>(`/journals/${journalId}/blocks`, {
+                title: data.title,
+                blocks: blocks,
+                clientRevision: data.clientRevision,
+              });
+            }
+            throw err;
+          }
+        }
       }
 
-      // Strategy 3: Multi-block delta (2 to 15 dirty blocks)
-      if (dirtyIds.length > 1 && dirtyIds.length <= 15 && !data.isOrderDirty) {
-        const dirtyBlocksList = blocks
-          .filter((b: any) => dirtyIds.includes(b.id))
-          .map((b: any) => ({ id: b.id, content: b.content }));
-
-        return await api.patch<any>(`/journals/${journalId}/blocks/delta`, {
-          title: titleToSave,
-          dirtyBlocks: dirtyBlocksList,
-          clientRevision: data.clientRevision,
-        });
-      }
-
-      // Strategy 4: Fallback batch sync (Large paste, structural reorder with text edits, etc.)
+      // Strategy 4: Fallback batch sync (Large paste, structural reorder with text edits, block addition/deletion, etc.)
       return await api.patch<any>(`/journals/${journalId}/blocks`, {
         title: data.title,
         blocks: blocks,
@@ -234,6 +269,7 @@ export default function EditorPage({ params }: PageProps) {
       const savedAt = data.savedAt || data.updatedAt;
       setRevision(nextRev, savedAt);
       setShowConflictDialog(false);
+      queryClient.invalidateQueries({ queryKey: ["journal", journalId] });
     },
     onError: (err: any) => {
       setSaving(false);
@@ -434,12 +470,14 @@ export default function EditorPage({ params }: PageProps) {
         blocks: state.blocks,
         clientRevision: state.clientRevision,
         dirtyBlockIds: state.dirtyBlockIds,
+        serverBlockIds: state.serverBlockIds,
+        isStructureDirty: state.isStructureDirty,
         isOrderDirty: state.isOrderDirty,
         isTitleDirty: state.isTitleDirty,
       });
     }, 2500);
     return () => clearTimeout(timer);
-  }, [title, blocks, isDirty, isSaving, previewMode, clientRevision, syncStatus, isEditable, dirtyBlockIds, isOrderDirty, isTitleDirty]);
+  }, [title, blocks, isDirty, isSaving, previewMode, clientRevision, syncStatus, isEditable, dirtyBlockIds, serverBlockIds, isStructureDirty, isOrderDirty, isTitleDirty]);
 
   // Real-time network connectivity handling (RULE-INF06, Phase 5.5)
   useEffect(() => {
@@ -455,6 +493,8 @@ export default function EditorPage({ params }: PageProps) {
           blocks: state.blocks,
           clientRevision: state.clientRevision,
           dirtyBlockIds: state.dirtyBlockIds,
+          serverBlockIds: state.serverBlockIds,
+          isStructureDirty: state.isStructureDirty,
           isOrderDirty: state.isOrderDirty,
           isTitleDirty: state.isTitleDirty,
         });
@@ -495,6 +535,8 @@ export default function EditorPage({ params }: PageProps) {
           blocks: state.blocks,
           clientRevision: state.clientRevision,
           dirtyBlockIds: state.dirtyBlockIds,
+          serverBlockIds: state.serverBlockIds,
+          isStructureDirty: state.isStructureDirty,
           isOrderDirty: state.isOrderDirty,
           isTitleDirty: state.isTitleDirty,
         });
@@ -593,16 +635,42 @@ export default function EditorPage({ params }: PageProps) {
         isOpen={showConflictDialog}
         onReloadServer={async () => {
           clearLocalSnapshot(journalId);
-          await refetchJournal();
+          const res = await refetchJournal();
+          if (res?.data) {
+            useDocumentStore.getState().init(
+              res.data.id,
+              res.data.title,
+              res.data.blocks || [],
+              res.data.status,
+              res.data.currentVersion || 1,
+              res.data.activeRevisionNumber || 1
+            );
+          }
           setShowConflictDialog(false);
           setSyncStatus("synced");
         }}
-        onForceSaveLocal={() => {
-          if (journal?.currentVersion) {
-            saveMutation.mutate({ title, blocks, clientRevision: journal.currentVersion });
+        onForceSaveLocal={async () => {
+          const state = useDocumentStore.getState();
+          try {
+            setSaving(true);
+            const res = await api.put<any>(`/journals/${journalId}`, {
+              title: state.title,
+              blocks: state.blocks,
+            });
+            if (res) {
+              const nextRev = res.currentVersion || state.clientRevision + 1;
+              setRevision(nextRev, res.updatedAt);
+              setShowConflictDialog(false);
+              queryClient.invalidateQueries({ queryKey: ["journal", journalId] });
+              toast.success("Document overwritten with local draft.", { title: "✅ Saved" });
+            }
+          } catch (err: any) {
+            toast.error(err.message || "Failed to force save local draft.");
+          } finally {
+            setSaving(false);
           }
         }}
-        isSaving={saveMutation.isPending}
+        isSaving={isSaving}
       />
 
       {/* Pre-submission Checklist Modal */}

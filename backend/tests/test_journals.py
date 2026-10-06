@@ -434,6 +434,39 @@ async def test_update_single_block_revision_conflict(mock_journal):
 
 @pytest.mark.anyio
 @patch("app.services.journal_service.JournalRepository")
+async def test_update_single_block_not_found_returns_404(mock_journal):
+    """Verify that updating a block not present in the journal raises NOT_FOUND (404) rather than REVISION_CONFLICT (409)."""
+    journal_repo = MagicMock()
+    journal_repo.find_by_id = AsyncMock(
+        return_value={
+            "id": "journal_999",
+            "studentId": "student_123",
+            "status": "draft",
+            "currentVersion": 5,
+            "blocks": [{"id": "existing_block", "type": "paragraph"}],
+        }
+    )
+    mock_journal.return_value = journal_repo
+
+    from app.schemas.journal import SingleBlockUpdateRequest
+
+    service = JournalService()
+    payload = SingleBlockUpdateRequest(
+        content={"text": "New Text"},
+        clientRevision=5,  # Matching revision!
+    )
+
+    with pytest.raises(AppException) as excinfo:
+        await service.update_single_block(
+            "journal_999", "student_123", "non_existent_block_uuid", payload
+        )
+    assert excinfo.value.code == ErrorCode.NOT_FOUND
+    assert excinfo.value.status_code == 404
+
+
+
+@pytest.mark.anyio
+@patch("app.services.journal_service.JournalRepository")
 @patch("app.services.journal_service.AuditLogRepository")
 async def test_update_blocks_batch_revision_success(mock_audit, mock_journal):
     """Verify that batch block updates matching current version succeed and increment server revision."""
