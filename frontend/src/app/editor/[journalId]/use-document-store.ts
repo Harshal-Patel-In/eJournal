@@ -49,6 +49,14 @@ interface DocumentState {
   setDirty: (status: boolean) => void;
   setSyncStatus: (syncStatus: SyncStatus) => void;
   setRevision: (serverRevision: number, savedAt?: string) => void;
+  acknowledgeSave: (
+    serverRevision: number,
+    savedAt?: string,
+    savedBlockSnapshotMap?: Record<string, string>,
+    savedStructureClean?: boolean,
+    savedOrderClean?: boolean,
+    savedTitleClean?: boolean
+  ) => void;
   loadLocalRecovery: (title: string, blocks: JournalBlock[]) => void;
   togglePreview: () => void;
 }
@@ -290,6 +298,59 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
         isStructureDirty: false,
         isOrderDirty: false,
         isTitleDirty: false,
+      };
+    }),
+
+  acknowledgeSave: (
+    serverRevision: number,
+    savedAt?: string,
+    savedBlockSnapshotMap: Record<string, string> = {},
+    savedStructureClean: boolean = false,
+    savedOrderClean: boolean = false,
+    savedTitleClean: boolean = false
+  ) =>
+    set((state) => {
+      // Determine which dirty blocks still have unsaved changes typed during in-flight save
+      const remainingDirtyIds = state.dirtyBlockIds.filter((id) => {
+        const sentContentJson = savedBlockSnapshotMap[id];
+        if (sentContentJson === undefined) {
+          // Block was not part of this save request -> must remain dirty
+          return true;
+        }
+        const currentBlock = state.blocks.find((b) => b.id === id);
+        const currentContentJson = JSON.stringify(currentBlock?.content || {});
+        // If student typed into this block while save was in-flight, content differs -> remains dirty!
+        return currentContentJson !== sentContentJson;
+      });
+
+      const isStructureStillDirty = savedStructureClean ? false : state.isStructureDirty;
+      const isOrderStillDirty = savedOrderClean ? false : state.isOrderDirty;
+      const isTitleStillDirty = savedTitleClean ? false : state.isTitleDirty;
+
+      const isStillDirty =
+        remainingDirtyIds.length > 0 ||
+        isStructureStillDirty ||
+        isOrderStillDirty ||
+        isTitleStillDirty;
+
+      if (!isStillDirty) {
+        clearLocalSnapshot(state.journalId);
+      } else {
+        saveLocalSnapshot(state.journalId, state.title, state.blocks, serverRevision);
+      }
+
+      return {
+        clientRevision: serverRevision,
+        serverRevision,
+        lastSavedAt: savedAt || new Date().toISOString(),
+        dirtyBlockIds: remainingDirtyIds,
+        isStructureDirty: isStructureStillDirty,
+        isOrderDirty: isOrderStillDirty,
+        isTitleDirty: isTitleStillDirty,
+        isDirty: isStillDirty,
+        isSaving: false,
+        syncStatus: isStillDirty ? "unsaved" : "synced",
+        serverBlockIds: state.blocks.map((b) => b.id),
       };
     }),
 

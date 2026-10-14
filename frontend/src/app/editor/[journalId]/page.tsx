@@ -88,6 +88,7 @@ export default function EditorPage({ params }: PageProps) {
     setDirty,
     setSyncStatus,
     setRevision,
+    acknowledgeSave,
     togglePreview,
     loadLocalRecovery,
   } = useDocumentStore();
@@ -155,9 +156,11 @@ export default function EditorPage({ params }: PageProps) {
     enabled: showVersionDrawer,
   });
 
-  // Initialize Zustand Store & Check Local Recovery
+  // Initialize Zustand Store ONCE on initial load (Immune to background refetches)
+  const initializedJournalIdRef = useRef<string | null>(null);
   useEffect(() => {
-    if (journal) {
+    if (journal && initializedJournalIdRef.current !== journal.id) {
+      initializedJournalIdRef.current = journal.id;
       const serverRev = journal.currentVersion || 1;
       init(journal.id, journal.title, journal.blocks, journal.status, serverRev, journal.activeRevisionNumber || 1);
 
@@ -175,6 +178,27 @@ export default function EditorPage({ params }: PageProps) {
     }
   }, [user, previewMode, togglePreview]);
 
+  // Helper to build save payload with snapshot map of content at time of dispatch
+  const buildSavePayload = (state: ReturnType<typeof useDocumentStore.getState>) => {
+    const savedBlockSnapshotMap: Record<string, string> = {};
+    (state.blocks || []).forEach((b: any) => {
+      if ((state.dirtyBlockIds || []).includes(b.id)) {
+        savedBlockSnapshotMap[b.id] = JSON.stringify(b.content || {});
+      }
+    });
+    return {
+      title: state.title,
+      blocks: state.blocks,
+      clientRevision: state.clientRevision,
+      dirtyBlockIds: state.dirtyBlockIds,
+      serverBlockIds: state.serverBlockIds,
+      isStructureDirty: state.isStructureDirty,
+      isOrderDirty: state.isOrderDirty,
+      isTitleDirty: state.isTitleDirty,
+      savedBlockSnapshotMap,
+    };
+  };
+
   // Smart Delta Auto-Save Mutation
   const saveMutation = useMutation({
     mutationFn: async (data: {
@@ -186,6 +210,7 @@ export default function EditorPage({ params }: PageProps) {
       isStructureDirty?: boolean;
       isOrderDirty?: boolean;
       isTitleDirty?: boolean;
+      savedBlockSnapshotMap?: Record<string, string>;
     }) => {
       const dirtyIds = data.dirtyBlockIds || [];
       const blocks = data.blocks || [];
@@ -263,13 +288,30 @@ export default function EditorPage({ params }: PageProps) {
       });
     },
     onMutate: () => setSaving(true),
-    onSuccess: (data: any) => {
+    onSuccess: (data: any, variables: any) => {
       setSaving(false);
       const nextRev = data.serverRevision || data.currentVersion || clientRevision + 1;
       const savedAt = data.savedAt || data.updatedAt;
-      setRevision(nextRev, savedAt);
+
+      const dirtyIds = variables.dirtyBlockIds || [];
+      const knownServerIds = variables.serverBlockIds || [];
+      const hasUnknownBlocks = dirtyIds.some((id: string) => !knownServerIds.includes(id));
+      const isStructural = Boolean(variables.isStructureDirty || hasUnknownBlocks);
+
+      // If Strategy 4 ran, full blocks array was synced, so structure is clean
+      const savedStructureClean = isStructural;
+      const savedOrderClean = Boolean(variables.isOrderDirty);
+      const savedTitleClean = Boolean(variables.isTitleDirty);
+
+      acknowledgeSave(
+        nextRev,
+        savedAt,
+        variables.savedBlockSnapshotMap || {},
+        savedStructureClean,
+        savedOrderClean,
+        savedTitleClean
+      );
       setShowConflictDialog(false);
-      queryClient.invalidateQueries({ queryKey: ["journal", journalId] });
     },
     onError: (err: any) => {
       setSaving(false);
@@ -464,17 +506,7 @@ export default function EditorPage({ params }: PageProps) {
   useEffect(() => {
     if (!isEditable || !isDirty || isSaving || previewMode || !title || syncStatus === "conflict" || syncStatus === "offline") return;
     const timer = setTimeout(() => {
-      const state = useDocumentStore.getState();
-      saveMutationRef.current.mutate({
-        title: state.title,
-        blocks: state.blocks,
-        clientRevision: state.clientRevision,
-        dirtyBlockIds: state.dirtyBlockIds,
-        serverBlockIds: state.serverBlockIds,
-        isStructureDirty: state.isStructureDirty,
-        isOrderDirty: state.isOrderDirty,
-        isTitleDirty: state.isTitleDirty,
-      });
+      saveMutationRef.current.mutate(buildSavePayload(useDocumentStore.getState()));
     }, 2500);
     return () => clearTimeout(timer);
   }, [title, blocks, isDirty, isSaving, previewMode, clientRevision, syncStatus, isEditable, dirtyBlockIds, serverBlockIds, isStructureDirty, isOrderDirty, isTitleDirty]);
@@ -488,16 +520,7 @@ export default function EditorPage({ params }: PageProps) {
       state.setSyncStatus(state.isDirty ? "unsaved" : "synced");
       toast.success("Network connection restored.", { title: "🌐 Online" });
       if (state.isDirty && !state.isSaving && state.title && (state.status === "draft" || state.status === "changes_requested")) {
-        saveMutationRef.current.mutate({
-          title: state.title,
-          blocks: state.blocks,
-          clientRevision: state.clientRevision,
-          dirtyBlockIds: state.dirtyBlockIds,
-          serverBlockIds: state.serverBlockIds,
-          isStructureDirty: state.isStructureDirty,
-          isOrderDirty: state.isOrderDirty,
-          isTitleDirty: state.isTitleDirty,
-        });
+        saveMutationRef.current.mutate(buildSavePayload(state));
       }
     };
 
@@ -530,16 +553,7 @@ export default function EditorPage({ params }: PageProps) {
     const handleBeforeUnload = () => {
       const state = useDocumentStore.getState();
       if (state.isDirty && !state.isSaving && state.title && !state.previewMode && user?.role === "student" && (state.status === "draft" || state.status === "changes_requested")) {
-        saveMutationRef.current.mutate({
-          title: state.title,
-          blocks: state.blocks,
-          clientRevision: state.clientRevision,
-          dirtyBlockIds: state.dirtyBlockIds,
-          serverBlockIds: state.serverBlockIds,
-          isStructureDirty: state.isStructureDirty,
-          isOrderDirty: state.isOrderDirty,
-          isTitleDirty: state.isTitleDirty,
-        });
+        saveMutationRef.current.mutate(buildSavePayload(state));
       }
     };
 
@@ -617,7 +631,7 @@ export default function EditorPage({ params }: PageProps) {
       {/* Editor Header Toolbar */}
       <EditorToolbar
         classroomId={classroomId}
-        onSave={() => saveMutation.mutate({ title, blocks, clientRevision })}
+        onSave={() => saveMutation.mutate(buildSavePayload(useDocumentStore.getState()))}
         onSubmit={() => setShowSubmitModal(true)}
         isSubmitting={submitMutation.isPending}
         onUnsubmit={() => unsubmitMutation.mutate()}
@@ -635,8 +649,10 @@ export default function EditorPage({ params }: PageProps) {
         isOpen={showConflictDialog}
         onReloadServer={async () => {
           clearLocalSnapshot(journalId);
+          initializedJournalIdRef.current = null;
           const res = await refetchJournal();
           if (res?.data) {
+            initializedJournalIdRef.current = res.data.id;
             useDocumentStore.getState().init(
               res.data.id,
               res.data.title,
@@ -661,7 +677,6 @@ export default function EditorPage({ params }: PageProps) {
               const nextRev = res.currentVersion || state.clientRevision + 1;
               setRevision(nextRev, res.updatedAt);
               setShowConflictDialog(false);
-              queryClient.invalidateQueries({ queryKey: ["journal", journalId] });
               toast.success("Document overwritten with local draft.", { title: "✅ Saved" });
             }
           } catch (err: any) {
