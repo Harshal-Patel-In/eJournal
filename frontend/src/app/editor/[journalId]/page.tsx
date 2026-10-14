@@ -129,11 +129,14 @@ export default function EditorPage({ params }: PageProps) {
   });
 
   // 2. Fetch Journal Details (only if not 'new')
-  const { data: journal, isLoading: journalLoading, error: journalError, refetch: refetchJournal } = useQuery<any>({
+  const { data: journal, isLoading: journalLoading, isFetching: journalFetching, error: journalError, refetch: refetchJournal } = useQuery<any>({
     queryKey: ["journal", journalId],
     queryFn: () => api.get(`/journals/${journalId}`),
     enabled: journalId !== "new",
     retry: false,
+    staleTime: 0,
+    gcTime: 0,
+    refetchOnMount: "always",
   });
 
   // 3. Fetch Assignment Details
@@ -156,10 +159,11 @@ export default function EditorPage({ params }: PageProps) {
     enabled: showVersionDrawer,
   });
 
-  // Initialize Zustand Store ONCE on initial load (Immune to background refetches)
+  // Initialize Zustand Store ONCE on initial load from fresh MongoDB response
   const initializedJournalIdRef = useRef<string | null>(null);
   useEffect(() => {
-    if (journal && initializedJournalIdRef.current !== journal.id) {
+    // Only initialize when fresh server data from MongoDB has arrived and is not in-flight
+    if (journal && !journalFetching && initializedJournalIdRef.current !== journal.id) {
       initializedJournalIdRef.current = journal.id;
       const serverRev = journal.currentVersion || 1;
       init(journal.id, journal.title, journal.blocks, journal.status, serverRev, journal.activeRevisionNumber || 1);
@@ -169,7 +173,14 @@ export default function EditorPage({ params }: PageProps) {
         setLocalRecoverySnapshot(snapshot);
       }
     }
-  }, [journal, init]);
+  }, [journal, journalFetching, init]);
+
+  // Clean tear-down on unmount so re-opening this or another journal always initializes cleanly
+  useEffect(() => {
+    return () => {
+      initializedJournalIdRef.current = null;
+    };
+  }, [journalId]);
 
   // Set default previewMode = true for teachers
   useEffect(() => {
@@ -312,6 +323,18 @@ export default function EditorPage({ params }: PageProps) {
         savedTitleClean
       );
       setShowConflictDialog(false);
+
+      // Keep React Query's in-memory cache synchronized with the newly saved revision & content
+      queryClient.setQueryData(["journal", journalId], (old: any) => {
+        if (!old) return old;
+        return {
+          ...old,
+          title: variables.title !== undefined ? variables.title : old.title,
+          blocks: variables.blocks !== undefined ? variables.blocks : old.blocks,
+          currentVersion: nextRev,
+          updatedAt: savedAt || new Date().toISOString(),
+        };
+      });
     },
     onError: (err: any) => {
       setSaving(false);
@@ -677,6 +700,7 @@ export default function EditorPage({ params }: PageProps) {
               const nextRev = res.currentVersion || state.clientRevision + 1;
               setRevision(nextRev, res.updatedAt);
               setShowConflictDialog(false);
+              queryClient.setQueryData(["journal", journalId], res);
               toast.success("Document overwritten with local draft.", { title: "✅ Saved" });
             }
           } catch (err: any) {
