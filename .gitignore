@@ -58,5 +58,7 @@ coverage/
 .agents/
 brag-output
 documents/SECURITY_AUDIT_REPORT
+documents/SECURITY_AUDIT_REPORT.md
+SECURITY_AUDIT_REPORT.md
 documents/admin.md
 documents/14_SYSTEM_PERFORMANCE_AND_SCALABILITY_ARCHITECTURE.md
