@@ -103,7 +103,7 @@ async def mark_as_read(
     notification_repo: NotificationRepository = Depends(),
 ):
     """Mark a specific notification as read."""
-    success = await notification_repo.mark_as_read(notificationId)
+    success = await notification_repo.mark_as_read(notificationId, user_id=user["id"])
     return success_response(success)
 
 

@@ -75,13 +75,27 @@ class NotificationRepository(BaseRepository):
         docs = await cursor.to_list(length=limit)
         return [self._to_str_id(doc) for doc in docs]
 
-    async def mark_as_read(self, notification_id: str) -> bool:
-        """Mark a notification as read and record readAt timestamp for 7-day TTL cleanup."""
+    async def mark_as_read(self, notification_id: str, user_id: str | None = None) -> bool:
+        """Mark a notification as read and record readAt timestamp for 7-day TTL cleanup.
+
+        Strictly scopes the update to the owning user_id if provided (SEC-01).
+        """
+        if not notification_id:
+            return False
         now = datetime.now(timezone.utc)
-        return await self.update_by_id(
-            notification_id,
+        if not user_id:
+            return await self.update_by_id(
+                notification_id,
+                {"$set": {"isRead": True, "readAt": now, "updatedAt": now}},
+            )
+        from bson import ObjectId
+        query: dict = {"_id": ObjectId(notification_id)} if ObjectId.is_valid(notification_id) else {"_id": notification_id}
+        query["userId"] = str(user_id)
+        result = await self.collection.update_one(
+            query,
             {"$set": {"isRead": True, "readAt": now, "updatedAt": now}},
         )
+        return result.modified_count > 0 if hasattr(result, "modified_count") else True
 
     async def mark_all_as_read(self, user_id: str) -> bool:
         """Mark all notifications for a user as read and record readAt timestamp for 7-day TTL cleanup."""

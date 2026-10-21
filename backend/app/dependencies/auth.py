@@ -49,6 +49,30 @@ async def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
         )
 
+    # Check Redis token blacklist (SEC-04)
+    try:
+        from app.core.redis import get_redis
+        redis_client = get_redis()
+        if redis_client:
+            is_blacklisted = await redis_client.get(f"blacklisted_token:{token}")
+            if is_blacklisted:
+                response.delete_cookie(
+                    key="access_token",
+                    httponly=True,
+                    samesite="lax",
+                    secure=False,
+                    path="/",
+                )
+                raise AppException(
+                    code=ErrorCode.INVALID_TOKEN,
+                    message="Session has been signed out. Please log in again.",
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                )
+    except AppException:
+        raise
+    except Exception:
+        pass
+
     email = payload.get("sub")
     if not email:
         response.delete_cookie(
@@ -76,6 +100,23 @@ async def get_current_user(
         raise AppException(
             code=ErrorCode.USER_NOT_FOUND,
             message="User not found",
+            status_code=status.HTTP_401_UNAUTHORIZED,
+        )
+
+    # Validate token_version to immediately revoke tokens after password change or admin reset (SEC-04)
+    token_ver = payload.get("token_version")
+    user_ver = user.get("token_version", 1)
+    if token_ver is not None and token_ver < user_ver:
+        response.delete_cookie(
+            key="access_token",
+            httponly=True,
+            samesite="lax",
+            secure=False,
+            path="/",
+        )
+        raise AppException(
+            code=ErrorCode.INVALID_TOKEN,
+            message="Session invalidated due to password change or administrative action. Please log in again.",
             status_code=status.HTTP_401_UNAUTHORIZED,
         )
 

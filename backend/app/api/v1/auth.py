@@ -128,8 +128,32 @@ async def login(
 
 
 @router.post("/logout", response_model=ApiResponse[str])
-async def logout(response: Response):
-    """Clear access token cookie and sign out current user session."""
+async def logout(request: Request, response: Response):
+    """Clear access token cookie, blacklist token in Redis, and sign out current user session."""
+    token = request.cookies.get("access_token")
+    if not token:
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header[7:]
+
+    if token:
+        try:
+            from app.utils.security import decode_jwt_token
+            from datetime import datetime, timezone
+            from app.core.redis import get_redis
+
+            payload = decode_jwt_token(token)
+            if payload and payload.get("exp"):
+                exp_ts = payload["exp"]
+                now_ts = datetime.now(timezone.utc).timestamp()
+                remaining = int(exp_ts - now_ts)
+                if remaining > 0:
+                    redis_client = get_redis()
+                    if redis_client:
+                        await redis_client.set(f"blacklisted_token:{token}", "1", ex=remaining)
+        except Exception:
+            pass
+
     response.delete_cookie(
         key="access_token",
         httponly=True,

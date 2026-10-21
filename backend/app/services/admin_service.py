@@ -26,7 +26,9 @@ from app.repositories.user_repository import UserRepository
 from app.schemas.admin import FacultyCreateRequest
 from app.utils.email import send_notification_email
 from app.utils.security import hash_password, verify_password
+import os
 import platform
+import re
 import structlog
 import time
 import urllib.parse
@@ -186,7 +188,8 @@ class AdminService:
             conditions.append({"role": role})
 
         if department:
-            conditions.append({"profile.department": {"$regex": department, "$options": "i"}})
+            escaped_dept = re.escape(department.strip())
+            conditions.append({"profile.department": {"$regex": escaped_dept, "$options": "i"}})
 
         if status_filter:
             if status_filter == "pending_setup":
@@ -204,7 +207,7 @@ class AdminService:
                 conditions.append({"status": status_filter})
 
         if search:
-            escaped_search = search.strip()
+            escaped_search = re.escape(search.strip())
             conditions.append({
                 "$or": [
                     {"email": {"$regex": escaped_search, "$options": "i"}},
@@ -344,9 +347,10 @@ class AdminService:
                 status_code=status.HTTP_403_FORBIDDEN,
             )
 
+        new_token_version = user.get("token_version", 1) + 1
         await self.user_repo.update_by_id(
             user_id,
-            {"$set": {"status": new_status, "updatedAt": datetime.now(timezone.utc)}},
+            {"$set": {"status": new_status, "token_version": new_token_version, "updatedAt": datetime.now(timezone.utc)}},
         )
 
         await self.audit_repo.log_event(
@@ -403,11 +407,13 @@ class AdminService:
         )
         hashed = hash_password(raw_password)
 
+        new_token_version = user.get("token_version", 1) + 1
         await self.user_repo.update_by_id(
             user_id,
             {
                 "$set": {
                     "password_hash": hashed,
+                    "token_version": new_token_version,
                     "must_change_password": True,
                     "updatedAt": datetime.now(timezone.utc),
                 }
@@ -484,12 +490,14 @@ class AdminService:
             )
 
         hashed = hash_password(new_password)
+        new_token_version = user.get("token_version", 1) + 1
 
         await self.user_repo.update_by_id(
             user["id"],
             {
                 "$set": {
                     "password_hash": hashed,
+                    "token_version": new_token_version,
                     "must_change_password": False,
                     "updatedAt": datetime.now(timezone.utc),
                 }
@@ -514,7 +522,7 @@ class AdminService:
         query: dict[str, Any] = {}
 
         if search:
-            escaped = search.strip()
+            escaped = re.escape(search.strip())
             query["$or"] = [
                 {"name": {"$regex": escaped, "$options": "i"}},
                 {"subjectCode": {"$regex": escaped, "$options": "i"}},
@@ -782,10 +790,12 @@ class AdminService:
             )
 
         # Invariant: Root Super Administrator cannot be deleted
-        if user.get("email") == "admin@ejournal.com" or str(user["id"]) == str(admin_user.get("id")):
+        configured_admin_email = os.getenv("ADMIN_EMAIL", "admin@ejournal.com").lower().strip()
+        user_email = user.get("email", "").lower().strip()
+        if user_email == configured_admin_email or user.get("role") == "admin" or str(user["id"]) == str(admin_user.get("id")):
             raise AppException(
                 code=ErrorCode.FORBIDDEN,
-                message="Cannot delete the root administrator account or current active session",
+                message="Cannot delete an institutional administrator account or current active session",
                 status_code=status.HTTP_403_FORBIDDEN,
             )
 

@@ -17,6 +17,14 @@ from app.repositories.classroom_membership_repository import ClassroomMembership
 from app.repositories.classroom_repository import ClassroomRepository
 from app.repositories.journal_repository import JournalRepository
 from app.repositories.user_repository import UserRepository
+from typing import Any
+
+
+def _sanitize_csv_cell(val: Any) -> Any:
+    """Neutralize spreadsheet formula injection by prefixing formula triggers with a single quote (SEC-02)."""
+    if isinstance(val, str) and val and val[0] in ("=", "+", "-", "@", "\t", "\r"):
+        return f"'{val}"
+    return val
 
 
 class GradebookService:
@@ -294,9 +302,9 @@ class GradebookService:
 
         # Header metadata block
         writer.writerow(["eJournal — Academic Gradebook & Evaluation Report"])
-        writer.writerow(["Classroom:", classroom.get("name", "N/A"), "Subject:", classroom.get("subject", "N/A")])
-        writer.writerow(["Department:", classroom.get("department", "N/A"), "Semester / Div:", f"Sem {classroom.get('semester', '')} - Div {classroom.get('division', '')}"])
-        writer.writerow(["Division Filter:", summary.get("selectedDivision", "ALL"), "Batch Filter:", summary.get("selectedBatch", "ALL"), "Export Date (UTC):", datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")])
+        writer.writerow(["Classroom:", _sanitize_csv_cell(classroom.get("name", "N/A")), "Subject:", _sanitize_csv_cell(classroom.get("subject", "N/A"))])
+        writer.writerow(["Department:", _sanitize_csv_cell(classroom.get("department", "N/A")), "Semester / Div:", f"Sem {classroom.get('semester', '')} - Div {classroom.get('division', '')}"])
+        writer.writerow(["Division Filter:", _sanitize_csv_cell(summary.get("selectedDivision", "ALL")), "Batch Filter:", _sanitize_csv_cell(summary.get("selectedBatch", "ALL")), "Export Date (UTC):", datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")])
         writer.writerow(["Total Students:", summary.get("totalStudents", 0), "Class Avg Score:", f"{summary.get('classAveragePercentage', 0)}%"])
         writer.writerow([])  # Blank spacer row
 
@@ -317,7 +325,7 @@ class GradebookService:
 
         # Cluster subtotal columns
         for c in cluster_names_ordered:
-            headers.append(f"Subtotal: {c}")
+            headers.append(f"Subtotal: {_sanitize_csv_cell(c)}")
 
         headers.extend(["Total Obtained", "Total Max", "Percentage (%)", "Completed Practicals", "Standing"])
         writer.writerow(headers)
@@ -326,10 +334,10 @@ class GradebookService:
         for i, s in enumerate(students, 1):
             row = [
                 str(i),
-                s["enrollmentNumber"],
-                s["name"],
-                s.get("division", "N/A"),
-                s["batch"],
+                _sanitize_csv_cell(s["enrollmentNumber"]),
+                _sanitize_csv_cell(s["name"]),
+                _sanitize_csv_cell(s.get("division", "N/A")),
+                _sanitize_csv_cell(s["batch"]),
             ]
 
             for asg in assignments:
@@ -348,7 +356,7 @@ class GradebookService:
                 else:
                     cell_val = "Not Started"
 
-                row.append(cell_val)
+                row.append(_sanitize_csv_cell(cell_val))
 
             # Append cluster subtotals
             c_summaries = s.get("clusterSummaries", {})
@@ -370,7 +378,7 @@ class GradebookService:
                 f"{s['evaluatedMaxMarks']} (Term: {s['totalMaxMarks']})",
                 f"{pct:.2f}%" if s["completedCount"] > 0 else "N/A",
                 f"{s['completedCount']} / {s['totalAssignmentsCount']}",
-                standing,
+                _sanitize_csv_cell(standing),
             ])
             writer.writerow(row)
 

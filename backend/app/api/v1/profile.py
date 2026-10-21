@@ -43,6 +43,7 @@ async def get_profile(user: dict = Depends(get_active_user)):
         data={
             "sub": user["email"],
             "role": user["role"],
+            "token_version": user.get("token_version", 1),
             "is_admin": is_admin,
             "is_profile_complete": user.get("is_profile_complete", False),
         }
@@ -73,6 +74,7 @@ async def update_profile(
         data={
             "sub": updated_user["email"],
             "role": updated_user["role"],
+            "token_version": updated_user.get("token_version", 1),
             "is_admin": is_admin,
             "is_profile_complete": updated_user["is_profile_complete"],
         }

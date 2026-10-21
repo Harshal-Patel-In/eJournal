@@ -170,6 +170,7 @@ class AuthService:
             data={
                 "sub": user["email"],
                 "role": user["role"],
+                "token_version": user.get("token_version", 1),
                 "is_profile_complete": user.get("is_profile_complete", False),
             }
         )
@@ -233,14 +234,67 @@ class AuthService:
 
 
     async def login(self, email: str, password: str, ip_address: str | None = None) -> tuple[str, dict]:
-        """Validate credentials, check verification, and return token + user details."""
-        user = await self.user_repo.find_by_email(email)
-        if not user or not verify_password(password, user["password_hash"]):
+        """Validate credentials, enforce account lockout protection, and return token + user details."""
+        clean_email = email.lower().strip()
+        lockout_key = f"failed_login_lockout:{clean_email}"
+        attempts_key = f"failed_login_attempts:{clean_email}"
+
+        from app.core.redis import get_redis
+        redis_client = None
+        try:
+            redis_client = get_redis()
+        except Exception:
+            redis_client = None
+
+        if redis_client:
+            try:
+                is_locked = await redis_client.get(lockout_key)
+                if is_locked:
+                    raise AppException(
+                        code=ErrorCode.TOO_MANY_REQUESTS,
+                        message="Account temporarily locked due to repeated failed login attempts. Please try again after 15 minutes.",
+                        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    )
+            except AppException:
+                raise
+            except Exception:
+                pass
+
+        user = await self.user_repo.find_by_email(clean_email)
+        if not user or not verify_password(password, user.get("password_hash", "")):
+            if redis_client:
+                try:
+                    pipe = redis_client.pipeline()
+                    pipe.incr(attempts_key)
+                    pipe.expire(attempts_key, 900)  # 15 min rolling window
+                    res = await pipe.execute()
+                    attempts = res[0]
+                    if attempts >= 5:
+                        await redis_client.set(lockout_key, "locked", ex=900)  # 15 min lockout
+                        await redis_client.delete(attempts_key)
+                        raise AppException(
+                            code=ErrorCode.TOO_MANY_REQUESTS,
+                            message="Too many failed login attempts. Account temporarily locked for 15 minutes to protect your credentials.",
+                            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                        )
+                except AppException:
+                    raise
+                except Exception:
+                    pass
+
             raise AppException(
                 code=ErrorCode.INVALID_CREDENTIALS,
                 message="Invalid email or password",
                 status_code=status.HTTP_401_UNAUTHORIZED,
             )
+
+        # On successful credential verification, clear any recorded failed attempts
+        if redis_client:
+            try:
+                await redis_client.delete(attempts_key)
+                await redis_client.delete(lockout_key)
+            except Exception:
+                pass
 
         # Check verification state
         if not user.get("is_verified", False):
@@ -258,11 +312,12 @@ class AuthService:
                 status_code=status.HTTP_403_FORBIDDEN,
             )
 
-        # Create access token with role and password change flag
+        # Create access token with role, token_version, and password change flag
         access_token = create_jwt_token(
             data={
                 "sub": user["email"],
                 "role": user["role"],
+                "token_version": user.get("token_version", 1),
                 "is_admin": user.get("is_admin", False) or user["role"] == "admin",
                 "is_profile_complete": user.get("is_profile_complete", False),
                 "must_change_password": user.get("must_change_password", False),
@@ -300,12 +355,14 @@ class AuthService:
             )
 
         hashed = hash_password(new_password)
+        new_token_version = user.get("token_version", 1) + 1
 
         await self.user_repo.update_by_id(
             user["id"],
             {
                 "$set": {
                     "password_hash": hashed,
+                    "token_version": new_token_version,
                     "must_change_password": False,
                     "updatedAt": datetime.now(timezone.utc),
                 }
@@ -320,11 +377,12 @@ class AuthService:
             ip_address=ip_address,
         )
 
-        # Generate a fresh access token without the must_change_password flag
+        # Generate a fresh access token with the incremented token_version and without must_change_password
         fresh_token = create_jwt_token(
             data={
                 "sub": user["email"],
                 "role": user["role"],
+                "token_version": new_token_version,
                 "is_profile_complete": user.get("is_profile_complete", False),
                 "must_change_password": False,
             }

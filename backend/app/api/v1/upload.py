@@ -77,6 +77,67 @@ def _destroy_cloud_or_local_file(asset: dict) -> None:
 
 
 
+def _validate_image_content(content: bytes, ext: str) -> None:
+    """Validate binary file signatures (magic bytes) and sanitize SVG XML (SEC-06)."""
+    if len(content) < 4:
+        raise AppException(
+            code=ErrorCode.VALIDATION_ERROR,
+            message="Invalid file content: file is too small or corrupt",
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if ext in [".jpg", ".jpeg"]:
+        if not content.startswith(b"\xff\xd8\xff"):
+            raise AppException(
+                code=ErrorCode.VALIDATION_ERROR,
+                message="File content does not match JPEG image signature",
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+    elif ext == ".png":
+        if not content.startswith(b"\x89PNG\r\n\x1a\n"):
+            raise AppException(
+                code=ErrorCode.VALIDATION_ERROR,
+                message="File content does not match PNG image signature",
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+    elif ext == ".webp":
+        if not (content.startswith(b"RIFF") and len(content) >= 12 and content[8:12] == b"WEBP"):
+            raise AppException(
+                code=ErrorCode.VALIDATION_ERROR,
+                message="File content does not match WebP image signature",
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+    elif ext == ".svg":
+        try:
+            text = content.decode("utf-8", errors="ignore").lower()
+        except Exception:
+            raise AppException(
+                code=ErrorCode.VALIDATION_ERROR,
+                message="Malformed SVG file encoding",
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+        if "<svg" not in text:
+            raise AppException(
+                code=ErrorCode.VALIDATION_ERROR,
+                message="File content does not match SVG image structure",
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+        import re
+        dangerous_patterns = [
+            r"<script\b",
+            r"<foreignobject\b",
+            r"\bon\w+\s*=",
+            r"href\s*=\s*['\"]?\s*javascript:",
+        ]
+        for pattern in dangerous_patterns:
+            if re.search(pattern, text):
+                raise AppException(
+                    code=ErrorCode.VALIDATION_ERROR,
+                    message="SVG file contains forbidden executable script or active event handlers",
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                )
+
+
 @router.post("/images", response_model=ApiResponse[dict])
 async def upload_image(
     file: UploadFile = File(...),
@@ -114,6 +175,9 @@ async def upload_image(
             message="File size exceeds maximum size limit of 5MB",
             status_code=status.HTTP_400_BAD_REQUEST,
         )
+
+    # Validate actual file header signatures & XML safety (SEC-06)
+    _validate_image_content(content, ext)
 
     asset_repo = AssetRepository()
 
