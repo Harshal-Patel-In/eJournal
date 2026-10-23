@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useMemo } from "react";
+import { createPortal } from "react-dom";
 import {
   Bell,
   Check,
@@ -20,6 +21,9 @@ import {
   FlaskConical,
   Layers,
   User,
+  X,
+  Search,
+  ArrowUpRight,
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
@@ -62,9 +66,9 @@ function getNotificationIntent(notif: any) {
     return {
       category: "Assignment",
       badgeText: "Assignment",
-      icon: <BookOpen className="size-4 text-indigo-400 shrink-0" />,
-      avatarBg: "bg-indigo-500/15 border-indigo-500/25",
-      badgeClass: "bg-indigo-500/15 text-indigo-300 border-indigo-500/30",
+      icon: <BookOpen className="size-4 text-indigo-600 dark:text-indigo-400 shrink-0" />,
+      avatarBg: "bg-indigo-500/10 dark:bg-indigo-500/20 border-indigo-500/25 dark:border-indigo-500/35",
+      badgeClass: "bg-indigo-50 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-500/30",
     };
   }
 
@@ -72,9 +76,9 @@ function getNotificationIntent(notif: any) {
     return {
       category: "Late Submission",
       badgeText: "Late Submission",
-      icon: <ClockAlert className="size-4 text-rose-400 shrink-0" />,
-      avatarBg: "bg-rose-500/15 border-rose-500/25",
-      badgeClass: "bg-rose-500/15 text-rose-300 border-rose-500/30 font-extrabold",
+      icon: <ClockAlert className="size-4 text-rose-600 dark:text-rose-400 shrink-0" />,
+      avatarBg: "bg-rose-500/10 dark:bg-rose-500/20 border-rose-500/25 dark:border-rose-500/35",
+      badgeClass: "bg-rose-50 dark:bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-500/30 font-extrabold",
     };
   }
 
@@ -82,9 +86,9 @@ function getNotificationIntent(notif: any) {
     return {
       category: "Submission",
       badgeText: "Submitted",
-      icon: <FileCheck className="size-4 text-emerald-400 shrink-0" />,
-      avatarBg: "bg-emerald-500/15 border-emerald-500/25",
-      badgeClass: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
+      icon: <FileCheck className="size-4 text-emerald-600 dark:text-emerald-400 shrink-0" />,
+      avatarBg: "bg-emerald-500/10 dark:bg-emerald-500/20 border-emerald-500/25 dark:border-emerald-500/35",
+      badgeClass: "bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/30",
     };
   }
 
@@ -92,9 +96,9 @@ function getNotificationIntent(notif: any) {
     return {
       category: "Revision",
       badgeText: "Revision",
-      icon: <FileEdit className="size-4 text-amber-400 shrink-0" />,
-      avatarBg: "bg-amber-500/15 border-amber-500/25",
-      badgeClass: "bg-amber-500/15 text-amber-300 border-amber-500/30 font-extrabold",
+      icon: <FileEdit className="size-4 text-amber-600 dark:text-amber-400 shrink-0" />,
+      avatarBg: "bg-amber-500/10 dark:bg-amber-500/20 border-amber-500/25 dark:border-amber-500/35",
+      badgeClass: "bg-amber-50 dark:bg-amber-500/15 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-500/30 font-extrabold",
     };
   }
 
@@ -102,9 +106,9 @@ function getNotificationIntent(notif: any) {
     return {
       category: "Graded",
       badgeText: "Approved & Graded",
-      icon: <GraduationCap className="size-4 text-teal-400 shrink-0" />,
-      avatarBg: "bg-teal-500/15 border-teal-500/25",
-      badgeClass: "bg-teal-500/15 text-teal-300 border-teal-500/30",
+      icon: <GraduationCap className="size-4 text-teal-600 dark:text-teal-400 shrink-0" />,
+      avatarBg: "bg-teal-500/10 dark:bg-teal-500/20 border-teal-500/25 dark:border-teal-500/35",
+      badgeClass: "bg-teal-50 dark:bg-teal-500/15 text-teal-700 dark:text-teal-300 border-teal-200 dark:border-teal-500/30",
     };
   }
 
@@ -112,9 +116,9 @@ function getNotificationIntent(notif: any) {
     return {
       category: "Announcement",
       badgeText: "Announcement",
-      icon: <Megaphone className="size-4 text-cyan-400 shrink-0" />,
-      avatarBg: "bg-cyan-500/15 border-cyan-500/25",
-      badgeClass: "bg-cyan-500/15 text-cyan-300 border-cyan-500/30",
+      icon: <Megaphone className="size-4 text-cyan-600 dark:text-cyan-400 shrink-0" />,
+      avatarBg: "bg-cyan-500/10 dark:bg-cyan-500/20 border-cyan-500/25 dark:border-cyan-500/35",
+      badgeClass: "bg-cyan-50 dark:bg-cyan-500/15 text-cyan-800 dark:text-cyan-300 border-cyan-200 dark:border-cyan-500/30",
     };
   }
 
@@ -122,8 +126,8 @@ function getNotificationIntent(notif: any) {
     category: "System",
     badgeText: "Notification",
     icon: <Bell className="size-4 text-primary shrink-0" />,
-    avatarBg: "bg-primary/15 border-primary/25",
-    badgeClass: "bg-primary/15 text-primary border-primary/30",
+    avatarBg: "bg-primary/10 dark:bg-primary/20 border-primary/20 dark:border-primary/30",
+    badgeClass: "bg-primary/10 dark:bg-primary/15 text-primary border-primary/20 dark:border-primary/30",
   };
 }
 
@@ -204,9 +208,42 @@ function formatRelativeTime(dateStr: string): string {
   return formatRelativeTimeIST(dateStr);
 }
 
+// Apple-style Monogram Avatar palettes with soft pastel tints
+const AVATAR_PALETTES = [
+  { bg: "bg-violet-500/10 dark:bg-violet-500/20", text: "text-violet-600 dark:text-violet-400", border: "border-violet-500/25" },
+  { bg: "bg-indigo-500/10 dark:bg-indigo-500/20", text: "text-indigo-600 dark:text-indigo-400", border: "border-indigo-500/25" },
+  { bg: "bg-emerald-500/10 dark:bg-emerald-500/20", text: "text-emerald-600 dark:text-emerald-400", border: "border-emerald-500/25" },
+  { bg: "bg-amber-500/10 dark:bg-amber-500/20", text: "text-amber-600 dark:text-amber-400", border: "border-amber-500/25" },
+  { bg: "bg-rose-500/10 dark:bg-rose-500/20", text: "text-rose-600 dark:text-rose-400", border: "border-rose-500/25" },
+  { bg: "bg-sky-500/10 dark:bg-sky-500/20", text: "text-sky-600 dark:text-sky-400", border: "border-sky-500/25" },
+  { bg: "bg-teal-500/10 dark:bg-teal-500/20", text: "text-teal-600 dark:text-teal-400", border: "border-teal-500/25" },
+  { bg: "bg-cyan-500/10 dark:bg-cyan-500/20", text: "text-cyan-600 dark:text-cyan-400", border: "border-cyan-500/25" },
+];
+
+function getStudentAvatarInfo(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  let initials = "ST";
+  if (parts.length >= 2) {
+    initials = `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+  } else if (parts.length === 1 && parts[0].length >= 2) {
+    initials = parts[0].substring(0, 2).toUpperCase();
+  } else if (parts.length === 1) {
+    initials = parts[0][0].toUpperCase();
+  }
+
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const palette = AVATAR_PALETTES[Math.abs(hash) % AVATAR_PALETTES.length];
+
+  return { initials, ...palette };
+}
+
 export default function NotificationBell() {
   const [isOpen, setIsOpen] = useState(false);
   const [filterMode, setFilterMode] = useState<"all" | "unread">("all");
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Tier 1: Single expanded experiment ID (Auto-collapses other experiments)
   const [expandedExpId, setExpandedExpId] = useState<string | null>(null);
@@ -217,22 +254,48 @@ export default function NotificationBell() {
   // Tier 3: Single active unstacked category stack ID (Auto-collapses other category stacks)
   const [unstackedCategoryId, setUnstackedCategoryId] = useState<string | null>(null);
 
-
+  const [mounted, setMounted] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const router = useRouter();
   const queryClient = useQueryClient();
   const [bellPulsing, setBellPulsing] = useState(false);
 
-  // Close dropdown on outside click
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Close drawer on outside click, Escape key & lock body scroll while open
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      if (
+        isOpen &&
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node) &&
+        triggerRef.current &&
+        !triggerRef.current.contains(event.target as Node)
+      ) {
         setIsOpen(false);
       }
     }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        setIsOpen(false);
+      }
+    }
+    if (isOpen) {
+      document.addEventListener("keydown", handleKeyDown);
+      document.addEventListener("mousedown", handleClickOutside);
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.body.style.overflow = "";
+    };
+  }, [isOpen]);
 
   // Fetch user profile to determine role (Teacher vs Student)
   const { data: user } = useQuery<any>({
@@ -379,11 +442,29 @@ export default function NotificationBell() {
   const unreadCount = notifications.filter((n: any) => !n.isRead).length;
 
   const visibleNotifications = useMemo(() => {
+    let list = notifications;
     if (filterMode === "unread") {
-      return notifications.filter((n: any) => !n.isRead);
+      list = list.filter((n: any) => !n.isRead);
     }
-    return notifications;
-  }, [notifications, filterMode]);
+    const q = searchQuery.trim().toLowerCase();
+    if (q) {
+      list = list.filter((n: any) => {
+        const title = (n.title || "").toLowerCase();
+        const msg = (n.message || "").toLowerCase();
+        const student = getStudentName(n).toLowerCase();
+        const exp = getNormalizedExperimentGroup(n).name.toLowerCase();
+        const cat = getNotificationIntent(n).category.toLowerCase();
+        return (
+          title.includes(q) ||
+          msg.includes(q) ||
+          student.includes(q) ||
+          exp.includes(q) ||
+          cat.includes(q)
+        );
+      });
+    }
+    return list;
+  }, [notifications, filterMode, searchQuery]);
 
   // Helper to build category stacks for a collection of notifications
   const buildCategoryStacks = (prefix: string, items: any[]): CategoryStack[] => {
@@ -469,7 +550,7 @@ export default function NotificationBell() {
       });
   }, [visibleNotifications, isTeacher]);
 
-  // Auto-expand default: Open first experiment with unread items or first experiment
+  // Auto-expand default: Open first experiment with unread items, first experiment, or on search
   useEffect(() => {
     if (isOpen) {
       const targetExp = groupedNotifications.find((g) => g.unreadCount > 0) || groupedNotifications[0];
@@ -481,7 +562,7 @@ export default function NotificationBell() {
         }
       }
     }
-  }, [isOpen, groupedNotifications.length, isTeacher]);
+  }, [isOpen, groupedNotifications.length, isTeacher, searchQuery]);
 
   // Mark single notification as read
   const readMutation = useMutation({
@@ -538,7 +619,7 @@ export default function NotificationBell() {
     setUnstackedCategoryId((prev) => (prev === stackId ? null : stackId));
   };
 
-  // Render an individual notification card (Samsung One UI capsule style)
+  // Render an individual notification card - Clean, aligned, Apple-grade card
   const renderSingleCard = (notif: any) => {
     const intent = getNotificationIntent(notif);
     const relTime = formatRelativeTime(notif.createdAt);
@@ -552,18 +633,18 @@ export default function NotificationBell() {
       .trim();
 
     return (
-      <button
+      <div
         key={notif.id}
         onClick={() => handleNotificationClick(notif)}
-        className={`w-full p-3 text-left transition-all flex items-start gap-3 rounded-2xl border cursor-pointer group relative shadow-2xs ${
+        className={`w-full p-3 text-left rounded-xl border transition-all duration-200 flex items-start gap-3 cursor-pointer group relative active:scale-[0.99] ${
           !notif.isRead
-            ? "bg-zinc-100 dark:bg-zinc-800 border-primary/40 ring-1 ring-primary/20 shadow-xs hover:border-primary"
-            : "bg-zinc-100/70 dark:bg-zinc-800/60 border-border/60 dark:border-zinc-700/60 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:border-border"
+            ? "bg-violet-50/80 dark:bg-[#1a1824] border-violet-400/50 dark:border-violet-500/35 ring-1 ring-violet-500/20 shadow-xs dark:shadow-[0_2px_10px_rgba(0,0,0,0.4)]"
+            : "bg-white dark:bg-[#18191e] border-zinc-200/90 dark:border-white/10 hover:border-zinc-300 dark:hover:border-white/20 shadow-xs dark:shadow-[0_2px_8px_rgba(0,0,0,0.3)]"
         }`}
       >
-        {/* Rounded Squircle App/Category Icon */}
+        {/* Squircle Icon */}
         <div
-          className={`size-8 rounded-xl border ${intent.avatarBg} flex items-center justify-center shrink-0 mt-0.5 shadow-xs transition-transform group-hover:scale-105`}
+          className={`size-8 rounded-xl border ${intent.avatarBg} flex items-center justify-center shrink-0 mt-0.5 shadow-2xs dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.15)] transition-transform duration-200 group-hover:scale-105`}
         >
           {intent.icon}
         </div>
@@ -572,24 +653,24 @@ export default function NotificationBell() {
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-1.5 flex-wrap">
               <span
-                className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider border ${intent.badgeClass}`}
+                className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider border shadow-2xs ${intent.badgeClass}`}
               >
                 {intent.badgeText}
               </span>
               {!notif.isRead && (
-                <span className="px-1.5 py-0.5 rounded-full text-[8px] font-extrabold uppercase tracking-wider bg-primary/15 text-primary border border-primary/25 flex items-center gap-1">
-                  <span className="size-1 rounded-full bg-primary animate-pulse" />
-                  <span>UNREAD</span>
+                <span className="px-1.5 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/25 flex items-center gap-1 shadow-2xs">
+                  <span className="size-1 rounded-full bg-rose-500 animate-pulse" />
+                  <span>NEW</span>
                 </span>
               )}
               {isLate && (
-                <span className="px-1.5 py-0.5 rounded-full text-[8px] font-extrabold uppercase tracking-wider bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30">
+                <span className="px-1.5 py-0.5 rounded-full text-[8px] font-extrabold uppercase tracking-wider bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30 shadow-2xs">
                   LATE
                 </span>
               )}
             </div>
             <span
-              className="text-[10px] text-zinc-400 dark:text-zinc-400 font-semibold shrink-0"
+              className="text-[10px] text-zinc-400 dark:text-zinc-500 font-semibold shrink-0"
               title={formatDateTimeIST(notif.createdAt)}
             >
               {relTime}
@@ -601,37 +682,53 @@ export default function NotificationBell() {
           </span>
 
           {cleanedMessage && (
-            <p className="text-[11px] text-zinc-600 dark:text-zinc-300 leading-relaxed line-clamp-1 font-medium">
+            <p className="text-[11px] text-zinc-600 dark:text-zinc-300 leading-relaxed line-clamp-2 font-medium break-words">
               {cleanedMessage}
             </p>
           )}
         </div>
 
-        {(notif.link || notif.metadata?.actionUrl) && (
-          <ChevronRight className="size-4 text-muted-foreground/50 group-hover:text-foreground group-hover:translate-x-0.5 transition-all shrink-0 self-center" />
-        )}
-      </button>
+        {/* Quick Actions & Trailing Affordance */}
+        <div className="flex items-center gap-1 shrink-0 self-center">
+          {!notif.isRead && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                readMutation.mutate(notif.id);
+              }}
+              title="Mark as read"
+              className="size-7 rounded-lg bg-zinc-100 hover:bg-emerald-500 hover:text-white dark:bg-zinc-800 dark:hover:bg-emerald-500 text-zinc-600 dark:text-zinc-300 flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 cursor-pointer shadow-2xs active:scale-90"
+            >
+              <Check className="size-3.5" />
+            </button>
+          )}
+          {(notif.link || notif.metadata?.actionUrl) && (
+            <span
+              title="Open Journal"
+              className="size-7.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-zinc-500 hover:text-zinc-900 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-100 flex items-center justify-center transition-all duration-150 shadow-2xs group-hover:translate-x-0.5"
+            >
+              <ArrowUpRight className="size-3.5" />
+            </span>
+          )}
+        </div>
+      </div>
     );
   };
 
-  // Render a Category Stack with authentic Samsung One UI card deck behavior
+  // Render a Category Stack with clean, unified Apple-grade list architecture
   const renderCategoryStack = (stack: CategoryStack) => {
     const isUnstacked = unstackedCategoryId === stack.id;
 
-
-    // If only 1 item, render directly as a single card
+    // If only 1 item, render directly as a single aligned card
     if (stack.items.length === 1) {
       return renderSingleCard(stack.items[0]);
     }
 
-    // Multiple items: Samsung One UI Stacked Deck
+    // Multiple items - Collapsed Stack View: Refined minimal tactile card deck with crisp white paper layers
     if (!isUnstacked) {
       const topNotif = stack.items[0];
       const intent = getNotificationIntent(topNotif);
       const relTime = formatRelativeTime(topNotif.createdAt);
-      const isLate =
-        (topNotif.message || "").toLowerCase().includes("late") ||
-        (topNotif.title || "").toLowerCase().includes("late");
 
       const cleanedMessage = (topNotif.message || "")
         .replace(/\s*\((LATE SUBMISSION|LATE)\)/gi, "")
@@ -642,12 +739,19 @@ export default function NotificationBell() {
         <div
           key={stack.id}
           onClick={() => toggleCategoryStack(stack.id)}
-          className="relative group cursor-pointer mt-1 mb-2 select-none transition-transform active:scale-[0.99]"
+          className="relative isolate group cursor-pointer select-none transition-transform active:scale-[0.99] pb-2"
         >
-          {/* Top Physical Card */}
-          <div className="p-3 text-left bg-zinc-100 dark:bg-zinc-800 border border-border/80 dark:border-zinc-700/80 rounded-2xl shadow-xs flex items-start gap-3 relative z-10 transition-all hover:border-zinc-400 dark:hover:border-zinc-600">
+          {/* Main Top Card */}
+          <div
+            className={`w-full p-3 text-left rounded-xl border transition-all duration-200 flex items-start gap-3 relative z-30 shadow-[0_4px_14px_-2px_rgba(0,0,0,0.08),0_1px_3px_rgba(0,0,0,0.04)] dark:shadow-[0_6px_20px_rgba(0,0,0,0.65)] ${
+              stack.unreadCount > 0
+                ? "bg-violet-50/80 dark:bg-[#1a1824] border-violet-400/50 dark:border-violet-500/35 ring-1 ring-violet-500/20"
+                : "bg-white dark:bg-[#18191e] border-zinc-200/90 dark:border-white/10 group-hover:border-zinc-300 dark:group-hover:border-white/20"
+            }`}
+          >
+            {/* Squircle Icon */}
             <div
-              className={`size-8 rounded-xl border ${intent.avatarBg} flex items-center justify-center shrink-0 mt-0.5 shadow-xs`}
+              className={`size-8 rounded-xl border ${intent.avatarBg} flex items-center justify-center shrink-0 mt-0.5 shadow-2xs dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.15)] transition-transform duration-200 group-hover:scale-105`}
             >
               {intent.icon}
             </div>
@@ -656,23 +760,22 @@ export default function NotificationBell() {
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <span
-                    className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider border ${intent.badgeClass}`}
+                    className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider border shadow-2xs ${intent.badgeClass}`}
                   >
                     {intent.badgeText}
                   </span>
-                  {/* Samsung One UI Stack Indicator Badge */}
-                  <span className="px-1.5 py-0.5 rounded-full text-[8px] font-extrabold uppercase tracking-wider bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-200 border border-border/50 dark:border-zinc-600/50 flex items-center gap-1">
+                  <span className="px-1.5 py-0.5 rounded-full text-[8px] font-extrabold uppercase tracking-wider bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 border border-zinc-200 dark:border-white/10 flex items-center gap-1 shadow-2xs">
                     <Layers className="size-2.5" />
                     <span>{stack.items.length} stacked</span>
                   </span>
                   {stack.unreadCount > 0 && (
-                    <span className="px-1.5 py-0.5 rounded-full text-[8px] font-black bg-primary/15 text-primary border border-primary/25 flex items-center gap-1">
-                      <span className="size-1 rounded-full bg-primary animate-pulse" />
+                    <span className="px-1.5 py-0.5 rounded-full text-[8px] font-black bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/25 flex items-center gap-1 shadow-2xs">
+                      <span className="size-1 rounded-full bg-rose-500 animate-pulse" />
                       <span>{stack.unreadCount} unread</span>
                     </span>
                   )}
                 </div>
-                <span className="text-[10px] text-zinc-400 dark:text-zinc-400 font-semibold shrink-0">
+                <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-semibold shrink-0">
                   {relTime}
                 </span>
               </div>
@@ -681,50 +784,53 @@ export default function NotificationBell() {
                 {topNotif.title}
               </span>
               {cleanedMessage && (
-                <p className="text-[11px] text-zinc-600 dark:text-zinc-300 leading-relaxed line-clamp-1 font-medium">
+                <p className="text-[11px] text-zinc-600 dark:text-zinc-300 leading-relaxed line-clamp-2 font-medium break-words">
                   {cleanedMessage}
                 </p>
               )}
             </div>
+
+            {/* Expand Chevron Affordance */}
+            <div className="flex items-center self-center shrink-0 pr-0.5 text-zinc-400 group-hover:text-zinc-800 dark:group-hover:text-zinc-100 transition-colors">
+              <ChevronDown className="size-4 transition-transform group-hover:translate-y-0.5" />
+            </div>
           </div>
 
-          {/* Samsung One UI Under-Card 1 (Full card shape sitting behind, peeking 3.5px below) */}
-          <div className="absolute inset-x-2 -bottom-1 h-full rounded-2xl bg-zinc-200 dark:bg-zinc-800/80 border border-border/50 dark:border-zinc-700/50 pointer-events-none -z-10 shadow-2xs" />
+          {/* Under-Card 1: Full-body stacked card with disciplined 3.5px peek & realistic shadow */}
+          <div className="absolute inset-x-1.5 top-1 -bottom-1 rounded-xl bg-zinc-50/95 dark:bg-[#15161a] border border-zinc-200/90 dark:border-white/10 z-20 pointer-events-none shadow-[0_3px_10px_-2px_rgba(0,0,0,0.06)] dark:shadow-[0_4px_14px_rgba(0,0,0,0.45)] transition-all duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:-bottom-1.5 group-hover:inset-x-2" />
 
-          {/* Samsung One UI Under-Card 2 (If > 2 items, peeking 6px below) */}
+          {/* Under-Card 2 (if > 2 items): 3rd full-body card layer with 7px peek */}
           {stack.items.length > 2 && (
-            <div className="absolute inset-x-4 -bottom-2 h-full rounded-2xl bg-zinc-300 dark:bg-zinc-800/50 border border-border/40 dark:border-zinc-700/30 pointer-events-none -z-20 shadow-2xs" />
+            <div className="absolute inset-x-3 top-2 -bottom-2 rounded-xl bg-zinc-100/90 dark:bg-[#121316] border border-zinc-200/80 dark:border-white/[0.08] z-10 pointer-events-none shadow-[0_2px_8px_-2px_rgba(0,0,0,0.04)] dark:shadow-[0_2px_10px_rgba(0,0,0,0.35)] transition-all duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:-bottom-3 group-hover:inset-x-4" />
           )}
         </div>
       );
     }
 
-    // Unstacked Expanded View (Matching One UI Screenshot 2: Clean header + individual cards)
+    // Multiple items - Unstacked Expanded View: Contained mini-card with clean dividers
     return (
-      <div key={stack.id} className="flex flex-col gap-2 my-1 animate-in slide-in-from-top-1 duration-150">
-        {/* Clean One UI Section Header with Collapse Action (NO ugly gray outer container!) */}
-        <div className="flex items-center justify-between px-2 pt-1 pb-0.5">
+      <div key={stack.id} className="flex flex-col rounded-xl border border-zinc-200/90 dark:border-white/10 overflow-hidden bg-white dark:bg-[#18191e] shadow-2xs animate-in fade-in-50 duration-150">
+        <div className="flex items-center justify-between px-3.5 py-2 border-b border-zinc-100 dark:border-white/5 bg-zinc-50/80 dark:bg-white/[0.03]">
           <div className="flex items-center gap-1.5">
             <span
-              className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider border ${stack.intent.badgeClass}`}
+              className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider border shadow-2xs ${stack.intent.badgeClass}`}
             >
               {stack.categoryName}
             </span>
-            <span className="text-[10px] font-bold text-muted-foreground">
-              ({stack.items.length} notifications)
+            <span className="text-[10px] font-semibold text-muted-foreground">
+              {stack.items.length} notifications
             </span>
           </div>
           <button
             onClick={() => toggleCategoryStack(stack.id)}
-            className="p-1 text-zinc-400 hover:text-zinc-100 transition-colors cursor-pointer flex items-center gap-1 text-[10px] font-semibold"
+            className="px-2 py-0.5 text-muted-foreground hover:text-foreground transition-colors cursor-pointer flex items-center gap-1 text-[10px] font-semibold rounded hover:bg-zinc-200/50 dark:hover:bg-zinc-800"
           >
             <span>Collapse</span>
-            <ChevronUp className="size-3.5" />
+            <ChevronUp className="size-3" />
           </button>
         </div>
 
-        {/* Individual Cards neatly separated */}
-        <div className="flex flex-col gap-2">
+        <div className="p-2.5 space-y-2 bg-zinc-50/40 dark:bg-black/15">
           {stack.items.map((item) => renderSingleCard(item))}
         </div>
       </div>
@@ -732,9 +838,10 @@ export default function NotificationBell() {
   };
 
   return (
-    <div className="relative" ref={dropdownRef}>
+    <div className="relative">
       {/* Trigger Bell Button */}
       <button
+        ref={triggerRef}
         onClick={() => setIsOpen(!isOpen)}
         aria-label="Open notifications"
         className={`relative size-8 rounded-full glass-btn-violet flex items-center justify-center hover:scale-105 active:scale-95 transition-all cursor-pointer focus:outline-none ${
@@ -749,202 +856,296 @@ export default function NotificationBell() {
         )}
       </button>
 
-      {/* Floating Popover Dropdown */}
-      {isOpen && (
-        <div className="absolute right-0 mt-2.5 w-[390px] sm:w-[430px] rounded-3xl bg-white dark:bg-zinc-900 border border-border shadow-2xl z-[100] overflow-hidden flex flex-col transform origin-top-right transition-all select-none">
-          {/* Header */}
-          <div className="shrink-0 px-4 py-3.5 border-b border-border bg-zinc-50/90 dark:bg-zinc-800/90 backdrop-blur-md flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Sparkles className="size-4 text-primary" />
-              <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">Notifications</span>
-              {unreadCount > 0 && (
-                <span className="px-1.5 py-0.5 rounded-full text-[10px] font-black bg-primary/15 text-primary border border-primary/20">
-                  {unreadCount} new
-                </span>
-              )}
-            </div>
-            {unreadCount > 0 && (
-              <button
-                onClick={() => readAllMutation.mutate()}
-                disabled={readAllMutation.isPending}
-                className="text-[11px] font-bold text-primary hover:underline flex items-center gap-1 cursor-pointer disabled:opacity-50"
-              >
-                <Check className="size-3" />
-                <span>Mark all read</span>
-              </button>
-            )}
-          </div>
+      {/* Slide-Over Drawer Portal & Backdrop mounted directly at document.body */}
+      {isOpen &&
+        mounted &&
+        createPortal(
+          <div className="fixed inset-0 z-[9999] flex justify-end">
+            {/* Dimmed Backdrop */}
+            <div
+              onClick={() => setIsOpen(false)}
+              className="fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity duration-300 animate-in fade-in"
+            />
 
-          {/* Filter Tabs: All vs Unread */}
-          <div className="shrink-0 flex items-center gap-1 px-3 pt-2.5 pb-1.5 border-b border-border/40 bg-zinc-50/40 dark:bg-zinc-900/50">
-            <button
-              onClick={() => setFilterMode("all")}
-              className={`px-3 py-1 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                filterMode === "all"
-                  ? "bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-xs"
-                  : "text-muted-foreground hover:text-foreground hover:bg-zinc-100 dark:hover:bg-zinc-800/50"
-              }`}
+            {/* Slide-In Drawer Panel: Rich tinted canvas (#f8f9fa / #0c0d0e) with deep layered shadow */}
+            <div
+              ref={dropdownRef}
+              className="relative z-10 w-full sm:w-[480px] h-screen max-h-screen bg-[#f8f9fa] dark:bg-[#0c0d0e] border-l border-zinc-200/90 dark:border-white/10 shadow-[-20px_0_60px_-15px_rgba(0,0,0,0.25)] dark:shadow-[-20px_0_60px_-15px_rgba(0,0,0,0.85)] flex flex-col select-none animate-in slide-in-from-right duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]"
             >
-              All ({notifications.length})
-            </button>
-            <button
-              onClick={() => setFilterMode("unread")}
-              className={`px-3 py-1 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
-                filterMode === "unread"
-                  ? "bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-xs"
-                  : "text-muted-foreground hover:text-foreground hover:bg-zinc-100 dark:hover:bg-zinc-800/50"
-              }`}
-            >
-              <span>Unread</span>
-              {unreadCount > 0 && (
-                <span className="size-1.5 rounded-full bg-rose-500 animate-pulse" />
-              )}
-              <span>({unreadCount})</span>
-            </button>
-          </div>
-
-          {/* Ultra-Compact 4px Smooth Scrollable Container */}
-          <div
-            onWheel={(e) => e.stopPropagation()}
-            className="w-full max-h-[360px] overflow-y-auto px-3 pt-3 pb-4 space-y-2.5 notif-scrollbar"
-            style={{
-              maxHeight: "350px",
-              overflowY: "auto",
-              overscrollBehavior: "contain",
-            }}
-          >
-            {isLoading ? (
-              <div className="p-10 flex items-center justify-center text-muted-foreground text-xs gap-2">
-                <Loader2 className="size-4 animate-spin text-primary" />
-                <span>Syncing notifications...</span>
-              </div>
-            ) : groupedNotifications.length === 0 ? (
-              <div className="p-10 flex flex-col items-center justify-center text-muted-foreground/60 text-center gap-2">
-                <MailOpen className="size-7 text-muted-foreground/45" />
-                <span className="text-xs font-medium">
-                  {filterMode === "unread" ? "No unread notifications" : "No notifications yet"}
-                </span>
-              </div>
-            ) : (
-              groupedNotifications.map((expGroup) => {
-                const isExpExpanded = expandedExpId === expGroup.id;
-
-                return (
-                  <div
-                    key={expGroup.id}
-                    className="flex flex-col rounded-2xl border border-border/70 overflow-hidden bg-zinc-50/50 dark:bg-zinc-800/30 transition-all"
-                  >
-                    {/* Tier 1: Experiment Accordion Header (Active Auto-Collapse) */}
-                    <button
-                      onClick={() => toggleExperiment(expGroup.id)}
-                      className={`w-full px-3.5 py-2.5 flex items-center justify-between text-left transition-colors cursor-pointer group ${
-                        isExpExpanded
-                          ? "bg-zinc-100/90 dark:bg-zinc-800/90 text-zinc-900 dark:text-zinc-100"
-                          : "hover:bg-zinc-100/70 dark:hover:bg-zinc-800/70 text-zinc-800 dark:text-zinc-200"
-                      }`}
-                    >
-                      <div className="flex items-center gap-2 min-w-0">
-                        <div className="size-6 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                          <FlaskConical className="size-3.5" />
-                        </div>
-                        <span className="text-xs font-bold truncate">
-                          {expGroup.name}
-                        </span>
-                        <span className="px-1.5 py-0.2 rounded-full text-[9px] font-extrabold bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-200">
-                          {expGroup.items.length}
-                        </span>
-                        {expGroup.unreadCount > 0 && (
-                          <span className="px-1.5 py-0.2 rounded-full text-[9px] font-black bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30">
-                            {expGroup.unreadCount} unread
-                          </span>
-                        )}
-                      </div>
-                      <ChevronDown
-                        className={`size-4 text-muted-foreground group-hover:text-foreground transition-transform duration-200 shrink-0 ${
-                          isExpExpanded ? "rotate-180" : ""
-                        }`}
-                      />
-                    </button>
-
-                    {/* Content inside this experiment */}
-                    {isExpExpanded && (
-                      <div className="px-2.5 pb-2.5 pt-1.5 flex flex-col gap-2.5 border-t border-border/40 animate-in slide-in-from-top-1 duration-150">
-                        {isTeacher ? (
-                          /* TEACHER VIEW: Tier 2 Students List */
-                          expGroup.students.map((studentGroup) => {
-                            const isStudentExpanded = expandedStudentId === studentGroup.id;
-
-                            return (
-                              <div key={studentGroup.id} className="flex flex-col transition-all">
-                                {/* Tier 2 Student Header Button (Auto-collapses other students) */}
-                                <button
-                                  onClick={() => toggleStudent(studentGroup.id)}
-                                  className={`w-full px-3 py-2 flex items-center justify-between group/st cursor-pointer rounded-xl border transition-all ${
-                                    isStudentExpanded
-                                      ? "bg-white dark:bg-zinc-800 border-border text-foreground font-bold shadow-xs"
-                                      : "bg-white/40 dark:bg-zinc-800/40 border-border/40 text-muted-foreground hover:text-foreground hover:bg-white dark:hover:bg-zinc-800"
-                                  }`}
-                                >
-                                  <div className="flex items-center gap-2 min-w-0">
-                                    <div className="size-6 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
-                                      <User className="size-3" />
-                                    </div>
-                                    <span className="text-xs font-bold truncate">
-                                      {studentGroup.studentName}
-                                    </span>
-                                    <span className="px-1.5 py-0.2 rounded-full text-[8px] font-extrabold bg-muted text-muted-foreground border border-border/40">
-                                      {studentGroup.items.length}
-                                    </span>
-                                    {studentGroup.unreadCount > 0 && (
-                                      <span className="px-1.5 py-0.2 rounded-full text-[8px] font-black bg-primary/15 text-primary">
-                                        {studentGroup.unreadCount} new
-                                      </span>
-                                    )}
-                                  </div>
-                                  <ChevronDown
-                                    className={`size-3 text-muted-foreground group-hover/st:text-foreground transition-transform duration-200 shrink-0 ${
-                                      isStudentExpanded ? "rotate-180" : ""
-                                    }`}
-                                  />
-                                </button>
-
-                                {/* Tier 3 Category Stacks inside Student */}
-                                {isStudentExpanded && (
-                                  <div className="mt-2 pl-2.5 flex flex-col gap-2.5 border-l-2 border-emerald-500/30 animate-in slide-in-from-top-1 duration-150">
-                                    {studentGroup.categoryStacks.map((stack) =>
-                                      renderCategoryStack(stack)
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })
-                        ) : (
-                          /* STUDENT VIEW: Direct Category Stacks under Experiment */
-                          expGroup.categoryStacks.map((stack) => renderCategoryStack(stack))
-                        )}
-                      </div>
-                    )}
+              {/* Header with glassmorphism & elevated drop shadow */}
+              <div className="shrink-0 px-5 py-4 border-b border-zinc-200/80 dark:border-white/10 bg-white/85 dark:bg-[#121316]/85 backdrop-blur-xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] dark:shadow-[0_4px_16px_rgba(0,0,0,0.4)] flex items-center justify-between z-10">
+                <div className="flex items-center gap-3">
+                  <div className="size-8.5 rounded-xl bg-primary/10 text-primary border border-primary/20 flex items-center justify-center shrink-0 shadow-xs dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.15)]">
+                    <Sparkles className="size-4" />
                   </div>
-                );
-              })
-            )}
-          </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">
+                        Notifications
+                      </span>
+                      {unreadCount > 0 && (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-primary/15 text-primary border border-primary/20 shadow-xs">
+                          {unreadCount} new
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-muted-foreground font-medium">
+                      {filterMode === "unread" ? `${unreadCount} unread` : `${notifications.length} total`}
+                    </p>
+                  </div>
+                </div>
 
-          {/* Bottom Footer Notice Bar */}
-          <div className="shrink-0 px-4 py-2.5 bg-zinc-50/90 dark:bg-zinc-850/90 border-t border-border/60 flex items-center justify-between text-[11px] text-muted-foreground select-none">
-            <div className="flex items-center gap-1.5">
-              <Clock className="size-3 text-primary/80 shrink-0" />
-              <span>Read items auto-cleared in <strong className="text-foreground font-semibold">7 days</strong></span>
+                <div className="flex items-center gap-2">
+                  {unreadCount > 0 && (
+                    <button
+                      onClick={() => readAllMutation.mutate()}
+                      disabled={readAllMutation.isPending}
+                      className="px-2.5 py-1 rounded-lg text-xs font-semibold text-primary hover:bg-primary/10 flex items-center gap-1.5 cursor-pointer disabled:opacity-50 transition-colors shadow-xs"
+                    >
+                      <Check className="size-3.5" />
+                      <span>Mark all read</span>
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setIsOpen(false)}
+                    className="size-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-zinc-200/70 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+                    aria-label="Close notifications"
+                  >
+                    <X className="size-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Apple Segmented Control Filter & Elevated Search */}
+              <div className="shrink-0 px-4 pt-3.5 pb-3 border-b border-zinc-200/70 dark:border-white/[0.08] bg-white/50 dark:bg-[#121316]/50 backdrop-blur-md flex flex-col gap-2.5">
+                <div className="flex p-1 rounded-xl bg-zinc-200/70 dark:bg-zinc-800/90 border border-zinc-300/50 dark:border-white/[0.06] shadow-inner gap-1">
+                  <button
+                    onClick={() => setFilterMode("all")}
+                    className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                      filterMode === "all"
+                        ? "bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 font-bold shadow-[0_2px_6px_rgba(0,0,0,0.12),0_1px_2px_rgba(0,0,0,0.06)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_2px_8px_rgba(0,0,0,0.4)]"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <span>All</span>
+                    <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${filterMode === "all" ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 font-bold" : "text-muted-foreground"}`}>
+                      {notifications.length}
+                    </span>
+                  </button>
+                  <button
+                    onClick={() => setFilterMode("unread")}
+                    className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                      filterMode === "unread"
+                        ? "bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 font-bold shadow-[0_2px_6px_rgba(0,0,0,0.12),0_1px_2px_rgba(0,0,0,0.06)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_2px_8px_rgba(0,0,0,0.4)]"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <span>Unread</span>
+                    {unreadCount > 0 && (
+                      <span className="size-1.5 rounded-full bg-rose-500 animate-pulse" />
+                    )}
+                    <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${filterMode === "unread" ? "bg-rose-500/15 text-rose-600 dark:text-rose-400 font-bold" : "text-muted-foreground"}`}>
+                      {unreadCount}
+                    </span>
+                  </button>
+                </div>
+
+                {/* Instant Search Bar with subtle depth */}
+                <div className="relative flex items-center">
+                  <Search className="absolute left-3 size-3.5 text-muted-foreground/60 pointer-events-none" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search by experiment, student, or title..."
+                    className="w-full pl-9 pr-7 py-2 text-xs rounded-xl bg-white dark:bg-zinc-800/90 border border-zinc-200/90 dark:border-white/10 placeholder:text-muted-foreground/60 text-foreground shadow-[0_1px_3px_rgba(0,0,0,0.04)] dark:shadow-[inset_0_1px_2px_rgba(0,0,0,0.3)] focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary/50 transition-all"
+                  />
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery("")}
+                      className="absolute right-2 p-0.5 rounded hover:bg-muted text-muted-foreground cursor-pointer"
+                    >
+                      <X className="size-3" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Full-Height Smooth Scrollable Container with high-contrast canvas */}
+              <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3.5 notif-scrollbar">
+                {isLoading ? (
+                  <div className="p-10 flex items-center justify-center text-muted-foreground text-xs gap-2">
+                    <Loader2 className="size-4 animate-spin text-primary" />
+                    <span>Syncing notifications...</span>
+                  </div>
+                ) : groupedNotifications.length === 0 ? (
+                  searchQuery.trim() ? (
+                    <div className="p-12 flex flex-col items-center justify-center text-muted-foreground/60 text-center gap-2">
+                      <Search className="size-8 text-muted-foreground/40" />
+                      <span className="text-xs font-semibold text-foreground">No matches found</span>
+                      <p className="text-[11px] text-muted-foreground">
+                        No notifications matched &ldquo;{searchQuery}&rdquo;
+                      </p>
+                      <button
+                        onClick={() => setSearchQuery("")}
+                        className="mt-2 px-3 py-1 text-xs font-semibold rounded-lg bg-zinc-200 dark:bg-zinc-800 text-foreground hover:bg-zinc-300 dark:hover:bg-zinc-700 cursor-pointer shadow-xs"
+                      >
+                        Clear Search
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="p-16 flex flex-col items-center justify-center text-muted-foreground/60 text-center gap-3">
+                      <MailOpen className="size-9 text-muted-foreground/45" />
+                      <span className="text-xs font-medium">
+                        {filterMode === "unread" ? "No unread notifications" : "No notifications yet"}
+                      </span>
+                    </div>
+                  )
+                ) : (
+                  groupedNotifications.map((expGroup) => {
+                    const isExpExpanded = expandedExpId === expGroup.id;
+
+                    return (
+                      <div
+                        key={expGroup.id}
+                        className="flex flex-col rounded-2xl border border-zinc-200/90 dark:border-white/10 overflow-hidden bg-white dark:bg-[#141518] shadow-[0_4px_16px_-4px_rgba(0,0,0,0.06),0_1px_3px_rgba(0,0,0,0.04)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_6px_24px_rgba(0,0,0,0.5)] transition-all"
+                      >
+                        {/* Tier 1: Experiment Accordion Header (Active Auto-Collapse) */}
+                        <button
+                          onClick={() => toggleExperiment(expGroup.id)}
+                          className={`w-full px-4 py-3 flex items-center justify-between text-left transition-all cursor-pointer group active:scale-[0.99] ${
+                            isExpExpanded
+                              ? "bg-zinc-100/90 dark:bg-[#1a1b20] text-zinc-900 dark:text-zinc-100 font-bold border-b border-zinc-200/80 dark:border-white/10"
+                              : "bg-white dark:bg-[#141518] hover:bg-zinc-50 dark:hover:bg-[#18191d] text-zinc-800 dark:text-zinc-200 font-semibold"
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="size-6.5 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0 shadow-xs">
+                              <FlaskConical className="size-3.5" />
+                            </div>
+                            <span className="text-xs font-bold truncate">
+                              {expGroup.name}
+                            </span>
+                            <span className="px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-zinc-200/80 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-200 shadow-xs">
+                              {expGroup.items.length}
+                            </span>
+                            {expGroup.unreadCount > 0 && (
+                              <span className="px-1.5 py-0.5 rounded-full text-[9px] font-black bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30 flex items-center gap-1 shadow-xs">
+                                <span className="size-1.5 rounded-full bg-rose-500 animate-pulse" />
+                                <span>{expGroup.unreadCount} unread</span>
+                              </span>
+                            )}
+                          </div>
+                          <ChevronDown
+                            className={`size-3.5 text-muted-foreground group-hover:text-foreground transition-transform duration-250 ease-out shrink-0 ${
+                              isExpExpanded ? "rotate-180" : ""
+                            }`}
+                          />
+                        </button>
+
+                        {/* Content inside this experiment with Emil Kowalski CSS Grid height transition */}
+                        <div
+                          className={`grid transition-[grid-template-rows] duration-250 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+                            isExpExpanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+                          }`}
+                        >
+                          <div className="overflow-hidden">
+                            {isTeacher ? (
+                              <div className="divide-y divide-zinc-100 dark:divide-white/5 bg-white dark:bg-[#141518]">
+                                {/* TEACHER VIEW: Students List as clean rows */}
+                                {expGroup.students.map((studentGroup) => {
+                                  const isStudentExpanded = expandedStudentId === studentGroup.id;
+                                  const avatar = getStudentAvatarInfo(studentGroup.studentName);
+
+                                  return (
+                                    <div key={studentGroup.id} className="flex flex-col">
+                                      {/* Tier 2 Student Header Row */}
+                                      <button
+                                        onClick={() => toggleStudent(studentGroup.id)}
+                                        className={`w-full px-4 py-2.5 flex items-center justify-between group/st cursor-pointer transition-colors ${
+                                          isStudentExpanded
+                                            ? "bg-zinc-50 dark:bg-white/[0.03] text-zinc-900 dark:text-zinc-100 font-bold border-b border-zinc-100 dark:border-white/5"
+                                            : "hover:bg-zinc-50/80 dark:hover:bg-white/[0.03] text-zinc-700 dark:text-zinc-300 font-semibold"
+                                        }`}
+                                      >
+                                        <div className="flex items-center gap-2.5 min-w-0">
+                                          <div
+                                            className={`size-6 rounded-lg border ${avatar.border} ${avatar.bg} ${avatar.text} flex items-center justify-center font-bold text-[9px] shrink-0 tracking-tight shadow-xs`}
+                                          >
+                                            {avatar.initials}
+                                          </div>
+                                          <span className="text-xs truncate font-semibold">
+                                            {studentGroup.studentName}
+                                          </span>
+                                          <span className="px-1.5 py-0.5 rounded-full text-[8px] font-bold bg-zinc-200/80 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300 shadow-xs">
+                                            {studentGroup.items.length}
+                                          </span>
+                                          {studentGroup.unreadCount > 0 && (
+                                            <span className="px-1.5 py-0.5 rounded-full text-[8px] font-black bg-primary/15 text-primary flex items-center gap-1 shadow-xs">
+                                              <span className="size-1 rounded-full bg-primary animate-pulse" />
+                                              <span>{studentGroup.unreadCount}</span>
+                                            </span>
+                                          )}
+                                        </div>
+                                        <ChevronDown
+                                          className={`size-3 text-muted-foreground group-hover/st:text-foreground transition-transform duration-200 shrink-0 ${
+                                            isStudentExpanded ? "rotate-180" : ""
+                                          }`}
+                                        />
+                                      </button>
+
+                                      {/* Tier 3 Category Stacks inside Student: Elevated card tray */}
+                                      <div
+                                        className={`grid transition-[grid-template-rows] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+                                          isStudentExpanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+                                        }`}
+                                      >
+                                        <div className="overflow-hidden">
+                                          <div className="p-3 space-y-2.5 pb-4 bg-zinc-50/50 dark:bg-black/20">
+                                            {studentGroup.categoryStacks.map((stack) =>
+                                              renderCategoryStack(stack)
+                                            )}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            ) : (
+                              /* STUDENT VIEW: Direct Category Stacks under Experiment in elevated card tray */
+                              <div className="p-3 space-y-2.5 pb-4 bg-zinc-50/50 dark:bg-black/20">
+                                {expGroup.categoryStacks.map((stack) => renderCategoryStack(stack))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              {/* Bottom Footer Notice Bar */}
+              <div className="shrink-0 px-5 py-3.5 bg-white/85 dark:bg-[#121316]/85 backdrop-blur-xl border-t border-zinc-200/80 dark:border-white/10 shadow-[0_-2px_10px_rgba(0,0,0,0.03)] dark:shadow-[0_-4px_16px_rgba(0,0,0,0.4)] flex items-center justify-between text-xs text-muted-foreground select-none">
+                <div className="flex items-center gap-1.5">
+                  <Clock className="size-3.5 text-primary/80 shrink-0" />
+                  <span>Read items auto-cleared in <strong className="text-foreground font-semibold">7 days</strong></span>
+                </div>
+                {unreadCount > 0 ? (
+                  <span className="text-[11px] font-semibold text-rose-500">
+                    {unreadCount} unread
+                  </span>
+                ) : (
+                  <span className="text-[11px] text-muted-foreground/80">
+                    All caught up
+                  </span>
+                )}
+              </div>
             </div>
-            {unreadCount > 0 && (
-              <span className="text-[10px] font-medium text-muted-foreground/80">
-                {unreadCount} unread
-              </span>
-            )}
-          </div>
-        </div>
-      )}
+          </div>,
+          document.body
+        )}
     </div>
   );
 }
