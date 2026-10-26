@@ -238,7 +238,7 @@ function InlineReplyBox({
 
 /** RECURSIVE SUB-THREAD TREE (Self-contained segment lines with zero overhang across all levels) */
 function SubThreadTree({
-  children,
+  items,
   stemLeftPx,
   curveWidthPx,
   contentLeftPaddingClass,
@@ -253,7 +253,7 @@ function SubThreadTree({
   onRejectSuggestion,
   onResolveAnnotation,
 }: {
-  children: CommentNode[];
+  items: CommentNode[];
   stemLeftPx: number;
   curveWidthPx: number;
   contentLeftPaddingClass: string;
@@ -270,9 +270,9 @@ function SubThreadTree({
 }) {
   return (
     <div className="relative flex flex-col">
-      {children.map((childNode, idx) => {
+      {items.map((childNode, idx) => {
         const ann = childNode.comment;
-        const isLast = idx === children.length - 1;
+        const isLast = idx === items.length - 1;
         const text = ann.content || ann.message || "";
         const isReplyingToThis = activeReplyTargetId === ann.id;
         const hasSubChildren = childNode.children.length > 0;
@@ -396,7 +396,7 @@ function SubThreadTree({
                 className="relative flex flex-col"
               >
                 <SubThreadTree
-                  children={childNode.children}
+                  items={childNode.children}
                   stemLeftPx={stemLeftPx}
                   curveWidthPx={24}
                   contentLeftPaddingClass="pl-9"
@@ -722,7 +722,7 @@ function RootThreadNode({
           {isThreadExpanded && (
             <div className="relative flex flex-col">
               <SubThreadTree
-                children={node.children}
+                items={node.children}
                 stemLeftPx={16}
                 curveWidthPx={30}
                 contentLeftPaddingClass="pl-11"

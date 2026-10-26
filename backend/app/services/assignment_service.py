@@ -96,7 +96,7 @@ class AssignmentService:
 
             # 1. Dispatch In-App Notification & WebSocket
             msg = f"Experiment #{request.experimentNumber}: {request.title} has been published in {classroom['name']}."
-            link = f"/classrooms/{classroom_id}"
+            link = f"/classrooms/{classroom_id}?tab=assignments&assignmentId={assignment_id}"
             metadata = {
                 "entityType": "classrooms",
                 "entityId": classroom_id,
@@ -112,6 +112,10 @@ class AssignmentService:
                 type_str="assignment",
                 link=link,
                 metadata=metadata,
+                entity_type="assignment",
+                entity_id=assignment_id,
+                classroom_id=classroom_id,
+                category="assignment",
             )
 
             try:
@@ -129,6 +133,10 @@ class AssignmentService:
                             "isRead": False,
                             "link": link,
                             "metadata": metadata,
+                            "entityType": "assignment",
+                            "entityId": assignment_id,
+                            "classroomId": classroom_id,
+                            "category": "assignment",
                             "createdAt": notif_doc["createdAt"].isoformat(),
                         },
                     },

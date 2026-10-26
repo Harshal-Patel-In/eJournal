@@ -103,7 +103,19 @@ class CommentService:
             "createdAt": datetime.now(timezone.utc),
         }
 
-        return await self.comment_repo.create_comment(comment_data)
+        created_comment = await self.comment_repo.create_comment(comment_data)
+        await self._dispatch_comment_notification(
+            journal=journal,
+            created_comment=created_comment,
+            author_id=author_id,
+            author_name=author_name,
+            author_role="teacher",
+            journal_id=journal_id,
+            block_id=payload.blockId,
+            comment_type=ann_type,
+            text_content=text_content,
+        )
+        return created_comment
 
     async def add_comment(
         self, author_id: str, author_role: str, payload: CommentCreateRequest
@@ -142,7 +154,33 @@ class CommentService:
         }
         created_comment = await self.comment_repo.create_comment(comment_data)
 
-        # Notify the other party (teacher or student)
+        await self._dispatch_comment_notification(
+            journal=journal,
+            created_comment=created_comment,
+            author_id=author_id,
+            author_name=author_name,
+            author_role=author_role,
+            journal_id=payload.journalId,
+            block_id=payload.blockId,
+            comment_type=payload.type,
+            text_content=text_content,
+        )
+
+        return created_comment
+
+    async def _dispatch_comment_notification(
+        self,
+        journal: dict,
+        created_comment: dict,
+        author_id: str,
+        author_name: str,
+        author_role: str,
+        journal_id: str,
+        block_id: str | None,
+        comment_type: str | None,
+        text_content: str,
+    ) -> None:
+        """Helper to dispatch notification and websocket update for comments and annotations."""
         try:
             from app.repositories.notification_repository import NotificationRepository
             from app.repositories.assignment_repository import AssignmentRepository
@@ -150,30 +188,37 @@ class CommentService:
             from app.core.websocket_manager import websocket_manager
 
             notification_repo = NotificationRepository()
+            asg_repo = AssignmentRepository()
+            class_repo = ClassroomRepository()
+
+            asg = await asg_repo.find_by_id(journal.get("assignmentId", ""))
+            classroom_id = asg.get("classroomId", "") if asg else ""
+
             recipient_id = None
             if author_role == "teacher":
                 recipient_id = journal.get("studentId")
             else:
-                asg_repo = AssignmentRepository()
-                class_repo = ClassroomRepository()
-                asg = await asg_repo.find_by_id(journal.get("assignmentId", ""))
-                if asg:
-                    classroom = await class_repo.find_by_id(asg.get("classroomId", ""))
+                if classroom_id:
+                    classroom = await class_repo.find_by_id(classroom_id)
                     if classroom:
                         recipient_id = classroom.get("teacherId")
 
             if recipient_id and recipient_id != author_id:
-                type_label = payload.type.capitalize() if payload.type else "Comment"
+                raw_type = (comment_type or "comment").lower()
+                category = raw_type if raw_type in ["question", "suggestion", "warning", "approval", "comment"] else "comment"
+                type_label = comment_type.capitalize() if comment_type else "Comment"
                 notif_title = f"New {type_label} on Journal"
-                notif_msg = f"{author_name} posted a {type_label.lower()}: '{text_content[:60]}...'" if len(text_content) > 60 else f"{author_name} posted a {type_label.lower()}: '{text_content}'"
-                notif_link = f"/editor/{payload.journalId}"
+                preview = f"'{text_content[:60]}...'" if len(text_content) > 60 else f"'{text_content}'"
+                notif_msg = f"{author_name} posted a {type_label.lower()}: {preview}"
+                notif_link = f"/editor/{journal_id}?blockId={block_id}" if block_id else f"/editor/{journal_id}"
                 notif_metadata = {
-                    "entityType": "journals",
-                    "entityId": payload.journalId,
-                    "blockId": payload.blockId,
+                    "entityType": "journal",
+                    "entityId": journal_id,
+                    "journalId": journal_id,
+                    "blockId": block_id,
                     "commentId": created_comment.get("id"),
                     "actionUrl": notif_link,
-                    "category": "comment",
+                    "category": category,
                 }
                 notif_doc = await notification_repo.create_notification(
                     user_id=recipient_id,
@@ -182,6 +227,11 @@ class CommentService:
                     type_str="comment",
                     link=notif_link,
                     metadata=notif_metadata,
+                    entity_type="journal",
+                    entity_id=journal_id,
+                    sub_entity_id=block_id,
+                    classroom_id=classroom_id,
+                    category=category,
                 )
                 await websocket_manager.send_personal_notification(
                     recipient_id,
@@ -196,14 +246,17 @@ class CommentService:
                             "isRead": False,
                             "link": notif_link,
                             "metadata": notif_metadata,
+                            "entityType": "journal",
+                            "entityId": journal_id,
+                            "subEntityId": block_id,
+                            "classroomId": classroom_id,
+                            "category": category,
                             "createdAt": notif_doc["createdAt"].isoformat(),
                         },
                     },
                 )
         except Exception:
             pass
-
-        return created_comment
 
     async def list_journal_comments(
         self, journal_id: str, user_id: str | None = None, user_role: str | None = None

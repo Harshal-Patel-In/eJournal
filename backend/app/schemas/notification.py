@@ -17,6 +17,11 @@ class NotificationResponse(BaseModel):
     isRead: bool = Field(..., description="Has student/teacher read this notification")
     link: str | None = Field(None, description="Optional relative UI path to route user click action")
     metadata: dict | None = Field(None, description="Structured event metadata for deep-linking, filtering and categorizing")
+    entityType: str | None = Field(None, description="Target domain entity type (journal, assignment, classroom)")
+    entityId: str | None = Field(None, description="Target domain entity primary ID")
+    subEntityId: str | None = Field(None, description="Optional sub-entity ID like blockId for inline annotations")
+    classroomId: str | None = Field(None, description="Associated classroom ID")
+    category: str | None = Field(None, description="Pedagogical category (question, suggestion, warning, revision, approval, submission, etc.)")
     createdAt: datetime = Field(..., description="Time notification was dispatched")
 
     model_config = {

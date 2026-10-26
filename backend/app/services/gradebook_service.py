@@ -505,3 +505,77 @@ class GradebookService:
             "cumulativeAverageScore": cumulative_avg,
             "classroomsProgress": classrooms_progress,
         }
+
+    async def get_teacher_analytics(self, teacher_id: str) -> dict:
+        """Construct operational dashboard telemetry for an instructor."""
+        classrooms = await self.classroom_repo.find_by_teacher_id(teacher_id)
+        classroom_ids = [c["id"] for c in classrooms]
+
+        if not classroom_ids:
+            return {
+                "totalClassrooms": 0,
+                "totalStudents": 0,
+                "totalAssignments": 0,
+                "pendingSubmissions": 0,
+                "approvedSubmissions": 0,
+                "classroomsStats": {},
+            }
+
+        # 2. Fetch all assignments across teacher's classrooms
+        assignments = await self.assignment_repo.find_many({"classroomId": {"$in": classroom_ids}})
+        assignment_ids = [a["id"] for a in assignments]
+
+        assignments_by_classroom: dict[str, int] = {cid: 0 for cid in classroom_ids}
+        for a in assignments:
+            cid = a.get("classroomId")
+            if cid in assignments_by_classroom:
+                assignments_by_classroom[cid] += 1
+
+        # 3. Fetch unique students per classroom and overall
+        all_unique_students: set[str] = set()
+        students_by_classroom: dict[str, int] = {cid: 0 for cid in classroom_ids}
+        for cid in classroom_ids:
+            members = await self.membership_repo.find_members_by_classroom_id(cid)
+            c_students = {m["studentId"] for m in members if m.get("studentId")}
+            students_by_classroom[cid] = len(c_students)
+            all_unique_students.update(c_students)
+
+        # 4. Fetch pending journals across these assignments
+        pending_by_classroom: dict[str, int] = {cid: 0 for cid in classroom_ids}
+        total_pending = 0
+        total_approved = 0
+
+        if assignment_ids:
+            asg_to_classroom = {a["id"]: a.get("classroomId") for a in assignments}
+            journals = await self.journal_repo.find_many(
+                {"assignmentId": {"$in": assignment_ids}}, limit=5000
+            )
+            for j in journals:
+                st = j.get("status")
+                asg_id = j.get("assignmentId")
+                cid = asg_to_classroom.get(asg_id)
+                if st in ("submitted", "late_submitted"):
+                    total_pending += 1
+                    if cid and cid in pending_by_classroom:
+                        pending_by_classroom[cid] += 1
+                elif st == "approved":
+                    total_approved += 1
+
+        classrooms_stats = {}
+        for c in classrooms:
+            cid = c["id"]
+            classrooms_stats[cid] = {
+                "studentCount": students_by_classroom.get(cid, 0),
+                "assignmentCount": assignments_by_classroom.get(cid, 0),
+                "pendingReviewCount": pending_by_classroom.get(cid, 0),
+            }
+
+        return {
+            "totalClassrooms": len(classrooms),
+            "totalStudents": len(all_unique_students),
+            "totalAssignments": len(assignments),
+            "pendingSubmissions": total_pending,
+            "approvedSubmissions": total_approved,
+            "classroomsStats": classrooms_stats,
+        }
+

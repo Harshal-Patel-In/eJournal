@@ -70,6 +70,11 @@ export function formatLatexForKatex(input: string): string {
   processed = processed.replace(/\(\s*\^\\circ\s*C\s*\)/gi, "(^{\\circ}\\text{C})");
   processed = processed.replace(/\^\\circ\s*C\b/gi, "^{\\circ}\\text{C}");
 
+  // 0f. Normalize Unicode fraction and division slashes (⁄ U+2044, ∕ U+2215), minus signs, and dots
+  processed = processed.replace(/[⁄∕]/g, "/");
+  processed = processed.replace(/[−–—]/g, "-");
+  processed = processed.replace(/[·∙]/g, " \\cdot ");
+
   // 1. Greek letter shortcut conversion
   const GREEK_WORDS = [
     "alpha", "beta", "gamma", "delta", "epsilon", "zeta", "eta", "theta",
@@ -182,7 +187,7 @@ export function formatLatexForKatex(input: string): string {
   const formattedLines = [];
   let hasEqualsAlignment = false;
 
-  for (let rawLine of rawLines) {
+  for (const rawLine of rawLines) {
     const rawTrimmed = rawLine.trim();
     if (!rawTrimmed) continue;
 

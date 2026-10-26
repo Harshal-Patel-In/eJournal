@@ -31,7 +31,6 @@ class AnnouncementService:
         if not memberships:
             return
 
-        notif_docs = []
         target_student_ids = []
         now = datetime.now(timezone.utc)
         link = f"/classrooms/{classroom_id}?tab=announcements"
@@ -54,21 +53,20 @@ class AnnouncementService:
                 continue
 
             target_student_ids.append(student_id)
-            notif_docs.append(
-                {
-                    "userId": student_id,
-                    "title": f"Announcement in {classroom_name}",
-                    "message": announcement_title,
-                    "type": "announcement",
-                    "link": link,
-                    "metadata": metadata,
-                    "isRead": False,
-                    "createdAt": now,
-                }
-            )
 
-        if notif_docs:
-            await self.notification_repo.insert_many(notif_docs)
+        if target_student_ids:
+            await self.notification_repo.create_many_notifications(
+                user_ids=target_student_ids,
+                title=f"Announcement in {classroom_name}",
+                message=announcement_title,
+                type_str="announcement",
+                link=link,
+                metadata=metadata,
+                entity_type="classroom",
+                entity_id=classroom_id,
+                classroom_id=classroom_id,
+                category="announcement",
+            )
             try:
                 from app.core.websocket_manager import websocket_manager
                 await websocket_manager.broadcast_to_users(
@@ -82,6 +80,10 @@ class AnnouncementService:
                             "isRead": False,
                             "link": link,
                             "metadata": metadata,
+                            "entityType": "classroom",
+                            "entityId": classroom_id,
+                            "classroomId": classroom_id,
+                            "category": "announcement",
                             "createdAt": now.isoformat(),
                         },
                     },

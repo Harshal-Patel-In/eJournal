@@ -55,7 +55,7 @@ npm-debug.log*
 # Testing
 coverage/
 
-.agents/
+.agent/
 brag-output
 documents/SECURITY_AUDIT_REPORT
 documents/SECURITY_AUDIT_REPORT.md

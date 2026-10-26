@@ -32,6 +32,7 @@ export default function EditorPage({ params }: PageProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const assignmentIdParam = searchParams.get("assignmentId");
+  const blockIdParam = searchParams.get("blockId");
   const queryClient = useQueryClient();
 
   const [mounted, setMounted] = useState(false);
@@ -188,6 +189,25 @@ export default function EditorPage({ params }: PageProps) {
       togglePreview();
     }
   }, [user, previewMode, togglePreview]);
+
+  // Auto-scroll to target block when opened via deep-link (e.g. comment/annotation notifications)
+  useEffect(() => {
+    if (blockIdParam && journal && !journalLoading) {
+      setActiveAnnotationBlockId(blockIdParam);
+      setShowReviewDrawer(true);
+      const timer = setTimeout(() => {
+        const el = document.getElementById(`block-${blockIdParam}`) || document.getElementById(blockIdParam);
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+          el.classList.add("ring-2", "ring-indigo-500", "ring-offset-4");
+          setTimeout(() => {
+            el.classList.remove("ring-2", "ring-indigo-500", "ring-offset-4");
+          }, 2500);
+        }
+      }, 400);
+      return () => clearTimeout(timer);
+    }
+  }, [blockIdParam, journal, journalLoading]);
 
   // Helper to build save payload with snapshot map of content at time of dispatch
   const buildSavePayload = (state: ReturnType<typeof useDocumentStore.getState>) => {
@@ -523,7 +543,9 @@ export default function EditorPage({ params }: PageProps) {
 
   const isEditable = (status === "draft" || status === "changes_requested") && user?.role === "student";
   const saveMutationRef = useRef(saveMutation);
-  saveMutationRef.current = saveMutation;
+  useEffect(() => {
+    saveMutationRef.current = saveMutation;
+  });
 
   // Auto-Save Debounce
   useEffect(() => {

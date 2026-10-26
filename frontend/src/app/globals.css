@@ -129,28 +129,36 @@
   }
 }
 
+/* Pure CSS Ambient Workspace Lighting System */
 .bg-textured-workspace {
   position: relative;
-  background-color: #edeef2;
+  background-color: #f8fafc;
+  background-image: 
+    radial-gradient(at 0% 0%, #e0e7ff 0px, transparent 55%),
+    radial-gradient(at 100% 0%, #ede9fe 0px, transparent 50%),
+    radial-gradient(at 50% 25%, #e0f2fe 0px, transparent 50%),
+    radial-gradient(at 100% 100%, #f1f5f9 0px, transparent 50%);
+  background-attachment: fixed;
 }
 
 .bg-textured-workspace::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  background-image: url('https://img.magnific.com/free-photo/white-wall-textures_74190-2830.jpg?semt=ais_hybrid&w=740&q=80');
-  background-repeat: repeat;
-  background-size: 500px auto;
-  opacity: 0.40;
-  pointer-events: none;
-  z-index: 0;
+  display: none !important;
 }
 
-:is(.dark *) .bg-textured-workspace {
-  background-color: transparent;
+:is(.dark *) .bg-textured-workspace,
+:is(.dark) .bg-textured-workspace,
+.dark .bg-textured-workspace {
+  background-color: #08090d !important;
+  background-image: 
+    radial-gradient(at 50% 0%, rgba(99, 102, 241, 0.32) 0px, transparent 65%),
+    radial-gradient(at 15% 30%, rgba(139, 92, 246, 0.20) 0px, transparent 50%),
+    radial-gradient(at 85% 25%, rgba(14, 165, 233, 0.18) 0px, transparent 50%) !important;
+  background-attachment: fixed !important;
 }
 
-:is(.dark *) .bg-textured-workspace::before {
+:is(.dark *) .bg-textured-workspace::before,
+:is(.dark) .bg-textured-workspace::before,
+.dark .bg-textured-workspace::before {
   display: none !important;
 }
 

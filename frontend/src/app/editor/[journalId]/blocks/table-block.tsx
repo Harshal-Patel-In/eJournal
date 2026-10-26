@@ -49,7 +49,7 @@ export default function TableBlock({ id, content, previewMode }: TableBlockProps
     formulas: Record<number, string> = columnFormulas,
     precisions: Record<number, string> = columnPrecision
   ): string[] => {
-    let computedRow = [...row];
+    const computedRow = [...row];
     for (const [colIdxStr, formula] of Object.entries(formulas)) {
       const targetCol = parseInt(colIdxStr, 10);
       if (isNaN(targetCol) || targetCol < 0 || targetCol >= currentHeaders.length) continue;
@@ -73,7 +73,7 @@ export default function TableBlock({ id, content, previewMode }: TableBlockProps
   const updateCell = (rowIndex: number, colIndex: number, value: string) => {
     const nextRows = rows.map((row, rIdx) => {
       if (rIdx === rowIndex) {
-        let nextRow = [...row];
+        const nextRow = [...row];
         nextRow[colIndex] = applyMathShortcuts(value);
         return recomputeRowFormulas(nextRow);
       }
@@ -134,14 +134,14 @@ export default function TableBlock({ id, content, previewMode }: TableBlockProps
       const maxColsInPaste = Math.max(...parsedData.map((r) => r.length));
       const numNewCols = Math.max(headers.length, startCol + maxColsInPaste);
 
-      let nextHeaders = [...headers];
+      const nextHeaders = [...headers];
       while (nextHeaders.length < numNewCols) {
         nextHeaders.push(`Column ${nextHeaders.length + 1}`);
       }
 
-      let nextRows: string[][] = [];
+      const nextRows: string[][] = [];
       for (let r = 0; r < numNewRows; r++) {
-        let rowData = r < rows.length ? [...rows[r]] : Array(headers.length).fill("");
+        const rowData = r < rows.length ? [...rows[r]] : Array(headers.length).fill("");
         while (rowData.length < numNewCols) {
           rowData.push("");
         }

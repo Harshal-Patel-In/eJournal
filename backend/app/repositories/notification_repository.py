@@ -21,9 +21,21 @@ class NotificationRepository(BaseRepository):
         type_str: str,
         link: str | None = None,
         metadata: dict | None = None,
+        entity_type: str | None = None,
+        entity_id: str | None = None,
+        sub_entity_id: str | None = None,
+        classroom_id: str | None = None,
+        category: str | None = None,
     ) -> dict:
         """Create a new user notification and return the created record."""
         now = datetime.now(timezone.utc)
+        meta = metadata or {}
+        ent_type = entity_type or meta.get("entityType")
+        ent_id = entity_id or meta.get("entityId") or meta.get("journalId") or meta.get("assignmentId")
+        sub_ent_id = sub_entity_id or meta.get("subEntityId") or meta.get("blockId")
+        cls_id = classroom_id or meta.get("classroomId")
+        cat = category or meta.get("category") or type_str
+
         doc = {
             "userId": user_id,
             "title": title,
@@ -31,7 +43,12 @@ class NotificationRepository(BaseRepository):
             "type": type_str,
             "isRead": False,
             "link": link,
-            "metadata": metadata or {},
+            "metadata": meta,
+            "entityType": ent_type,
+            "entityId": ent_id,
+            "subEntityId": sub_ent_id,
+            "classroomId": cls_id,
+            "category": cat,
             "createdAt": now,
         }
         notif_id = await self.insert_one(doc)
@@ -46,11 +63,23 @@ class NotificationRepository(BaseRepository):
         type_str: str,
         link: str | None = None,
         metadata: dict | None = None,
+        entity_type: str | None = None,
+        entity_id: str | None = None,
+        sub_entity_id: str | None = None,
+        classroom_id: str | None = None,
+        category: str | None = None,
     ) -> list[dict]:
         """Create notifications for multiple users efficiently."""
         if not user_ids:
             return []
         now = datetime.now(timezone.utc)
+        meta = metadata or {}
+        ent_type = entity_type or meta.get("entityType")
+        ent_id = entity_id or meta.get("entityId") or meta.get("journalId") or meta.get("assignmentId")
+        sub_ent_id = sub_entity_id or meta.get("subEntityId") or meta.get("blockId")
+        cls_id = classroom_id or meta.get("classroomId")
+        cat = category or meta.get("category") or type_str
+
         docs = [
             {
                 "userId": uid,
@@ -59,7 +88,12 @@ class NotificationRepository(BaseRepository):
                 "type": type_str,
                 "isRead": False,
                 "link": link,
-                "metadata": metadata or {},
+                "metadata": meta,
+                "entityType": ent_type,
+                "entityId": ent_id,
+                "subEntityId": sub_ent_id,
+                "classroomId": cls_id,
+                "category": cat,
                 "createdAt": now,
             }
             for uid in user_ids

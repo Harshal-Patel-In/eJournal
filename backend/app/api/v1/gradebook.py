@@ -47,3 +47,14 @@ async def get_student_analytics(
     """Retrieve overall academic progress and performance analytics for current student."""
     analytics = await gradebook_service.get_student_analytics(user["id"])
     return success_response(analytics)
+
+
+@router.get("/analytics/teacher", response_model=ApiResponse[dict])
+async def get_teacher_analytics(
+    user: dict = Depends(RoleChecker(["teacher"])),
+    gradebook_service: GradebookService = Depends(),
+):
+    """Retrieve operational dashboard telemetry for authenticated instructor."""
+    analytics = await gradebook_service.get_teacher_analytics(user["id"])
+    return success_response(analytics)
+

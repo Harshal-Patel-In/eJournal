@@ -24,11 +24,19 @@ import {
   X,
   Search,
   ArrowUpRight,
+  HelpCircle,
+  AlertTriangle,
+  MessageSquare,
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { formatRelativeTimeIST, formatDateTimeIST } from "@/lib/date";
+import {
+  resolveNotificationCategory,
+  resolveNotificationTarget,
+  getCategoryDisplayMeta,
+} from "@/lib/notification-resolver";
 
 interface CategoryStack {
   id: string;
@@ -56,78 +64,36 @@ interface ExperimentGroup {
   unreadCount: number;
 }
 
-function getNotificationIntent(notif: any) {
-  const type = (notif.type || "").toLowerCase();
-  const title = (notif.title || "").toLowerCase();
-  const message = (notif.message || "").toLowerCase();
-  const isLate = message.includes("late") || title.includes("late");
+function getNotificationIntent(notif: any, isTeacher: boolean = true, hasJournal: boolean = false) {
+  const category = resolveNotificationCategory(notif);
+  const meta = getCategoryDisplayMeta(category, isTeacher, hasJournal);
 
-  if (type === "assignment" || title.includes("assignment")) {
-    return {
-      category: "Assignment",
-      badgeText: "Assignment",
-      icon: <BookOpen className="size-4 text-indigo-600 dark:text-indigo-400 shrink-0" />,
-      avatarBg: "bg-indigo-500/10 dark:bg-indigo-500/20 border-indigo-500/25 dark:border-indigo-500/35",
-      badgeClass: "bg-indigo-50 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-500/30",
-    };
-  }
-
-  if (isLate) {
-    return {
-      category: "Late Submission",
-      badgeText: "Late Submission",
-      icon: <ClockAlert className="size-4 text-rose-600 dark:text-rose-400 shrink-0" />,
-      avatarBg: "bg-rose-500/10 dark:bg-rose-500/20 border-rose-500/25 dark:border-rose-500/35",
-      badgeClass: "bg-rose-50 dark:bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-500/30 font-extrabold",
-    };
-  }
-
-  if (type === "submission" || title.includes("submission") || title.includes("handed in")) {
-    return {
-      category: "Submission",
-      badgeText: "Submitted",
-      icon: <FileCheck className="size-4 text-emerald-600 dark:text-emerald-400 shrink-0" />,
-      avatarBg: "bg-emerald-500/10 dark:bg-emerald-500/20 border-emerald-500/25 dark:border-emerald-500/35",
-      badgeClass: "bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/30",
-    };
-  }
-
-  if (type === "changes_requested" || title.includes("changes requested") || title.includes("revision")) {
-    return {
-      category: "Revision",
-      badgeText: "Revision",
-      icon: <FileEdit className="size-4 text-amber-600 dark:text-amber-400 shrink-0" />,
-      avatarBg: "bg-amber-500/10 dark:bg-amber-500/20 border-amber-500/25 dark:border-amber-500/35",
-      badgeClass: "bg-amber-50 dark:bg-amber-500/15 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-500/30 font-extrabold",
-    };
-  }
-
-  if (type === "approval" || title.includes("approved") || title.includes("graded")) {
-    return {
-      category: "Graded",
-      badgeText: "Approved & Graded",
-      icon: <GraduationCap className="size-4 text-teal-600 dark:text-teal-400 shrink-0" />,
-      avatarBg: "bg-teal-500/10 dark:bg-teal-500/20 border-teal-500/25 dark:border-teal-500/35",
-      badgeClass: "bg-teal-50 dark:bg-teal-500/15 text-teal-700 dark:text-teal-300 border-teal-200 dark:border-teal-500/30",
-    };
-  }
-
-  if (type === "announcement" || title.includes("announcement")) {
-    return {
-      category: "Announcement",
-      badgeText: "Announcement",
-      icon: <Megaphone className="size-4 text-cyan-600 dark:text-cyan-400 shrink-0" />,
-      avatarBg: "bg-cyan-500/10 dark:bg-cyan-500/20 border-cyan-500/25 dark:border-cyan-500/35",
-      badgeClass: "bg-cyan-50 dark:bg-cyan-500/15 text-cyan-800 dark:text-cyan-300 border-cyan-200 dark:border-cyan-500/30",
-    };
+  let icon = <Bell className="size-4 text-primary shrink-0" />;
+  if (meta.iconType === "help-circle") {
+    icon = <HelpCircle className="size-4 text-purple-600 dark:text-purple-400 shrink-0" />;
+  } else if (meta.iconType === "sparkles") {
+    icon = <Sparkles className="size-4 text-amber-600 dark:text-amber-400 shrink-0" />;
+  } else if (meta.iconType === "alert-triangle") {
+    icon = <AlertTriangle className="size-4 text-rose-600 dark:text-rose-400 shrink-0" />;
+  } else if (meta.iconType === "message-square") {
+    icon = <MessageSquare className="size-4 text-sky-600 dark:text-sky-400 shrink-0" />;
+  } else if (meta.iconType === "clock-alert") {
+    icon = <ClockAlert className="size-4 text-rose-600 dark:text-rose-400 shrink-0" />;
+  } else if (meta.iconType === "file-check") {
+    icon = <FileCheck className="size-4 text-emerald-600 dark:text-emerald-400 shrink-0" />;
+  } else if (meta.iconType === "file-edit") {
+    icon = <FileEdit className="size-4 text-amber-600 dark:text-amber-400 shrink-0" />;
+  } else if (meta.iconType === "graduation") {
+    icon = <GraduationCap className="size-4 text-teal-600 dark:text-teal-400 shrink-0" />;
+  } else if (meta.iconType === "book") {
+    icon = <BookOpen className="size-4 text-indigo-600 dark:text-indigo-400 shrink-0" />;
+  } else if (meta.iconType === "megaphone") {
+    icon = <Megaphone className="size-4 text-cyan-600 dark:text-cyan-400 shrink-0" />;
   }
 
   return {
-    category: "System",
-    badgeText: "Notification",
-    icon: <Bell className="size-4 text-primary shrink-0" />,
-    avatarBg: "bg-primary/10 dark:bg-primary/20 border-primary/20 dark:border-primary/30",
-    badgeClass: "bg-primary/10 dark:bg-primary/15 text-primary border-primary/20 dark:border-primary/30",
+    ...meta,
+    icon,
   };
 }
 
@@ -304,6 +270,64 @@ export default function NotificationBell() {
   });
   const isTeacher = user?.role === "teacher";
 
+  // Fetch student journals if user is student to enable instant deep-linking into the journal
+  const { data: studentJournalsRes } = useQuery<any>({
+    queryKey: ["student-journals"],
+    queryFn: () => api.get("/journals"),
+    enabled: !isTeacher && mounted,
+  });
+  const studentJournals: any[] = useMemo(() => {
+    return Array.isArray(studentJournalsRes) ? studentJournalsRes : studentJournalsRes?.data || [];
+  }, [studentJournalsRes]);
+
+  const findStudentJournalForNotif = (notif: any) => {
+    // 1. If notif already has direct journal link in link (e.g. /editor/6a5cf4904e8114f803ae84e2)
+    if (notif.link && notif.link.startsWith("/editor/")) {
+      const linkId = notif.link.replace("/editor/", "").split("?")[0];
+      return { id: linkId, _id: linkId, status: "approved" };
+    }
+
+    // 2. Direct journalId or entityId in metadata
+    const directId = notif.metadata?.journalId || (notif.metadata?.entityType === "journals" ? notif.metadata?.entityId : null);
+    if (directId) {
+      if (studentJournals && studentJournals.length > 0) {
+        const match = studentJournals.find((j: any) => (j.id || j._id) === directId);
+        if (match) return match;
+      }
+      return { id: directId, _id: directId };
+    }
+
+    if (!studentJournals || studentJournals.length === 0) return null;
+
+    // 3. AssignmentId in metadata or link query
+    let asgId = notif.metadata?.assignmentId;
+    if (!asgId && notif.link && notif.link.includes("assignment")) {
+      const match = notif.link.match(/assignment(?:Id)?=([a-f0-9]+)/i);
+      if (match) asgId = match[1];
+    }
+    if (asgId) {
+      const match = studentJournals.find((j: any) => j.assignmentId === asgId);
+      if (match) return match;
+    }
+
+    // 4. Match by experiment number in normalized group:
+    const expGroup = getNormalizedExperimentGroup(notif);
+    if (expGroup.sortIndex && expGroup.sortIndex < 900) {
+      const expNum = expGroup.sortIndex;
+      const match = studentJournals.find((j: any) => {
+        const title = (j.title || "").toLowerCase();
+        const numMatch = title.match(/(?:Experiment|Practical|Lab)\s*#?\s*(\d+)/i);
+        if (numMatch && parseInt(numMatch[1], 10) === expNum) {
+          return true;
+        }
+        return false;
+      });
+      if (match) return match;
+    }
+
+    return null;
+  };
+
   // Real-Time WebSocket Notification Streaming
   useEffect(() => {
     let ws: WebSocket | null = null;
@@ -470,7 +494,8 @@ export default function NotificationBell() {
   const buildCategoryStacks = (prefix: string, items: any[]): CategoryStack[] => {
     const catMap = new Map<string, any[]>();
     items.forEach((item) => {
-      const intent = getNotificationIntent(item);
+      const studentJournal = !isTeacher ? findStudentJournalForNotif(item) : null;
+      const intent = getNotificationIntent(item, isTeacher, !!studentJournal);
       const catKey = intent.category;
       if (!catMap.has(catKey)) {
         catMap.set(catKey, []);
@@ -478,13 +503,16 @@ export default function NotificationBell() {
       catMap.get(catKey)!.push(item);
     });
 
-    return Array.from(catMap.entries()).map(([catKey, catItems]) => ({
-      id: `${prefix}_${catKey}`.replace(/\s+/g, "_"),
-      categoryName: catKey,
-      intent: getNotificationIntent(catItems[0]),
-      items: catItems,
-      unreadCount: catItems.filter((i) => !i.isRead).length,
-    }));
+    return Array.from(catMap.entries()).map(([catKey, catItems]) => {
+      const topJournal = !isTeacher ? findStudentJournalForNotif(catItems[0]) : null;
+      return {
+        id: `${prefix}_${catKey}`.replace(/\s+/g, "_"),
+        categoryName: catKey,
+        intent: getNotificationIntent(catItems[0], isTeacher, !!topJournal),
+        items: catItems,
+        unreadCount: catItems.filter((i) => !i.isRead).length,
+      };
+    });
   };
 
   // Build role-aware tree:
@@ -548,7 +576,7 @@ export default function NotificationBell() {
           };
         }
       });
-  }, [visibleNotifications, isTeacher]);
+  }, [visibleNotifications, isTeacher, studentJournals]);
 
   // Auto-expand default: Open first experiment with unread items, first experiment, or on search
   useEffect(() => {
@@ -585,7 +613,63 @@ export default function NotificationBell() {
       readMutation.mutate(notif.id);
     }
     setIsOpen(false);
-    const targetUrl = notif.metadata?.actionUrl || notif.link;
+
+    const studentJournal = !isTeacher ? findStudentJournalForNotif(notif) : null;
+    const studentJournalId = studentJournal?.id || studentJournal?._id || null;
+
+    // STUDENT VIEW: When a student clicks an assignment notification and has no journal yet,
+    // start or open the journal via POST /journals
+    if (!isTeacher && !studentJournalId && (notif.category === "assignment" || notif.type === "assignment")) {
+      let asgId =
+        (notif.entityType === "assignment" ? notif.entityId : null) ||
+        notif.metadata?.assignmentId;
+
+      if (!asgId && notif.link && notif.link.includes("assignment")) {
+        const match = notif.link.match(/assignment(?:Id)?=([a-f0-9]+)/i);
+        if (match) asgId = match[1];
+      }
+
+      if (!asgId) {
+        const classroomId =
+          notif.classroomId ||
+          notif.metadata?.classroomId ||
+          (notif.link?.startsWith("/classrooms/")
+            ? notif.link.replace("/classrooms/", "").split("?")[0].split("/")[0]
+            : null);
+        const expGroup = getNormalizedExperimentGroup(notif);
+        if (classroomId && expGroup.sortIndex && expGroup.sortIndex < 900) {
+          try {
+            const asgs: any = await api.get(`/classrooms/${classroomId}/assignments`);
+            const asgList: any[] = Array.isArray(asgs) ? asgs : asgs?.data || [];
+            const matchedAsg = asgList.find((a: any) => a.experimentNumber === expGroup.sortIndex);
+            if (matchedAsg) asgId = matchedAsg.id || matchedAsg._id;
+          } catch (e) {
+            console.error("Failed to fetch classroom assignments:", e);
+          }
+        }
+      }
+
+      if (asgId) {
+        try {
+          const res: any = await api.post("/journals", { assignmentId: asgId });
+          const journalId = res?.id || res?._id || (typeof res === "string" ? res : null);
+          if (journalId) {
+            queryClient.invalidateQueries({ queryKey: ["student-journals"] });
+            router.push(`/editor/${journalId}`);
+            return;
+          }
+        } catch (e) {
+          console.error("Failed to start/open journal for assignment:", e);
+        }
+      }
+    }
+
+    // RESOLVE TARGET FOR TEACHER & GENERAL
+    const targetUrl = resolveNotificationTarget(notif, {
+      isTeacher,
+      studentJournalId,
+    });
+
     if (targetUrl) {
       router.push(targetUrl);
     }
@@ -621,7 +705,8 @@ export default function NotificationBell() {
 
   // Render an individual notification card - Clean, aligned, Apple-grade card
   const renderSingleCard = (notif: any) => {
-    const intent = getNotificationIntent(notif);
+    const studentJournal = !isTeacher ? findStudentJournalForNotif(notif) : null;
+    const intent = getNotificationIntent(notif, isTeacher, !!studentJournal);
     const relTime = formatRelativeTime(notif.createdAt);
     const isLate =
       (notif.message || "").toLowerCase().includes("late") ||
@@ -663,7 +748,7 @@ export default function NotificationBell() {
                   <span>NEW</span>
                 </span>
               )}
-              {isLate && (
+              {isLate && !intent.badgeText.toUpperCase().includes("LATE") && (
                 <span className="px-1.5 py-0.5 rounded-full text-[8px] font-extrabold uppercase tracking-wider bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30 shadow-2xs">
                   LATE
                 </span>
@@ -692,23 +777,31 @@ export default function NotificationBell() {
         <div className="flex items-center gap-1 shrink-0 self-center">
           {!notif.isRead && (
             <button
+              type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 readMutation.mutate(notif.id);
               }}
               title="Mark as read"
+              aria-label="Mark as read"
               className="size-7 rounded-lg bg-zinc-100 hover:bg-emerald-500 hover:text-white dark:bg-zinc-800 dark:hover:bg-emerald-500 text-zinc-600 dark:text-zinc-300 flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 cursor-pointer shadow-2xs active:scale-90"
             >
               <Check className="size-3.5" />
             </button>
           )}
-          {(notif.link || notif.metadata?.actionUrl) && (
-            <span
-              title="Open Journal"
-              className="size-7.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-zinc-500 hover:text-zinc-900 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-100 flex items-center justify-center transition-all duration-150 shadow-2xs group-hover:translate-x-0.5"
+          {(notif.link || notif.metadata?.actionUrl || notif.metadata?.entityId || notif.entityId || notif.entityType || studentJournal || notif.type === "assignment") && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleNotificationClick(notif);
+              }}
+              title={intent.actionLabel || "Open"}
+              aria-label={intent.actionLabel || "Open notification"}
+              className={`size-7.5 rounded-lg border border-zinc-200/70 dark:border-white/10 bg-zinc-100 text-zinc-500 dark:bg-zinc-800/80 dark:text-zinc-400 flex items-center justify-center transition-all duration-200 shadow-2xs cursor-pointer active:scale-95 ${intent.cardHoverBtn} ${intent.directHoverBtn}`}
             >
-              <ArrowUpRight className="size-3.5" />
-            </span>
+              <ArrowUpRight className="size-3.5 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+            </button>
           )}
         </div>
       </div>
@@ -727,7 +820,8 @@ export default function NotificationBell() {
     // Multiple items - Collapsed Stack View: Refined minimal tactile card deck with crisp white paper layers
     if (!isUnstacked) {
       const topNotif = stack.items[0];
-      const intent = getNotificationIntent(topNotif);
+      const topJournal = !isTeacher ? findStudentJournalForNotif(topNotif) : null;
+      const intent = getNotificationIntent(topNotif, isTeacher, !!topJournal);
       const relTime = formatRelativeTime(topNotif.createdAt);
 
       const cleanedMessage = (topNotif.message || "")
@@ -738,11 +832,11 @@ export default function NotificationBell() {
       return (
         <div
           key={stack.id}
-          onClick={() => toggleCategoryStack(stack.id)}
           className="relative isolate group cursor-pointer select-none transition-transform active:scale-[0.99] pb-2"
         >
           {/* Main Top Card */}
           <div
+            onClick={() => handleNotificationClick(topNotif)}
             className={`w-full p-3 text-left rounded-xl border transition-all duration-200 flex items-start gap-3 relative z-30 shadow-[0_4px_14px_-2px_rgba(0,0,0,0.08),0_1px_3px_rgba(0,0,0,0.04)] dark:shadow-[0_6px_20px_rgba(0,0,0,0.65)] ${
               stack.unreadCount > 0
                 ? "bg-violet-50/80 dark:bg-[#1a1824] border-violet-400/50 dark:border-violet-500/35 ring-1 ring-violet-500/20"
@@ -790,9 +884,32 @@ export default function NotificationBell() {
               )}
             </div>
 
-            {/* Expand Chevron Affordance */}
-            <div className="flex items-center self-center shrink-0 pr-0.5 text-zinc-400 group-hover:text-zinc-800 dark:group-hover:text-zinc-100 transition-colors">
-              <ChevronDown className="size-4 transition-transform group-hover:translate-y-0.5" />
+            {/* Quick Actions & Trailing Affordance */}
+            <div className="flex items-center gap-1 self-center shrink-0">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleNotificationClick(topNotif);
+                }}
+                title={intent.actionLabel || "Open"}
+                aria-label={intent.actionLabel || "Open notification"}
+                className={`size-7.5 rounded-lg border border-zinc-200/70 dark:border-white/10 bg-zinc-100 text-zinc-500 dark:bg-zinc-800/80 dark:text-zinc-400 flex items-center justify-center transition-all duration-200 shadow-2xs cursor-pointer active:scale-95 ${intent.cardHoverBtn} ${intent.directHoverBtn}`}
+              >
+                <ArrowUpRight className="size-3.5 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleCategoryStack(stack.id);
+                }}
+                title="Expand stacked notifications"
+                aria-label="Expand stacked notifications"
+                className="size-7 rounded-lg text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <ChevronDown className="size-4 transition-transform group-hover:translate-y-0.5" />
+              </button>
             </div>
           </div>
 
@@ -856,21 +973,21 @@ export default function NotificationBell() {
         )}
       </button>
 
-      {/* Slide-Over Drawer Portal & Backdrop mounted directly at document.body */}
+      {/* Apple-style Floating Island Drawer Portal mounted directly at document.body */}
       {isOpen &&
         mounted &&
         createPortal(
-          <div className="fixed inset-0 z-[9999] flex justify-end">
+          <div className="fixed inset-0 z-[9999] flex justify-end p-2.5 sm:p-3.5 pointer-events-none">
             {/* Dimmed Backdrop */}
             <div
               onClick={() => setIsOpen(false)}
-              className="fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity duration-300 animate-in fade-in"
+              className="fixed inset-0 bg-black/40 backdrop-blur-md transition-opacity duration-300 animate-in fade-in pointer-events-auto"
             />
 
-            {/* Slide-In Drawer Panel: Rich tinted canvas (#f8f9fa / #0c0d0e) with deep layered shadow */}
+            {/* Apple Floating Island Drawer Panel: Continuous squircle curvature, perimeter border & layered depth */}
             <div
               ref={dropdownRef}
-              className="relative z-10 w-full sm:w-[480px] h-screen max-h-screen bg-[#f8f9fa] dark:bg-[#0c0d0e] border-l border-zinc-200/90 dark:border-white/10 shadow-[-20px_0_60px_-15px_rgba(0,0,0,0.25)] dark:shadow-[-20px_0_60px_-15px_rgba(0,0,0,0.85)] flex flex-col select-none animate-in slide-in-from-right duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]"
+              className="relative z-10 w-full sm:w-[480px] h-full max-h-[calc(100vh-20px)] sm:max-h-[calc(100vh-28px)] rounded-3xl bg-[#f8f9fa] dark:bg-[#0c0d0e] border border-zinc-200/90 dark:border-white/10 ring-1 ring-black/5 dark:ring-white/10 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3),_0_0_0_1px_rgba(255,255,255,0.4)] dark:shadow-[0_24px_70px_-15px_rgba(0,0,0,0.9),_0_0_0_1px_rgba(255,255,255,0.08)] flex flex-col select-none overflow-hidden animate-in slide-in-from-right duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] pointer-events-auto"
             >
               {/* Header with glassmorphism & elevated drop shadow */}
               <div className="shrink-0 px-5 py-4 border-b border-zinc-200/80 dark:border-white/10 bg-white/85 dark:bg-[#121316]/85 backdrop-blur-xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] dark:shadow-[0_4px_16px_rgba(0,0,0,0.4)] flex items-center justify-between z-10">

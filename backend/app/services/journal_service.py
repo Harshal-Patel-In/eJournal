@@ -777,16 +777,20 @@ class JournalService:
                 exp_num = assignment.get("experimentNumber", 1)
 
                 late_str = " (LATE SUBMISSION)" if is_late else ""
+                sub_category = "late_submission" if is_late else "submission"
                 msg = f"{student_name} has handed in the journal for Experiment #{exp_num} in {classroom_name}{late_str}."
-                link = f"/classrooms/{classroom['id']}/grades?assignment={assignment['id']}"
+                link = f"/editor/{journal_id}"
                 metadata = {
-                    "entityType": "journals",
+                    "entityType": "journal",
                     "entityId": journal_id,
+                    "journalId": journal_id,
+                    "studentId": student_id,
+                    "studentName": student_name,
                     "classroomId": classroom["id"],
                     "assignmentId": assignment["id"],
                     "experimentNumber": exp_num,
                     "actionUrl": link,
-                    "category": "submission",
+                    "category": sub_category,
                 }
                 notif_doc = await notification_repo.create_notification(
                     user_id=teacher_id,
@@ -795,6 +799,10 @@ class JournalService:
                     type_str="submission",
                     link=link,
                     metadata=metadata,
+                    entity_type="journal",
+                    entity_id=journal_id,
+                    classroom_id=classroom["id"],
+                    category=sub_category,
                 )
 
                 try:
@@ -809,6 +817,10 @@ class JournalService:
                                 "title": "Journal Submission",
                                 "message": msg,
                                 "type": "submission",
+                                "entityType": "journal",
+                                "entityId": journal_id,
+                                "classroomId": classroom["id"],
+                                "category": sub_category,
                                 "isRead": False,
                                 "link": link,
                                 "metadata": metadata,
@@ -1015,13 +1027,14 @@ class JournalService:
         changes_msg = f"Your teacher requested changes on Experiment #{exp_num}: '{payload.remarks}'"
         changes_link = f"/editor/{journal_id}"
         changes_metadata = {
-            "entityType": "journals",
+            "entityType": "journal",
             "entityId": journal_id,
+            "journalId": journal_id,
             "classroomId": assignment["classroomId"],
             "assignmentId": assignment["id"],
             "experimentNumber": exp_num,
             "actionUrl": changes_link,
-            "category": "review",
+            "category": "revision",
         }
         notif_doc = await notification_repo.create_notification(
             user_id=journal["studentId"],
@@ -1030,6 +1043,10 @@ class JournalService:
             type_str="review",
             link=changes_link,
             metadata=changes_metadata,
+            entity_type="journal",
+            entity_id=journal_id,
+            classroom_id=assignment["classroomId"],
+            category="revision",
         )
 
         try:
@@ -1044,6 +1061,10 @@ class JournalService:
                         "title": "Changes Requested",
                         "message": changes_msg,
                         "type": "review",
+                        "entityType": "journal",
+                        "entityId": journal_id,
+                        "classroomId": assignment["classroomId"],
+                        "category": "revision",
                         "isRead": False,
                         "link": changes_link,
                         "metadata": changes_metadata,
@@ -1136,8 +1157,9 @@ class JournalService:
         approve_msg = f"Experiment #{exp_num} approved! Marks awarded: {payload.marks}/{max_marks}."
         approve_link = f"/editor/{journal_id}"
         approve_metadata = {
-            "entityType": "journals",
+            "entityType": "journal",
             "entityId": journal_id,
+            "journalId": journal_id,
             "classroomId": assignment["classroomId"],
             "assignmentId": assignment["id"],
             "experimentNumber": exp_num,
@@ -1153,6 +1175,10 @@ class JournalService:
             type_str="approval",
             link=approve_link,
             metadata=approve_metadata,
+            entity_type="journal",
+            entity_id=journal_id,
+            classroom_id=assignment["classroomId"],
+            category="approval",
         )
 
         try:
@@ -1167,6 +1193,10 @@ class JournalService:
                         "title": "Journal Approved",
                         "message": approve_msg,
                         "type": "approval",
+                        "entityType": "journal",
+                        "entityId": journal_id,
+                        "classroomId": assignment["classroomId"],
+                        "category": "approval",
                         "isRead": False,
                         "link": approve_link,
                         "metadata": approve_metadata,

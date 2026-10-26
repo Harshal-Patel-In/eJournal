@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import {
   Image as ImageIcon,
@@ -108,14 +108,7 @@ export default function ImageBlock({ id, content, previewMode }: ImageBlockProps
 
   const mainCaption = content.mainCaption || (content.images ? content.caption || "" : "");
 
-  // Fetch Recycle Bin items whenever the drawer opens
-  useEffect(() => {
-    if (isRecycleBinOpen) {
-      fetchTrash();
-    }
-  }, [isRecycleBinOpen]);
-
-  const fetchTrash = async () => {
+  const fetchTrash = useCallback(async () => {
     setLoadingTrash(true);
     try {
       const data = await api.get<TrashedAsset[]>("/uploads/trash");
@@ -125,7 +118,14 @@ export default function ImageBlock({ id, content, previewMode }: ImageBlockProps
     } finally {
       setLoadingTrash(false);
     }
-  };
+  }, []);
+
+  // Fetch Recycle Bin items whenever the drawer opens
+  useEffect(() => {
+    if (isRecycleBinOpen) {
+      fetchTrash();
+    }
+  }, [isRecycleBinOpen, fetchTrash]);
 
   const handleMultipleFilesUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);

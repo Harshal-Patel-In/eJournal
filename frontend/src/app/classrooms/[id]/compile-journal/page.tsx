@@ -75,24 +75,25 @@ export default function CompileJournalPage({ params }: PageProps) {
       return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
     });
 
-    let cumulativePage = 4; // Pages 1 (Cover), 2 (Certificate), 3 (Index Table)
-
-    const list = sortedAssignments.map((asg, idx) => {
+    let currentPage = 4; // Pages 1 (Cover), 2 (Certificate), 3 (Index Table)
+    const list = [];
+    for (let idx = 0; idx < sortedAssignments.length; idx++) {
+      const asg = sortedAssignments[idx];
       const journal = allJournals.find((j) => j.assignmentId === asg.id);
       const estPages = journal?.blocks?.length ? Math.max(1, Math.ceil(journal.blocks.length / 4)) : 1;
-      const startPage = cumulativePage;
-      const endPage = cumulativePage + estPages - 1;
-      cumulativePage = endPage + 1;
+      const startPage = currentPage;
+      const endPage = currentPage + estPages - 1;
+      currentPage = endPage + 1;
 
-      return {
+      list.push({
         index: idx + 1,
         assignment: asg,
         journal: journal || null,
         startPage,
         endPage,
         pageRange: startPage === endPage ? `${startPage}` : `${startPage} – ${endPage}`,
-      };
-    });
+      });
+    }
 
     if (isSingleMode && targetJournalId) {
       const found = list.filter((p) => p.journal?.id === targetJournalId);

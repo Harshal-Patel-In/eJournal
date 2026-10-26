@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import {
   Plus,
@@ -75,6 +75,11 @@ export function TableSpreadsheetModal({
     }
   }, [initialFormulaCol]);
 
+  const handleSaveAndClose = useCallback(() => {
+    onSave(headers, rows, columnFormulas, columnPrecision);
+    onClose();
+  }, [headers, rows, columnFormulas, columnPrecision, onSave, onClose]);
+
   // Handle ESC key to close
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -121,7 +126,7 @@ export function TableSpreadsheetModal({
     formulas: Record<number, string> = columnFormulas,
     precisions: Record<number, string> = columnPrecision
   ): string[] => {
-    let computedRow = [...row];
+    const computedRow = [...row];
     for (const [colIdxStr, formula] of Object.entries(formulas)) {
       const targetCol = parseInt(colIdxStr, 10);
       if (isNaN(targetCol) || targetCol < 0 || targetCol >= currentHeaders.length) continue;
@@ -145,7 +150,7 @@ export function TableSpreadsheetModal({
   const updateCell = (rowIdx: number, colIdx: number, val: string) => {
     const next = rows.map((r, rIdx) => {
       if (rIdx === rowIdx) {
-        let nextR = [...r];
+        const nextR = [...r];
         nextR[colIdx] = applyMathShortcuts(val);
         return recomputeRowFormulas(nextR);
       }
@@ -231,14 +236,14 @@ export function TableSpreadsheetModal({
       const maxColsInPaste = Math.max(...parsedData.map((r) => r.length));
       const numNewCols = Math.max(headers.length, startCol + maxColsInPaste);
 
-      let nextHeaders = [...headers];
+      const nextHeaders = [...headers];
       while (nextHeaders.length < numNewCols) {
         nextHeaders.push(`Column ${nextHeaders.length + 1}`);
       }
 
-      let nextRows: string[][] = [];
+      const nextRows: string[][] = [];
       for (let r = 0; r < numNewRows; r++) {
-        let rowData = r < rows.length ? [...rows[r]] : Array(headers.length).fill("");
+        const rowData = r < rows.length ? [...rows[r]] : Array(headers.length).fill("");
         while (rowData.length < numNewCols) {
           rowData.push("");
         }
@@ -261,10 +266,6 @@ export function TableSpreadsheetModal({
     }
   };
 
-  const handleSaveAndClose = () => {
-    onSave(headers, rows, columnFormulas, columnPrecision);
-    onClose();
-  };
 
   return createPortal(
     <div className="fixed inset-0 z-[99999] w-screen h-screen bg-background flex flex-col overflow-hidden animate-in fade-in-50 duration-150 select-text">
