@@ -15,6 +15,7 @@ import EditorToolbar from "./editor-toolbar";
 import BlockWrapper from "./block-wrapper";
 import BlockRenderer from "./block-renderer";
 import FloatingToolbox from "./floating-toolbox";
+import TableOfContents from "./table-of-contents";
 import ConflictDialog from "./conflict-dialog";
 import ReviewDrawer from "./review-drawer";
 import { SubmitDialog } from "./submit-dialog";
@@ -1125,6 +1126,9 @@ export default function EditorPage({ params }: PageProps) {
             )}
           </div>
         </main>
+
+        {/* Right-Side Table of Contents / Outline Rail */}
+        {(!isTeacher || !showReviewDrawer) && <TableOfContents />}
 
         {/* Teacher Review Panel — Floating Right Sidebar */}
         {isTeacher && showReviewDrawer && (
