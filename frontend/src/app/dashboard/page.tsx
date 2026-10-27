@@ -41,55 +41,8 @@ import { Button } from "@/components/ui/button";
 import NotificationBell from "@/components/notification-bell";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { cn } from "@/lib/utils";
-
-const CLASSROOM_THEMES = [
-  {
-    // Muted Slate Sky
-    indicator: "bg-sky-500/70 dark:bg-sky-400/60",
-    badge:
-      "bg-sky-500/[0.06] text-sky-800 dark:text-sky-300 border-sky-500/20 font-semibold",
-    hoverBorder: "hover:border-sky-500/35",
-    hoverTitle: "group-hover:text-primary",
-  },
-  {
-    // Muted Sage
-    indicator: "bg-emerald-600/70 dark:bg-emerald-400/60",
-    badge:
-      "bg-emerald-600/[0.06] text-emerald-800 dark:text-emerald-300 border-emerald-600/20 font-semibold",
-    hoverBorder: "hover:border-emerald-600/35",
-    hoverTitle: "group-hover:text-primary",
-  },
-  {
-    // Muted Slate Violet
-    indicator: "bg-violet-600/70 dark:bg-violet-400/60",
-    badge:
-      "bg-violet-600/[0.06] text-violet-800 dark:text-violet-300 border-violet-600/20 font-semibold",
-    hoverBorder: "hover:border-violet-600/35",
-    hoverTitle: "group-hover:text-primary",
-  },
-  {
-    // Muted Warm Amber / Ochre
-    indicator: "bg-amber-600/70 dark:bg-amber-400/60",
-    badge:
-      "bg-amber-600/[0.06] text-amber-800 dark:text-amber-300 border-amber-600/20 font-semibold",
-    hoverBorder: "hover:border-amber-600/35",
-    hoverTitle: "group-hover:text-primary",
-  },
-  {
-    // Muted Terracotta / Dusty Rose (NOT hot pink)
-    indicator: "bg-rose-600/70 dark:bg-rose-400/60",
-    badge:
-      "bg-rose-600/[0.06] text-rose-800 dark:text-rose-300 border-rose-600/20 font-semibold",
-    hoverBorder: "hover:border-rose-600/35",
-    hoverTitle: "group-hover:text-primary",
-  },
-];
-
-function getClassroomTheme(id: string, index: number) {
-  if (!id) return CLASSROOM_THEMES[index % CLASSROOM_THEMES.length];
-  const charSum = id.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  return CLASSROOM_THEMES[charSum % CLASSROOM_THEMES.length];
-}
+import { getClassroomTheme } from "@/lib/classroom-theme";
+import { AppLoadingScreen } from "@/components/ui/app-loading-screen";
 
 interface ClassroomTelemetry {
   studentCount: number;
@@ -236,11 +189,10 @@ export default function DashboardPage() {
 
   if (userLoading || classroomsLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <p className="text-muted-foreground animate-pulse text-sm font-medium">
-          Loading academic workspace...
-        </p>
-      </div>
+      <AppLoadingScreen
+        title="Loading Academic Workspace..."
+        subtitle="Fetching your classrooms and academic schedule..."
+      />
     );
   }
 
@@ -314,19 +266,23 @@ export default function DashboardPage() {
         {/* Teacher vs Student Workspace Hero & Operational Telemetry */}
         {isStudent ? (
           <>
-            {/* Student Banner */}
-            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 p-6 md:p-8 rounded-3xl glass-card relative overflow-hidden transition-all duration-300">
-              <div className="flex flex-col gap-1.5 max-w-2xl">
+            {/* Student Welcome Deck (Seamless Surface, Zero Card Syndrome) */}
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pt-1">
+              <div className="flex flex-col gap-1.5">
                 <div className="flex items-center gap-2">
-                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-primary/10 text-primary border border-primary/20 flex items-center gap-1">
-                    <Sparkles className="size-3" />
-                    Student Workspace
+                  <span className="inline-flex items-center gap-1.5 text-xs font-bold text-primary tracking-wide">
+                    <Sparkles className="size-3.5" />
+                    Student Academic Workspace
+                  </span>
+                  <span className="text-muted-foreground/40">•</span>
+                  <span className="text-xs font-semibold text-muted-foreground">
+                    {user?.profile?.department || "Computer Engineering"}
                   </span>
                 </div>
-                <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-foreground">
+                <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-foreground">
                   Welcome back, {userDisplayName}
                 </h1>
-                <p className="text-sm text-muted-foreground leading-relaxed">
+                <p className="text-sm text-muted-foreground max-w-xl">
                   Access your active laboratory practicals, write mathematical journals, and track teacher reviews.
                 </p>
               </div>
@@ -335,7 +291,7 @@ export default function DashboardPage() {
                 <Button
                   onClick={() => setShowJoinModal(true)}
                   size="default"
-                  className="gap-2 font-semibold rounded-xl h-10 px-5 active:scale-95 transition-all duration-150 cursor-pointer"
+                  className="gap-2 font-semibold rounded-xl h-10 px-5 shadow-xs active:scale-95 transition-all cursor-pointer"
                 >
                   <UserPlus className="size-4" />
                   <span>Join Classroom</span>
@@ -343,47 +299,86 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* Student 3 Stat Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              <div className="p-5 rounded-2xl glass-card flex items-center justify-between gap-4 hover:scale-[1.02] transition-all duration-300">
+            {/* Unified Student Telemetry Cockpit (Single Cohesive Glass Bar, Zero Card Syndrome) */}
+            <div className="rounded-2xl glass-card border border-border/80 shadow-xs divide-y md:divide-y-0 md:divide-x divide-border/60 grid grid-cols-1 md:grid-cols-3 overflow-hidden">
+              {/* Sector 1: Coursework Progress */}
+              <div className="p-5 flex items-center justify-between gap-4">
                 <div className="flex flex-col gap-0.5">
-                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                      Coursework Completed
+                    </span>
+                    {(analytics?.completedApproved ?? 0) === (analytics?.totalAssigned ?? 0) && (analytics?.totalAssigned ?? 0) > 0 && (
+                      <span className="px-1.5 py-0.5 rounded-md text-[10px] font-extrabold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                        100% Done
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-baseline gap-2 mt-1">
+                    <span className="text-3xl font-extrabold tracking-tight text-foreground">
+                      {analytics?.completedApproved ?? 0}
+                      <span className="text-lg font-bold text-muted-foreground/60"> / {analytics?.totalAssigned ?? 0}</span>
+                    </span>
+                    <span className="text-xs text-muted-foreground font-medium">
+                      {(analytics?.totalAssigned ?? 0) - (analytics?.completedApproved ?? 0) === 0 && (analytics?.totalAssigned ?? 0) > 0
+                        ? "All evaluated"
+                        : `${(analytics?.totalAssigned ?? 0) - (analytics?.completedApproved ?? 0)} remaining`}
+                    </span>
+                  </div>
+                </div>
+                <div className="size-11 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-500/25 shrink-0">
+                  <CheckCircle2 className="size-5.5" />
+                </div>
+              </div>
+
+              {/* Sector 2: Teacher Evaluation Status */}
+              <div className="p-5 flex items-center justify-between gap-4">
+                <div className="flex flex-col gap-0.5">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                      Teacher Reviews
+                    </span>
+                    {(analytics?.changesRequested ?? 0) > 0 ? (
+                      <span className="px-1.5 py-0.5 rounded-md text-[10px] font-extrabold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                        Changes Requested
+                      </span>
+                    ) : (analytics?.submittedPending ?? 0) > 0 ? (
+                      <span className="px-1.5 py-0.5 rounded-md text-[10px] font-extrabold bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border border-indigo-500/30">
+                        Under Review
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className="flex items-baseline gap-2 mt-1">
+                    <span className="text-3xl font-extrabold tracking-tight text-foreground">
+                      {analytics?.submittedPending ?? 0}
+                    </span>
+                    <span className="text-xs text-muted-foreground font-medium">
+                      {(analytics?.submittedPending ?? 0) > 0 ? "With instructor" : "All up to date"}
+                    </span>
+                  </div>
+                </div>
+                <div className="size-11 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center border border-indigo-500/25 shrink-0">
+                  <Clock className="size-5.5" />
+                </div>
+              </div>
+
+              {/* Sector 3: Active Classroom Workspaces */}
+              <div className="p-5 flex items-center justify-between gap-4">
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                     Enrolled Subjects
                   </span>
-                  <span className="text-2xl font-extrabold text-foreground">
-                    {classrooms?.length || 0}
-                  </span>
+                  <div className="flex items-baseline gap-2 mt-1">
+                    <span className="text-3xl font-extrabold tracking-tight text-foreground">
+                      {classrooms?.length || 0}
+                    </span>
+                    <span className="text-xs text-muted-foreground font-medium">
+                      {user?.profile?.semester ? `Semester ${user.profile.semester}` : "Active Cohort"}
+                    </span>
+                  </div>
                 </div>
-                <div className="size-11 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-500/20">
+                <div className="size-11 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-500/25 shrink-0">
                   <BookOpen className="size-5.5" />
-                </div>
-              </div>
-
-              <div className="p-5 rounded-2xl glass-card flex items-center justify-between gap-4 hover:scale-[1.02] transition-all duration-300">
-                <div className="flex flex-col gap-0.5">
-                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                    Department
-                  </span>
-                  <span className="text-base font-bold text-foreground line-clamp-1">
-                    {user?.profile?.department || "Computer Engineering"}
-                  </span>
-                </div>
-                <div className="size-11 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center border border-purple-500/20">
-                  <Building2 className="size-5.5" />
-                </div>
-              </div>
-
-              <div className="p-5 rounded-2xl glass-card flex items-center justify-between gap-4 hover:scale-[1.02] transition-all duration-300">
-                <div className="flex flex-col gap-0.5">
-                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                    Account Role
-                  </span>
-                  <span className="text-base font-bold text-foreground capitalize">
-                    {user?.role || "Student"}
-                  </span>
-                </div>
-                <div className="size-11 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-500/20">
-                  <GraduationCap className="size-5.5" />
                 </div>
               </div>
             </div>
@@ -510,152 +505,7 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* Student Academic Progress & Performance Summary Widget */}
-        {isStudent && analytics && analytics.totalAssigned > 0 && (
-          <div className="p-6 sm:p-7 rounded-3xl glass-card border border-border/80 shadow-md flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 relative overflow-hidden group">
-            {/* Ambient Background Glow */}
-            <div className="absolute top-0 right-1/4 w-96 h-32 bg-gradient-to-r from-primary/5 via-accent/5 to-emerald-500/5 blur-3xl pointer-events-none -z-10" />
 
-            <div className="flex flex-col gap-3 max-w-lg w-full">
-              <div className="flex items-center justify-between gap-2 flex-wrap">
-                <div className="flex items-center gap-2">
-                  <div className="size-6 rounded-lg bg-indigo-500/10 text-indigo-500 flex items-center justify-center">
-                    <Sparkles className="size-3.5" />
-                  </div>
-                  <span className="text-[11px] font-extrabold uppercase tracking-widest text-muted-foreground">
-                    Continuous Assessment Tracker
-                  </span>
-                </div>
-
-                {/* Dynamic Academic Standing Badge */}
-                {analytics.cumulativeAverageScore >= 80 ? (
-                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold tracking-wide uppercase bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
-                    <Award className="size-3" /> Distinction Standing
-                  </span>
-                ) : analytics.cumulativeAverageScore >= 60 ? (
-                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold tracking-wide uppercase bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 flex items-center gap-1">
-                    <CheckCircle2 className="size-3" /> First Class Standing
-                  </span>
-                ) : (
-                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold tracking-wide uppercase bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 flex items-center gap-1">
-                    <Clock className="size-3" /> Assessment Active
-                  </span>
-                )}
-              </div>
-
-              <div>
-                <h3 className="text-xl font-extrabold text-foreground tracking-tight">
-                  {analytics.completedApproved} of {analytics.totalAssigned} Practicals Completed
-                </h3>
-                <p className="text-xs text-muted-foreground mt-0.5 font-medium">
-                  {analytics.completedApproved === analytics.totalAssigned
-                    ? "All laboratory coursework evaluated and completed for this term!"
-                    : `${analytics.totalAssigned - analytics.completedApproved} experiment${analytics.totalAssigned - analytics.completedApproved === 1 ? "" : "s"} remaining across your active classroom workspaces.`}
-                </p>
-              </div>
-
-              {/* Multi-Segmented Trajectory Progress Bar */}
-              <div className="flex flex-col gap-1.5 pt-1">
-                <div className="w-full bg-muted/70 h-3 rounded-full overflow-hidden border border-border/50 p-0.5 flex items-center gap-0.5 shadow-inner">
-                  {analytics.completedApproved > 0 && (
-                    <div
-                      className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 transition-all duration-700 shadow-xs"
-                      style={{
-                        width: `${Math.round((analytics.completedApproved / analytics.totalAssigned) * 100)}%`,
-                      }}
-                      title={`Approved & Graded: ${analytics.completedApproved}`}
-                    />
-                  )}
-                  {analytics.submittedPending > 0 && (
-                    <div
-                      className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-blue-500 transition-all duration-700 shadow-xs"
-                      style={{
-                        width: `${Math.round((analytics.submittedPending / analytics.totalAssigned) * 100)}%`,
-                      }}
-                      title={`Under Review: ${analytics.submittedPending}`}
-                    />
-                  )}
-                  {(analytics.totalAssigned - analytics.completedApproved - analytics.submittedPending) > 0 && (
-                    <div
-                      className="h-full rounded-full bg-amber-500 transition-all duration-700 shadow-xs"
-                      style={{
-                        width: `${Math.round(((analytics.totalAssigned - analytics.completedApproved - analytics.submittedPending) / analytics.totalAssigned) * 100)}%`,
-                      }}
-                      title={`To Complete / In Progress: ${analytics.totalAssigned - analytics.completedApproved - analytics.submittedPending}`}
-                    />
-                  )}
-                </div>
-
-                {/* Progress Bar Legend */}
-                <div className="flex items-center gap-3.5 text-[11px] font-bold text-muted-foreground pt-0.5 flex-wrap">
-                  {analytics.completedApproved > 0 && (
-                    <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
-                      <span className="size-2 rounded-full bg-emerald-500 shadow-xs" />
-                      {analytics.completedApproved} Approved
-                    </span>
-                  )}
-                  {analytics.submittedPending > 0 && (
-                    <span className="flex items-center gap-1.5 text-indigo-600 dark:text-indigo-400">
-                      <span className="size-2 rounded-full bg-indigo-500 shadow-xs" />
-                      {analytics.submittedPending} In Review
-                    </span>
-                  )}
-                  {(analytics.totalAssigned - analytics.completedApproved - analytics.submittedPending) > 0 && (
-                    <span className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400">
-                      <span className="size-2 rounded-full bg-amber-500 shadow-xs" />
-                      {analytics.totalAssigned - analytics.completedApproved - analytics.submittedPending} To Complete
-                      {analytics.inProgress > 0 ? ` (${analytics.inProgress} in progress)` : ""}
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Quick Metrics Grid */}
-            <div className="grid grid-cols-3 gap-3 w-full lg:w-auto shrink-0">
-              <div className="p-4 rounded-2xl glass-card border border-border/70 hover:border-emerald-500/30 hover:scale-[1.02] transition-all duration-200 flex flex-col items-center justify-center text-center group/card">
-                <div className="flex items-center gap-1.5 mb-1 text-emerald-600 dark:text-emerald-400">
-                  <TrendingUp className="size-3.5" />
-                  <span className="text-[10px] font-bold uppercase tracking-wider">Avg. Score</span>
-                </div>
-                <span className="text-2xl font-black text-foreground tracking-tight">
-                  {analytics.cumulativeAverageScore}%
-                </span>
-                <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 mt-0.5">
-                  Continuous Scale
-                </span>
-              </div>
-
-              <div className="p-4 rounded-2xl glass-card border border-border/70 hover:border-indigo-500/30 hover:scale-[1.02] transition-all duration-200 flex flex-col items-center justify-center text-center group/card">
-                <div className="flex items-center gap-1.5 mb-1 text-indigo-600 dark:text-indigo-400">
-                  <Clock className="size-3.5" />
-                  <span className="text-[10px] font-bold uppercase tracking-wider">In Review</span>
-                </div>
-                <span className="text-2xl font-black text-foreground tracking-tight">
-                  {analytics.submittedPending}
-                </span>
-                <span className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 mt-0.5">
-                  With Teacher
-                </span>
-              </div>
-
-              <div className="p-4 rounded-2xl glass-card border border-border/70 hover:border-amber-500/30 hover:scale-[1.02] transition-all duration-200 flex flex-col items-center justify-center text-center group/card">
-                <div className="flex items-center gap-1.5 mb-1 text-amber-600 dark:text-amber-400">
-                  <AlertCircle className="size-3.5" />
-                  <span className="text-[10px] font-bold uppercase tracking-wider">
-                    {analytics.inProgress > 0 ? "In Progress" : "Pending"}
-                  </span>
-                </div>
-                <span className="text-2xl font-black text-foreground tracking-tight">
-                  {analytics.totalAssigned - analytics.completedApproved - analytics.submittedPending}
-                </span>
-                <span className="text-[10px] font-semibold text-amber-600 dark:text-amber-400 mt-0.5">
-                  {analytics.inProgress > 0 ? `${analytics.inProgress} In Progress` : "To Complete"}
-                </span>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Section Title */}
         <div className="flex items-center justify-between">
@@ -678,6 +528,13 @@ export default function DashboardPage() {
               const assignmentCount = stats?.assignmentCount ?? 0;
               const pendingReview = stats?.pendingReviewCount ?? 0;
               const theme = getClassroomTheme(room.id, idx);
+
+              // Per-classroom student telemetry
+              const cProgress = analytics?.classroomsProgress?.find((cp: any) => cp.classroomId === room.id);
+              const studentTotal = cProgress?.total ?? 0;
+              const studentCompleted = cProgress?.completed ?? 0;
+              const studentPending = cProgress?.pending ?? 0;
+              const pct = studentTotal > 0 ? Math.round((studentCompleted / studentTotal) * 100) : 0;
 
               return (
                 <div
@@ -757,7 +614,27 @@ export default function DashboardPage() {
                     </div>
 
                     {/* Live Telemetry Strip */}
-                    {!isStudent && (
+                    {isStudent ? (
+                      <div className="flex flex-col gap-2 mt-4 pt-3 border-t border-border/40">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-semibold text-muted-foreground flex items-center gap-1.5">
+                            <FlaskConical className="size-3.5 text-primary/80" />
+                            {studentCompleted} / {studentTotal} Practicals Done
+                          </span>
+                          {studentTotal > 0 && (
+                            <span className="font-bold text-xs text-foreground font-mono">
+                              {pct}%
+                            </span>
+                          )}
+                        </div>
+                        <div className="w-full bg-muted/70 h-2 rounded-full overflow-hidden border border-border/40 p-0.5 shadow-inner">
+                          <div
+                            className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 transition-all duration-500 shadow-2xs"
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                      </div>
+                    ) : (
                       <div className="flex items-center gap-4 mt-4 pt-3 border-t border-border/40 text-xs text-muted-foreground font-medium">
                         <div
                           className="flex items-center gap-1.5"
@@ -781,7 +658,28 @@ export default function DashboardPage() {
                   {/* Footer Action & Evaluation Status */}
                   <div className="flex items-center justify-between border-t border-border/60 pt-4 mt-3">
                     <div>
-                      {!isStudent && (
+                      {isStudent ? (
+                        studentPending > 0 ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/30">
+                            <Clock className="size-3" />
+                            {studentPending} in review
+                          </span>
+                        ) : studentCompleted === studentTotal && studentTotal > 0 ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                            <CheckCircle2 className="size-3" />
+                            All completed
+                          </span>
+                        ) : studentTotal > studentCompleted ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                            <AlertCircle className="size-3" />
+                            {studentTotal - studentCompleted} remaining
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium text-muted-foreground bg-muted/40 border border-border/40">
+                            No practicals
+                          </span>
+                        )
+                      ) : (
                         pendingReview > 0 ? (
                           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30">
                             <Clock className="size-3" />

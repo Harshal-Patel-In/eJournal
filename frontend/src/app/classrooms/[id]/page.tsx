@@ -9,7 +9,10 @@
 import { use, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
+  AlertTriangle,
   ArrowLeft,
+  ArrowRight,
+  ArrowUpRight,
   BookOpen,
   Calendar,
   Check,
@@ -21,6 +24,7 @@ import {
   Clock,
   Copy,
   Edit2,
+  Eye,
   FileEdit,
   FileText,
   Folder,
@@ -30,6 +34,8 @@ import {
   Layers,
   LayoutGrid,
   Loader2,
+  MessageSquare,
+  MessageSquareQuote,
   MoreVertical,
   Plus,
   Sparkles,
@@ -51,6 +57,9 @@ import { Button } from "@/components/ui/button";
 import { GlassDropdown } from "@/components/ui/glass-dropdown";
 import NotificationBell from "@/components/notification-bell";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { cn } from "@/lib/utils";
+import { getClassroomTheme } from "@/lib/classroom-theme";
+import { AppLoadingScreen } from "@/components/ui/app-loading-screen";
 
 const publishAssignmentSchema = zod.object({
   experimentNumber: zod.number().min(1, "Must be at least 1"),
@@ -315,7 +324,11 @@ export default function ClassroomPage({ params }: PageProps) {
 
   const isTeacher = user?.role === "teacher";
 
-  // Real-time Academic Intelligence Metrics
+  // Real-time Academic Intelligence Metrics & Cohort Visual Identity
+  const theme = useMemo(
+    () => getClassroomTheme(classroomId || classroom?.id),
+    [classroomId, classroom?.id]
+  );
   const totalStudents = members?.length || 0;
   const totalPracticals = assignments?.length || 0;
 
@@ -508,6 +521,51 @@ export default function ClassroomPage({ params }: PageProps) {
     ).length;
   }, [isTeacher, journals, assignments]);
 
+  const studentPendingCount = useMemo(() => {
+    if (isTeacher || !journals || !assignments) return 0;
+    const assignmentIds = new Set(assignments.map((a: any) => a.id));
+    return journals.filter(
+      (j: any) => assignmentIds.has(j.assignmentId) && (j.status === "submitted" || j.status === "late_submitted")
+    ).length;
+  }, [isTeacher, journals, assignments]);
+
+  const upNextPractical = useMemo(() => {
+    if (isTeacher || !assignments || assignments.length === 0) return null;
+    const sorted = [...assignments].sort((a, b) => a.experimentNumber - b.experimentNumber);
+
+    // Priority 1: changes requested (student needs to revise)
+    const needsRevision = sorted.find((asg) => {
+      const j = journals?.find((item: any) => item.assignmentId === asg.id);
+      return j?.status === "changes_requested";
+    });
+    if (needsRevision) {
+      const j = journals?.find((item: any) => item.assignmentId === needsRevision.id);
+      return { asg: needsRevision, journal: j, status: "changes_requested" };
+    }
+
+    // Priority 2: in progress / draft
+    const inProgress = sorted.find((asg) => {
+      const j = journals?.find((item: any) => item.assignmentId === asg.id);
+      return j?.status === "draft" || j?.status === "in_progress";
+    });
+    if (inProgress) {
+      const j = journals?.find((item: any) => item.assignmentId === inProgress.id);
+      return { asg: inProgress, journal: j, status: "in_progress" };
+    }
+
+    // Priority 3: not started
+    const notStarted = sorted.find((asg) => {
+      const j = journals?.find((item: any) => item.assignmentId === asg.id);
+      return !j;
+    });
+    if (notStarted) {
+      return { asg: notStarted, journal: null, status: "not_started" };
+    }
+
+    // All are submitted or approved
+    return null;
+  }, [isTeacher, assignments, journals]);
+
   const getDeadlineInfo = (deadlineStr: string) => {
     if (!deadlineStr) return null;
     const deadlineDate = new Date(deadlineStr);
@@ -627,36 +685,64 @@ export default function ClassroomPage({ params }: PageProps) {
               {asg.aim}
             </p>
 
-            {/* Teacher Remarks Callout */}
-            {isApproved && relatedJournal?.teacherRemarks && (
-              <div className="flex items-start gap-1.5 text-[11px] mt-0.5">
-                <span className="font-semibold text-muted-foreground shrink-0">Teacher Remarks:</span>
-                <span className="italic text-foreground/90 font-medium line-clamp-2">"{relatedJournal.teacherRemarks}"</span>
+            {/* Instructor Remarks Callout Card */}
+            {relatedJournal?.teacherRemarks && (
+              <div className="p-3 rounded-xl bg-amber-500/[0.08] dark:bg-amber-500/[0.12] border border-amber-500/25 flex items-start gap-2.5 text-xs text-foreground mt-1 shadow-2xs">
+                <MessageSquareQuote className="size-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-300">
+                    Instructor Remarks
+                  </span>
+                  <p className="italic text-foreground/90 font-medium leading-relaxed">
+                    "{relatedJournal.teacherRemarks}"
+                  </p>
+                </div>
               </div>
             )}
 
-            {/* Annotation Breakdown Chips Row */}
-            {relatedJournal?.annotationCounts && Object.keys(relatedJournal.annotationCounts).length > 0 && (
-              <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
-                <span className="text-[10px] font-bold text-muted-foreground mr-0.5">Feedback:</span>
-                {Object.entries(relatedJournal.annotationCounts).map(([type, count]) => {
-                  const typeIcons: Record<string, string> = {
-                    Comment: "💬",
-                    Suggestion: "✨",
-                    Highlight: "🖍",
-                    Warning: "⚠️",
-                    Approval: "✅",
-                    Question: "❓",
-                  };
-                  const num = Number(count);
-                  return (
-                    <span key={type} className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-muted/40 text-foreground border border-border/40 flex items-center gap-1">
-                      <span>{typeIcons[type] || "💬"}</span> {num} {type}{num > 1 ? "s" : ""}
+            {/* Consolidated Annotation Feedback Strip */}
+            {relatedJournal?.annotationCounts && Object.keys(relatedJournal.annotationCounts).length > 0 && (() => {
+              const totalAnnotations = Object.values(relatedJournal.annotationCounts).reduce(
+                (acc: number, c: any) => acc + (Number(c) || 0),
+                0
+              );
+              const warningCount = Number(relatedJournal.annotationCounts["Warning"] || 0);
+              const questionCount = Number(relatedJournal.annotationCounts["Question"] || 0);
+              const commentCount = Number(relatedJournal.annotationCounts["Comment"] || 0);
+              const suggestionCount = Number(relatedJournal.annotationCounts["Suggestion"] || 0);
+
+              return (
+                <div className="flex flex-wrap items-center gap-2 mt-1">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-muted/70 text-foreground border border-border/60">
+                    <MessageSquare className="size-3 text-primary" />
+                    <span>{totalAnnotations} Review Notes</span>
+                  </span>
+                  {warningCount > 0 && (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30">
+                      <AlertTriangle className="size-3 text-amber-500" />
+                      <span>{warningCount} Action Required</span>
                     </span>
-                  );
-                })}
-              </div>
-            )}
+                  )}
+                  <div className="flex items-center gap-1 text-[11px] text-muted-foreground flex-wrap">
+                    {commentCount > 0 && (
+                      <span className="px-1.5 py-0.5 rounded bg-muted/40 border border-border/40 font-medium">
+                        💬 {commentCount} comments
+                      </span>
+                    )}
+                    {suggestionCount > 0 && (
+                      <span className="px-1.5 py-0.5 rounded bg-muted/40 border border-border/40 font-medium">
+                        ✨ {suggestionCount} suggestions
+                      </span>
+                    )}
+                    {questionCount > 0 && (
+                      <span className="px-1.5 py-0.5 rounded bg-muted/40 border border-border/40 font-medium">
+                        ❓ {questionCount} questions
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
 
             <div className="flex flex-wrap items-center gap-3 mt-0.5 text-[11px] font-medium text-muted-foreground">
               {hasMarks ? (
@@ -798,7 +884,7 @@ export default function ClassroomPage({ params }: PageProps) {
               size="sm"
               onClick={() => startJournalMutation.mutate(asg.id)}
               disabled={startJournalMutation.isPending}
-              className="font-semibold rounded-xl h-8 px-3 text-xs active:scale-95 transition-all duration-150 cursor-pointer"
+              className="font-semibold rounded-xl h-8 px-3.5 text-xs active:scale-95 transition-all duration-150 cursor-pointer shadow-xs gap-1.5"
             >
               {startJournalMutation.isPending && startJournalMutation.variables === asg.id ? (
                 <span className="flex items-center gap-1.5">
@@ -806,7 +892,10 @@ export default function ClassroomPage({ params }: PageProps) {
                   <span>Starting...</span>
                 </span>
               ) : (
-                <span>Start Journal</span>
+                <span className="flex items-center gap-1.5">
+                  <span>Start Journal</span>
+                  <ArrowRight className="size-3.5" />
+                </span>
               )}
             </Button>
           ) : (
@@ -814,14 +903,14 @@ export default function ClassroomPage({ params }: PageProps) {
               <span
                 className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase border text-center ${
                   isApproved
-                    ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
+                    ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
                     : isLateSubmitted
-                    ? "bg-rose-500/10 text-rose-600 border-rose-500/20"
+                    ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30"
                     : isSubmitted
-                    ? "bg-blue-500/10 text-blue-600 border-blue-500/20"
+                    ? "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30"
                     : isChangesRequested
-                    ? "bg-amber-500/10 text-amber-600 border-amber-500/20"
-                    : "bg-amber-500/10 text-amber-600 border-amber-500/20"
+                    ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30"
+                    : "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/30"
                 }`}
               >
                 {isApproved
@@ -834,16 +923,54 @@ export default function ClassroomPage({ params }: PageProps) {
                   ? "Changes Requested"
                   : "In Progress"}
               </span>
-              <Button
-                asChild
-                size="sm"
-                variant={isLocked ? "outline" : "default"}
-                className="font-semibold rounded-xl h-8 px-3.5 text-xs active:scale-95 transition-all duration-150 cursor-pointer"
-              >
-                <Link href={`/editor/${relatedJournal.id}`}>
-                  {isApproved ? "View Grade & Journal" : isLocked ? "Preview Journal" : "Resume Journal"}
-                </Link>
-              </Button>
+
+              {isChangesRequested ? (
+                <Button
+                  asChild
+                  size="sm"
+                  className="font-bold rounded-xl h-8 px-3.5 text-xs bg-amber-600 hover:bg-amber-700 text-white shadow-xs active:scale-95 transition-all duration-150 cursor-pointer gap-1.5"
+                >
+                  <Link href={`/editor/${relatedJournal.id}`}>
+                    <FileEdit className="size-3.5" />
+                    <span>Revise Journal</span>
+                  </Link>
+                </Button>
+              ) : isApproved ? (
+                <Button
+                  asChild
+                  size="sm"
+                  variant="outline"
+                  className="font-bold rounded-xl h-8 px-3.5 text-xs border border-border/80 hover:border-foreground/30 text-foreground hover:bg-muted/80 shadow-2xs active:scale-95 transition-all duration-150 cursor-pointer gap-1.5"
+                >
+                  <Link href={`/editor/${relatedJournal.id}`}>
+                    <span>View Grade & Journal</span>
+                    <ArrowUpRight className="size-3.5 text-muted-foreground" />
+                  </Link>
+                </Button>
+              ) : isLocked ? (
+                <Button
+                  asChild
+                  size="sm"
+                  variant="outline"
+                  className="font-semibold rounded-xl h-8 px-3.5 text-xs border border-border/80 text-foreground hover:bg-muted/80 shadow-2xs active:scale-95 transition-all duration-150 cursor-pointer gap-1.5"
+                >
+                  <Link href={`/editor/${relatedJournal.id}`}>
+                    <Eye className="size-3.5 text-muted-foreground" />
+                    <span>Preview Journal</span>
+                  </Link>
+                </Button>
+              ) : (
+                <Button
+                  asChild
+                  size="sm"
+                  className="font-semibold rounded-xl h-8 px-3.5 text-xs active:scale-95 transition-all duration-150 cursor-pointer shadow-xs gap-1.5"
+                >
+                  <Link href={`/editor/${relatedJournal.id}`}>
+                    <span>Resume Journal</span>
+                    <ArrowRight className="size-3.5" />
+                  </Link>
+                </Button>
+              )}
             </div>
           )}
         </div>
@@ -853,11 +980,10 @@ export default function ClassroomPage({ params }: PageProps) {
 
   if (classroomLoading || assignmentsLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <p className="text-muted-foreground animate-pulse text-sm font-medium">
-          Loading classroom space...
-        </p>
-      </div>
+      <AppLoadingScreen
+        title="Loading Classroom Workspace..."
+        subtitle="Syncing assignments, announcements, and classroom members..."
+      />
     );
   }
 
@@ -906,9 +1032,6 @@ export default function ClassroomPage({ params }: PageProps) {
               <User className="size-3.5" />
             </div>
           </Link>
-          <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-muted/80 text-foreground border border-border uppercase">
-            {classroom.subject}
-          </span>
         </div>
       </header>
 
@@ -917,43 +1040,133 @@ export default function ClassroomPage({ params }: PageProps) {
         <div className="flex flex-col lg:flex-row gap-6 items-start">
           {/* Desktop Intelligence Sidebar (Left Rail on Desktop: 320px/352px width, sticky on desktop, order-2 on mobile) */}
           <aside className="w-full lg:w-80 xl:w-88 shrink-0 flex flex-col gap-5 order-2 lg:order-1 lg:sticky lg:top-24">
-            {/* Sidebar Card 1: Classroom Cohort & Student Join Code (Consolidated) */}
-            <div className="p-5 rounded-2xl glass-card flex flex-col gap-3 shadow-xs">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Users className="size-3.5 text-indigo-500" />
-                  <h4 className="font-extrabold text-xs uppercase tracking-wider text-foreground">
-                    Classroom Cohort
-                  </h4>
+            {/* Sidebar Card 1: Classroom Cohort for Teachers vs Actionable Up Next Lab for Students */}
+            {isTeacher ? (
+              <div className="p-5 rounded-2xl glass-card flex flex-col gap-3 shadow-xs">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Users className="size-3.5 text-indigo-500" />
+                    <h4 className="font-extrabold text-xs uppercase tracking-wider text-foreground">
+                      Classroom Cohort
+                    </h4>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("roster")}
+                    className="text-[10px] font-bold text-primary hover:underline cursor-pointer"
+                  >
+                    View All ({totalStudents})
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab("roster")}
-                  className="text-[10px] font-bold text-primary hover:underline cursor-pointer"
-                >
-                  View All ({totalStudents})
-                </button>
-              </div>
 
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                <strong className="text-foreground">{totalStudents}</strong> enrolled students in <strong className="text-foreground">Semester {classroom.semester}</strong> ({classroom.department} - Div {classroom.division}).
-              </p>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  <strong className="text-foreground">{totalStudents}</strong> enrolled students in <strong className="text-foreground">Semester {classroom.semester}</strong> ({classroom.department} - Div {classroom.division}).
+                </p>
 
-              <div className="flex items-center justify-between p-2.5 rounded-xl bg-background/80 border border-border/60 shadow-2xs">
-                <div className="flex flex-col">
-                  <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">Student Join Code</span>
-                  <code className="font-mono text-xs font-black text-foreground">{classroom.joinCode}</code>
+                <div className="flex items-center justify-between p-2.5 rounded-xl bg-background/80 border border-border/60 shadow-2xs">
+                  <div className="flex flex-col">
+                    <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">Student Join Code</span>
+                    <code className="font-mono text-xs font-black text-foreground">{classroom.joinCode}</code>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleCopyCode}
+                    className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-primary/10 text-primary hover:bg-primary/20 transition-all cursor-pointer flex items-center gap-1 active:scale-95"
+                  >
+                    {copiedCode ? <Check className="size-3 text-emerald-500" /> : <Copy className="size-3" />}
+                    <span>{copiedCode ? "Copied" : "Copy"}</span>
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={handleCopyCode}
-                  className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-primary/10 text-primary hover:bg-primary/20 transition-all cursor-pointer flex items-center gap-1 active:scale-95"
-                >
-                  {copiedCode ? <Check className="size-3 text-emerald-500" /> : <Copy className="size-3" />}
-                  <span>{copiedCode ? "Copied" : "Copy"}</span>
-                </button>
               </div>
-            </div>
+            ) : upNextPractical ? (
+              <div className="p-5 rounded-2xl glass-card flex flex-col gap-3.5 shadow-xs border border-primary/25 relative overflow-hidden">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="size-6 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+                      <Sparkles className="size-3.5" />
+                    </div>
+                    <h4 className="font-extrabold text-xs uppercase tracking-wider text-foreground">
+                      Up Next
+                    </h4>
+                  </div>
+                  <span
+                    className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wide border ${
+                      upNextPractical.status === "changes_requested"
+                        ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30"
+                        : upNextPractical.status === "in_progress"
+                        ? "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/30"
+                        : "bg-muted text-muted-foreground border-border/60"
+                    }`}
+                  >
+                    {upNextPractical.status === "changes_requested"
+                      ? "Action Needed"
+                      : upNextPractical.status === "in_progress"
+                      ? "In Progress"
+                      : "Not Started"}
+                  </span>
+                </div>
+
+                <div>
+                  <div className="flex items-center gap-1.5 text-[11px] font-bold text-primary">
+                    <span>Experiment #{upNextPractical.asg.experimentNumber}</span>
+                  </div>
+                  <h5 className="font-bold text-sm text-foreground tracking-tight line-clamp-1 mt-0.5">
+                    {upNextPractical.asg.title}
+                  </h5>
+                  <p className="text-xs text-muted-foreground line-clamp-2 mt-1 leading-relaxed">
+                    {upNextPractical.asg.aim}
+                  </p>
+                </div>
+
+                <div className="pt-3 border-t border-border/50 flex items-center justify-between gap-2">
+                  <span className="text-[11px] text-muted-foreground font-medium">
+                    Max: {upNextPractical.asg.maxMarks} Marks
+                  </span>
+
+                  {upNextPractical.journal ? (
+                    <Button
+                      asChild
+                      size="sm"
+                      className="font-semibold rounded-xl h-8 px-3 text-xs active:scale-95 transition-all cursor-pointer shadow-xs gap-1"
+                    >
+                      <Link href={`/editor/${upNextPractical.journal.id}`}>
+                        <span>{upNextPractical.status === "changes_requested" ? "Revise Journal" : "Resume Draft"}</span>
+                        <ArrowRight className="size-3" />
+                      </Link>
+                    </Button>
+                  ) : (
+                    <Button
+                      size="sm"
+                      onClick={() => startJournalMutation.mutate(upNextPractical.asg.id)}
+                      disabled={startJournalMutation.isPending}
+                      className="font-semibold rounded-xl h-8 px-3 text-xs active:scale-95 transition-all cursor-pointer shadow-xs gap-1"
+                    >
+                      {startJournalMutation.isPending && startJournalMutation.variables === upNextPractical.asg.id ? (
+                        <span className="flex items-center gap-1.5">
+                          <Loader2 className="size-3 animate-spin" />
+                          <span>Starting...</span>
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1">
+                          <span>Start Journal</span>
+                          <ArrowRight className="size-3" />
+                        </span>
+                      )}
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="p-5 rounded-2xl glass-card flex flex-col items-center justify-center text-center gap-2 border border-emerald-500/20 shadow-xs">
+                <div className="size-10 rounded-full bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
+                  <CheckCircle2 className="size-5" />
+                </div>
+                <h4 className="font-bold text-sm text-foreground">Coursework Up To Date!</h4>
+                <p className="text-xs text-muted-foreground leading-relaxed max-w-[240px]">
+                  All practical experiments in this classroom have been submitted or approved.
+                </p>
+              </div>
+            )}
 
             {/* Sidebar Card 2: Live Action / Grading Queue for Teachers / Progress for Students */}
             {isTeacher ? (
@@ -1004,27 +1217,44 @@ export default function ClassroomPage({ params }: PageProps) {
                 </div>
               )
             ) : (
-              <div className="p-5 rounded-2xl glass-card flex flex-col gap-3 shadow-xs">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="size-3.5 text-emerald-500" />
-                  <h4 className="font-extrabold text-xs uppercase tracking-wider text-foreground">
-                    Your Practical Progress
-                  </h4>
-                </div>
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground">Completed</span>
-                  <span className="font-bold text-foreground">
-                    {studentCompletedCount} of {totalPracticals}
+              <div className="p-5 rounded-2xl glass-card flex flex-col gap-3.5 shadow-xs">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="size-3.5 text-emerald-500" />
+                    <h4 className="font-extrabold text-xs uppercase tracking-wider text-foreground">
+                      Practical Progress
+                    </h4>
+                  </div>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold font-mono bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
+                    {totalPracticals > 0 ? Math.round((studentCompletedCount / totalPracticals) * 100) : 0}% Done
                   </span>
                 </div>
-                <div className="h-2 w-full bg-muted/60 rounded-full overflow-hidden">
+
+                <div className="flex items-baseline justify-between text-xs">
+                  <span className="text-muted-foreground font-medium">Evaluation Completed</span>
+                  <span className="font-extrabold text-foreground font-mono">
+                    {studentCompletedCount} / {totalPracticals}
+                  </span>
+                </div>
+
+                <div className="h-2.5 w-full bg-muted/70 rounded-full overflow-hidden p-0.5 border border-border/40 shadow-inner">
                   <div
-                    className="h-full bg-emerald-500 rounded-full transition-all duration-300"
+                    className="h-full bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full transition-all duration-500 shadow-2xs"
                     style={{
                       width: `${totalPracticals > 0 ? (studentCompletedCount / totalPracticals) * 100 : 0}%`,
                     }}
                   />
                 </div>
+
+                {studentPendingCount > 0 && (
+                  <div className="pt-2 border-t border-border/40 flex items-center justify-between text-[11px]">
+                    <span className="text-muted-foreground font-medium">Awaiting Evaluation</span>
+                    <span className="inline-flex items-center gap-1 font-semibold text-indigo-600 dark:text-indigo-400">
+                      <Clock className="size-3" />
+                      {studentPendingCount} in review
+                    </span>
+                  </div>
+                )}
               </div>
             )}
 
@@ -1271,12 +1501,31 @@ export default function ClassroomPage({ params }: PageProps) {
             {/* Banner Section with Spatial Anchor Notch, Academic Metrics & Primary Actions */}
             <div className="p-6 md:p-7 rounded-3xl glass-card relative overflow-hidden transition-all duration-300 flex flex-col gap-4 shadow-sm">
               {/* Option C Spatial Anchor Notch */}
-              <div className="absolute left-0 top-6 bottom-6 w-1 rounded-r-full bg-indigo-500/80 shadow-[0_0_12px_rgba(99,102,241,0.5)]" />
+              <div
+                className={cn(
+                  "absolute left-0 top-6 bottom-6 w-1 rounded-r-full transition-all duration-300",
+                  theme.indicator,
+                  theme.notchGlow
+                )}
+              />
 
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              {/* Atmospheric Cohort Ambient Glow */}
+              <div
+                className={cn(
+                  "absolute -top-12 -right-12 w-96 h-48 rounded-full blur-3xl pointer-events-none opacity-40 bg-gradient-to-b",
+                  theme.bannerGlow
+                )}
+              />
+
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 relative z-10">
                 <div className="flex flex-col gap-1.5 pl-2 sm:pl-3">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-primary/10 text-primary border border-primary/20 flex items-center gap-1 shadow-2xs">
+                    <span
+                      className={cn(
+                        "px-2.5 py-0.5 rounded-md text-[11px] font-bold tracking-wide border flex items-center gap-1 shadow-2xs",
+                        theme.badge
+                      )}
+                    >
                       <BookOpen className="size-3" />
                       {classroom.subject}
                     </span>
@@ -1378,11 +1627,21 @@ export default function ClassroomPage({ params }: PageProps) {
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              <FileText className={`size-3.5 ${activeTab === "assignments" ? "text-primary" : "text-muted-foreground"}`} />
+              <FileText
+                className={cn(
+                  "size-3.5",
+                  activeTab === "assignments" ? theme.accentText : "text-muted-foreground"
+                )}
+              />
               <span>Practicals</span>
-              <span className={`px-1.5 py-0.2 rounded-full font-mono text-[10px] font-bold ${
-                activeTab === "assignments" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
-              }`}>
+              <span
+                className={cn(
+                  "px-1.5 py-0.2 rounded-full font-mono text-[10px] font-bold border",
+                  activeTab === "assignments"
+                    ? theme.activeBadge
+                    : "bg-muted text-muted-foreground border-transparent"
+                )}
+              >
                 {assignments?.length || 0}
               </span>
             </button>

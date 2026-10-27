@@ -2,7 +2,7 @@
 
 import React, { useMemo } from "react";
 import { LineChart, BarChart2, ScatterChart, Table as TableIcon, Settings2 } from "lucide-react";
-import { useDocumentStore } from "../use-document-store";
+import { useDocumentStore, JournalBlock } from "../use-document-store";
 import { CartesianChart, DataPoint } from "@/components/editor/cartesian-chart";
 import { GlassDropdown, DropdownOption } from "@/components/ui/glass-dropdown";
 
@@ -18,7 +18,7 @@ interface GraphBlockProps {
     showGrid?: boolean;
   };
   previewMode: boolean;
-  allBlocks?: any[];
+  allBlocks?: JournalBlock[];
 }
 
 // Helper to parse numerical cell values (handles "1.5 * 10^-3", "2.5e-3", "-4.2", etc.)

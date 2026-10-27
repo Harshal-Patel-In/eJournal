@@ -7,7 +7,7 @@ import { javascript } from "@codemirror/lang-javascript";
 import { cpp } from "@codemirror/lang-cpp";
 import { java } from "@codemirror/lang-java";
 import { useTheme } from "next-themes";
-import { Check, Copy } from "lucide-react";
+import { Check, Copy, Terminal } from "lucide-react";
 
 import { useDocumentStore } from "../use-document-store";
 import { GlassDropdown, DropdownOption } from "@/components/ui/glass-dropdown";
@@ -74,23 +74,21 @@ export default function CodeBlock({ id, content, previewMode }: CodeBlockProps) 
   const isDarkMode = resolvedTheme === "dark";
 
   return (
-    <div className="w-full my-4 rounded-2xl border border-border/80 dark:border-white/15 bg-card dark:bg-zinc-950/80 shadow-md transition-all relative z-10">
+    <div className="w-full my-4 rounded-2xl border border-border/80 dark:border-white/15 bg-card dark:bg-zinc-950/80 shadow-md transition-all relative z-10 print:break-inside-avoid print:shadow-none print:border-zinc-300 print:my-2">
       {/* macOS Studio Window Header Bar */}
-      <div className="flex items-center justify-between px-4 py-2.5 rounded-t-2xl bg-muted/40 dark:bg-zinc-900/60 border-b border-border/70 dark:border-white/10 select-none">
-        {/* Left: Window Dots & Language Picker */}
-        <div className="flex items-center gap-3">
-          {/* macOS Traffic Dots */}
-          <div className="flex items-center gap-1.5 shrink-0" aria-hidden="true">
-            <span className="size-2.5 rounded-full bg-rose-500/80 dark:bg-rose-500/70 inline-block" />
-            <span className="size-2.5 rounded-full bg-amber-500/80 dark:bg-amber-500/70 inline-block" />
-            <span className="size-2.5 rounded-full bg-emerald-500/80 dark:bg-emerald-500/70 inline-block" />
+      <div className="flex items-center justify-between px-4 py-2.5 rounded-t-2xl bg-muted/40 dark:bg-zinc-900/60 border-b border-border/70 dark:border-white/10 select-none print:bg-zinc-100 print:border-zinc-300">
+        {/* Left: Academic Code Terminal Badge & Language Picker */}
+        <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-muted/60 text-muted-foreground text-xs font-mono font-medium border border-border/40 print:hidden select-none">
+            <Terminal className="size-3 text-primary/80" />
+            <span className="text-[11px] font-semibold tracking-tight">Terminal</span>
           </div>
 
-          <div className="h-3.5 w-px bg-border/60 dark:bg-white/10 shrink-0" />
+          <div className="h-3.5 w-px bg-border/60 dark:bg-white/10 shrink-0 print:hidden" />
 
           {/* Language Selector (Editable in Edit Mode, Badge in Preview Mode) */}
           {previewMode ? (
-            <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+            <span className="px-2 py-0.5 rounded-md bg-muted text-[11px] font-mono font-bold text-foreground/80 border border-border/60 uppercase tracking-wider print:border-zinc-400 print:text-zinc-800">
               {language}
             </span>
           ) : (

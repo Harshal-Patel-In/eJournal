@@ -742,5 +742,40 @@ body::-webkit-scrollbar {
   color: var(--foreground) !important;
 }
 
+/* ==========================================================================
+   Circular View Transition for Theme Switching (Apple & Emil Kowalski Quality)
+   ========================================================================== */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none !important;
+  mix-blend-mode: normal !important;
+}
 
+::view-transition-old(root) {
+  z-index: 1 !important;
+}
+
+::view-transition-new(root) {
+  z-index: 9999 !important;
+}
+
+/* ==========================================================================
+   Indeterminate Loading Progress Animation (Hardware-Accelerated CSS)
+   ========================================================================== */
+@keyframes indeterminate-slide {
+  0% {
+    transform: translateX(-100%);
+  }
+  50% {
+    transform: translateX(120%);
+  }
+  100% {
+    transform: translateX(260%);
+  }
+}
+
+.animate-indeterminate-slide {
+  animation: indeterminate-slide 1.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  will-change: transform;
+}
 

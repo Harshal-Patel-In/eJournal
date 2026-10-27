@@ -19,7 +19,7 @@ function parseJwt(token: string) {
     const buffer = Buffer.from(base64, "base64");
     const jsonPayload = buffer.toString("utf-8");
     return JSON.parse(jsonPayload);
-  } catch (error) {
+  } catch {
     return null;
   }
 }

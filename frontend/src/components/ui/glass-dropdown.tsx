@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState, useId, useCallback } from "react";
+import React, { useEffect, useRef, useState, useId, useCallback, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { Check, ChevronDown } from "lucide-react";
 import { InlineMathText } from "@/components/inline-math-text";
@@ -47,7 +47,11 @@ export function GlassDropdown({
 }: GlassDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState<number>(-1);
-  const [mounted, setMounted] = useState(false);
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
   const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({});
   const dropdownRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -59,10 +63,6 @@ export function GlassDropdown({
 
   const selectedIndex = options.findIndex((opt) => opt.value === value);
   const selectedOption = selectedIndex !== -1 ? options[selectedIndex] : undefined;
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   const updatePosition = useCallback(() => {
     if (!buttonRef.current) return;
@@ -138,12 +138,6 @@ export function GlassDropdown({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isOpen]);
 
-  useEffect(() => {
-    if (isOpen) {
-      setHighlightedIndex(selectedIndex !== -1 ? selectedIndex : 0);
-    }
-  }, [isOpen, selectedIndex]);
-
   const renderLabel = (label: React.ReactNode | string) => {
     if (typeof label === "string" && renderMath) {
       return <InlineMathText text={label} />;
@@ -158,6 +152,7 @@ export function GlassDropdown({
       if (e.key === "ArrowDown" || e.key === "ArrowUp" || e.key === "Enter" || e.key === " ") {
         e.preventDefault();
         updatePosition();
+        setHighlightedIndex(selectedIndex !== -1 ? selectedIndex : 0);
         setIsOpen(true);
       }
       return;
@@ -211,7 +206,10 @@ export function GlassDropdown({
         aria-expanded={isOpen}
         aria-controls={isOpen ? listboxId : undefined}
         onClick={() => {
-          if (!isOpen) updatePosition();
+          if (!isOpen) {
+            updatePosition();
+            setHighlightedIndex(selectedIndex !== -1 ? selectedIndex : 0);
+          }
           setIsOpen(!isOpen);
         }}
         className={`w-full ${buttonClassName || defaultButtonStyles} bg-muted/50 dark:bg-zinc-800/60 hover:bg-muted/80 dark:hover:bg-zinc-700/60 border border-border/80 dark:border-white/10 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 ${

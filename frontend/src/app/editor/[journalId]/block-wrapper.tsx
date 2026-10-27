@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { Copy, GripVertical, Plus, Trash2, ChevronUp, ChevronDown, MoreHorizontal } from "lucide-react";
+import { Copy, GripVertical, Plus, Trash2, ChevronUp, ChevronDown } from "lucide-react";
+import type { DraggableProvided } from "@hello-pangea/dnd";
 import { useDocumentStore } from "./use-document-store";
 import SlashMenu from "./slash-menu";
 
@@ -9,7 +10,7 @@ interface BlockWrapperProps {
   id: string;
   index: number;
   type?: string;
-  provided: any;
+  provided: DraggableProvided;
   previewMode: boolean;
   children: React.ReactNode;
 }
@@ -91,8 +92,8 @@ export default function BlockWrapper({
     }
   };
 
-  const handleSelectBlockType = (type: string) => {
-    addBlock(index + 1, type);
+  const handleSelectBlockType = (type: string, content?: Record<string, unknown>) => {
+    addBlock(index + 1, type, content);
     setShowSlashMenu(false);
   };
 

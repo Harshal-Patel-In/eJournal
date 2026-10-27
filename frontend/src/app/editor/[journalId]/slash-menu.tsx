@@ -18,8 +18,14 @@ import {
 } from "lucide-react";
 
 interface SlashMenuProps {
-  onSelect: (type: string) => void;
+  onSelect: (type: string, content?: Record<string, unknown>) => void;
   onClose: () => void;
+  initialSearch?: string;
+  externalSearch?: string;
+  hideInput?: boolean;
+  selectedIndex?: number;
+  onSelectedIndexChange?: (index: number) => void;
+  className?: string;
 }
 
 const MENU_ITEMS = [
@@ -119,9 +125,42 @@ const MENU_ITEMS = [
   },
 ];
 
-export default function SlashMenu({ onSelect, onClose }: SlashMenuProps) {
-  const [search, setSearch] = useState("");
+export function getFilteredMenuItems(search: string) {
+  const q = search.toLowerCase().trim();
+  if (!q) return MENU_ITEMS;
+  return MENU_ITEMS.filter(
+    (item) =>
+      item.label.toLowerCase().includes(q) ||
+      item.type.toLowerCase().includes(q) ||
+      item.desc.toLowerCase().includes(q)
+  );
+}
+
+export default function SlashMenu({
+  onSelect,
+  onClose,
+  initialSearch = "",
+  externalSearch,
+  hideInput = false,
+  selectedIndex: controlledIndex,
+  onSelectedIndexChange,
+  className = "",
+}: SlashMenuProps) {
+  const [internalSearch, setInternalSearch] = useState(initialSearch);
+  const [internalIndex, setInternalIndex] = useState(0);
   const menuRef = useRef<HTMLDivElement>(null);
+  const itemsContainerRef = useRef<HTMLDivElement>(null);
+
+  const search = externalSearch !== undefined ? externalSearch : internalSearch;
+  const isControlled = controlledIndex !== undefined;
+  const selectedIndex = isControlled ? controlledIndex : internalIndex;
+
+  const updateSelectedIndex = (next: number) => {
+    if (!isControlled) {
+      setInternalIndex(next);
+    }
+    onSelectedIndexChange?.(next);
+  };
 
   // Close menu on outer click
   useEffect(() => {
@@ -134,46 +173,101 @@ export default function SlashMenu({ onSelect, onClose }: SlashMenuProps) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [onClose]);
 
-  const filteredItems = MENU_ITEMS.filter((item) =>
-    item.label.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredItems = getFilteredMenuItems(search);
+
+  // Reset selected index when search changes
+  useEffect(() => {
+    updateSelectedIndex(0);
+  }, [search]);
+
+  // Keyboard navigation (ArrowDown, ArrowUp, Enter, Escape)
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      onClose();
+      return;
+    }
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      updateSelectedIndex(filteredItems.length === 0 ? 0 : (selectedIndex + 1) % filteredItems.length);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      updateSelectedIndex(filteredItems.length === 0 ? 0 : (selectedIndex - 1 + filteredItems.length) % filteredItems.length);
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (filteredItems[selectedIndex]) {
+        const item = filteredItems[selectedIndex];
+        onSelect(item.type, item.content);
+      }
+    }
+  };
 
   return (
     <div
       ref={menuRef}
-      className="absolute z-50 w-72 rounded-2xl border border-white/60 dark:border-white/20 ring-1 ring-black/5 dark:ring-white/10 bg-gradient-to-b from-white/90 to-white/75 dark:from-gray-900/95 dark:to-gray-900/85 backdrop-blur-2xl shadow-2xl shadow-black/10 dark:shadow-black/40 shadow-[inset_0_1px_1px_0_rgba(255,255,255,0.8)] dark:shadow-[inset_0_1px_1px_0_rgba(255,255,255,0.2)] p-2 max-h-[380px] overflow-y-auto flex flex-col gap-1 transition-all duration-150 select-none"
+      className={`z-50 w-76 rounded-2xl border border-white/70 dark:border-white/15 ring-1 ring-black/5 dark:ring-white/10 bg-gradient-to-b from-white/95 via-white/90 to-white/85 dark:from-zinc-900/95 dark:via-zinc-900/90 dark:to-zinc-950/85 backdrop-blur-2xl shadow-2xl shadow-black/15 dark:shadow-black/60 p-2.5 max-h-[380px] flex flex-col gap-1.5 transition-all duration-150 select-none ${className}`}
     >
-      <input
-        type="text"
-        autoFocus
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        placeholder="Type to filter blocks..."
-        className="w-full text-xs font-medium bg-muted/60 hover:bg-muted/80 border border-border px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary focus:bg-background transition-all mb-1"
-      />
-
-      {filteredItems.length === 0 ? (
-        <div className="p-3 text-xs text-muted-foreground text-center">No blocks found</div>
-      ) : (
-        filteredItems.map((item, index) => {
-          const Icon = item.icon;
-          return (
-            <button
-              key={index}
-              onClick={() => onSelect(item.type)}
-              className="w-full flex items-start gap-3 p-2 hover:bg-muted rounded-lg text-left transition-all active:scale-99"
-            >
-              <div className="p-1.5 rounded-md bg-primary/10 text-primary shrink-0">
-                <Icon className="size-4" />
-              </div>
-              <div className="flex flex-col gap-0.5 min-w-0">
-                <span className="text-xs font-semibold text-foreground truncate">{item.label}</span>
-                <span className="text-[10px] text-muted-foreground truncate">{item.desc}</span>
-              </div>
-            </button>
-          );
-        })
+      {!hideInput && (
+        <input
+          type="text"
+          autoFocus
+          value={search}
+          onChange={(e) => setInternalSearch(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="Type block name (e.g. table, math, code)..."
+          className="w-full text-xs font-medium bg-muted/60 hover:bg-muted/80 border border-border px-3 py-2 rounded-xl focus:outline-none focus:ring-1 focus:ring-primary focus:bg-background transition-all"
+        />
       )}
+
+      <div
+        ref={itemsContainerRef}
+        className="overflow-y-auto flex flex-col gap-1 max-h-[300px] custom-scrollbar pr-0.5"
+      >
+        {filteredItems.length === 0 ? (
+          <div className="py-6 px-3 text-xs text-muted-foreground text-center flex flex-col items-center gap-1">
+            <span className="font-semibold text-foreground/80">No matching blocks</span>
+            <span className="text-[11px] text-muted-foreground/60">Try searching &quot;table&quot;, &quot;code&quot;, or &quot;heading&quot;</span>
+          </div>
+        ) : (
+          filteredItems.map((item, index) => {
+            const Icon = item.icon;
+            const isSelected = index === selectedIndex;
+
+            return (
+              <button
+                key={`${item.type}-${item.label}-${index}`}
+                type="button"
+                onClick={() => onSelect(item.type, item.content)}
+                onMouseEnter={() => updateSelectedIndex(index)}
+                className={`w-full flex items-center gap-3 p-2 rounded-xl text-left transition-all cursor-pointer ${
+                  isSelected
+                    ? "bg-primary/10 text-primary ring-1 ring-primary/25 shadow-2xs"
+                    : "hover:bg-muted/60 text-foreground/80 hover:text-foreground"
+                }`}
+              >
+                <div
+                  className={`p-2 rounded-lg shrink-0 transition-colors ${
+                    isSelected
+                      ? "bg-primary text-primary-foreground shadow-xs"
+                      : "bg-muted text-muted-foreground"
+                  }`}
+                >
+                  <Icon className="size-4" />
+                </div>
+                <div className="flex flex-col gap-0.5 min-w-0">
+                  <span className="text-xs font-semibold truncate leading-tight">
+                    {item.label}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground truncate leading-tight">
+                    {item.desc}
+                  </span>
+                </div>
+              </button>
+            );
+          })
+        )}
+      </div>
     </div>
   );
 }

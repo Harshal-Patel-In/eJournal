@@ -26,7 +26,6 @@ export function LiquidTooltipProvider() {
   const hideTimerRef = useRef<NodeJS.Timeout | null>(null);
   const activeElementRef = useRef<HTMLElement | null>(null);
   const lastActiveTimestampRef = useRef<number>(0);
-  const tooltipElementRef = useRef<HTMLDivElement | null>(null);
 
   const hideTooltip = useCallback(() => {
     if (showTimerRef.current) {

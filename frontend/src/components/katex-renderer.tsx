@@ -184,26 +184,48 @@ export function formatLatexForKatex(input: string): string {
   // 6. Line processing and auto-alignment
   const isMultiLine = processed.includes("\n") || processed.includes("\\\\");
   const rawLines = isMultiLine ? processed.split(/\n|\\\\/) : [processed];
+
+  // Pre-determine if any non-empty line requires '=' alignment
+  const hasEqualsAlignment = isMultiLine && rawLines.some((l) => {
+    const t = l.trim();
+    return (
+      t.startsWith("=") ||
+      (t.includes("=") &&
+        !t.includes("\\le") &&
+        !t.includes("\\ge") &&
+        !t.includes("\\neq"))
+    );
+  });
+
   const formattedLines = [];
-  let hasEqualsAlignment = false;
 
   for (const rawLine of rawLines) {
     const rawTrimmed = rawLine.trim();
-    if (!rawTrimmed) continue;
+
+    // Preserve empty lines in multi-line derivations
+    if (!rawTrimmed) {
+      if (isMultiLine) {
+        formattedLines.push(hasEqualsAlignment ? "& \\phantom{=}" : "~");
+      }
+      continue;
+    }
 
     if (isMultiLine) {
       if (rawTrimmed.startsWith("=")) {
-        hasEqualsAlignment = true;
         const rightPart = rawTrimmed.substring(1).trim();
         formattedLines.push(`&= ${formatExpression(rightPart)}`);
-      } else if (rawTrimmed.includes("=") && !rawTrimmed.includes("\\le") && !rawTrimmed.includes("\\ge") && !rawTrimmed.includes("\\neq")) {
-        hasEqualsAlignment = true;
+      } else if (
+        rawTrimmed.includes("=") &&
+        !rawTrimmed.includes("\\le") &&
+        !rawTrimmed.includes("\\ge") &&
+        !rawTrimmed.includes("\\neq")
+      ) {
         const equalsIdx = rawTrimmed.indexOf("=");
         const leftPart = rawTrimmed.substring(0, equalsIdx).trim();
         const rightPart = rawTrimmed.substring(equalsIdx + 1).trim();
         formattedLines.push(`${formatExpression(leftPart)} &= ${formatExpression(rightPart)}`);
       } else {
-        formattedLines.push(formatExpression(rawLine));
+        formattedLines.push(hasEqualsAlignment ? `${formatExpression(rawLine)} &` : formatExpression(rawLine));
       }
     } else {
       formattedLines.push(formatExpression(rawLine));

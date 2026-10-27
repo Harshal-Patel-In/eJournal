@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import {
   Image as ImageIcon,
@@ -55,7 +55,11 @@ export default function ImageBlock({ id, content, previewMode }: ImageBlockProps
   const updateBlock = useDocumentStore((state) => state.updateBlock);
   const [uploading, setUploading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [mounted, setMounted] = useState(false);
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
 
   // Recycle Bin state
   const [isRecycleBinOpen, setIsRecycleBinOpen] = useState(false);
@@ -64,11 +68,6 @@ export default function ImageBlock({ id, content, previewMode }: ImageBlockProps
   const [permanentlyDeletingId, setPermanentlyDeletingId] = useState<string | null>(null);
   const [assetToDelete, setAssetToDelete] = useState<TrashedAsset | null>(null);
   const [quickLookItem, setQuickLookItem] = useState<TrashedAsset | null>(null);
-
-  // Ensure portal target is mounted on client
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   // Lock body scroll and prevent keyboard leaks when modal/drawer is open
   useEffect(() => {

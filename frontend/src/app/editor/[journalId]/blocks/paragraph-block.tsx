@@ -5,6 +5,7 @@ import { Bold, Italic, Code, Highlighter, Sigma, Sparkles } from "lucide-react";
 import { useDocumentStore } from "../use-document-store";
 import { applyMathShortcuts } from "@/lib/math-shortcuts";
 import { InlineMathText } from "@/components/inline-math-text";
+import SlashMenu, { getFilteredMenuItems } from "../slash-menu";
 
 interface ParagraphBlockProps {
   id: string;
@@ -16,9 +17,17 @@ interface ParagraphBlockProps {
 
 export default function ParagraphBlock({ id, content, previewMode }: ParagraphBlockProps) {
   const updateBlock = useDocumentStore((state) => state.updateBlock);
+  const convertBlock = useDocumentStore((state) => state.convertBlock);
   const text = content.text || "";
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [showToolbar, setShowToolbar] = useState(false);
+  // Start in edit mode only if block has no text yet; otherwise render clean in-place preview
+  const [isFocused, setIsFocused] = useState<boolean>(() => !content.text);
+  const [slashSelectedIndex, setSlashSelectedIndex] = useState(0);
+
+  const isSlashActive = isFocused && text.startsWith("/") && !text.includes("\n");
+  const slashSearch = isSlashActive ? text.slice(1) : "";
+  const filteredSlashItems = isSlashActive ? getFilteredMenuItems(slashSearch) : [];
 
   // Auto-resize height based on text content length
   useEffect(() => {
@@ -26,7 +35,14 @@ export default function ParagraphBlock({ id, content, previewMode }: ParagraphBl
       textareaRef.current.style.height = "auto";
       textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
     }
-  }, [text]);
+  }, [text, isFocused]);
+
+  // When entering editing mode, focus the textarea automatically
+  useEffect(() => {
+    if (isFocused && textareaRef.current) {
+      textareaRef.current.focus();
+    }
+  }, [isFocused]);
 
   // Toggle formatting around currently selected text
   const toggleFormatting = useCallback(
@@ -102,10 +118,10 @@ export default function ParagraphBlock({ id, content, previewMode }: ParagraphBl
       const newText = rawText.slice(0, start) + wrapped + rawText.slice(end);
       updateBlock(id, { text: newText });
 
-      requestAnimationFrame(() => {
-        textarea.focus();
-        textarea.setSelectionRange(start, start + wrapped.length);
-      });
+        requestAnimationFrame(() => {
+          textarea.focus();
+          textarea.setSelectionRange(start, start + wrapped.length);
+        });
     },
     [id, text, updateBlock]
   );
@@ -121,8 +137,44 @@ export default function ParagraphBlock({ id, content, previewMode }: ParagraphBl
     }
   };
 
-  // Keyboard shortcuts (Ctrl+B, Ctrl+I, Ctrl+E, Ctrl+Shift+H, Ctrl+Shift+M)
+  // Keyboard shortcuts (Ctrl+B, Ctrl+I, Ctrl+E, Ctrl+Shift+H, Ctrl+Shift+M, Escape, Slash Menu navigation)
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (isSlashActive) {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setSlashSelectedIndex((prev) =>
+          filteredSlashItems.length === 0 ? 0 : (prev + 1) % filteredSlashItems.length
+        );
+        return;
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setSlashSelectedIndex((prev) =>
+          filteredSlashItems.length === 0 ? 0 : (prev - 1 + filteredSlashItems.length) % filteredSlashItems.length
+        );
+        return;
+      }
+      if (e.key === "Enter") {
+        e.preventDefault();
+        if (filteredSlashItems[slashSelectedIndex]) {
+          const selected = filteredSlashItems[slashSelectedIndex];
+          convertBlock(id, selected.type, selected.content);
+        }
+        return;
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        updateBlock(id, { text: "" });
+        return;
+      }
+    }
+
+    if (e.key === "Escape") {
+      e.preventDefault();
+      textareaRef.current?.blur();
+      return;
+    }
+
     const isMac = typeof navigator !== "undefined" && /Mac|iPod|iPhone|iPad/.test(navigator.platform);
     const cmdOrCtrl = isMac ? e.metaKey : e.ctrlKey;
 
@@ -146,9 +198,18 @@ export default function ParagraphBlock({ id, content, previewMode }: ParagraphBl
     }
   };
 
+  // Handle click on rendered text to enter editing mode (unless user was selecting text to copy)
+  const handleStartEdit = () => {
+    const selection = typeof window !== "undefined" ? window.getSelection() : null;
+    if (selection && selection.toString().length > 0) {
+      return;
+    }
+    setIsFocused(true);
+  };
+
   if (previewMode) {
     return (
-      <p className="text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap">
+      <p className="text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap py-1">
         {text ? (
           <InlineMathText text={text} />
         ) : (
@@ -167,86 +228,134 @@ export default function ParagraphBlock({ id, content, previewMode }: ParagraphBl
     /\*[^*]+?\*/.test(text);
 
   return (
-    <div className="flex flex-col gap-1.5 w-full group relative">
-      {/* Floating Selection Bubble Toolbar */}
-      {showToolbar && (
+    <div className="flex flex-col w-full group relative">
+      {/* 1. When blurred / user leaves block: show clean rendered preview in-place */}
+      {!isFocused ? (
         <div
-          className="absolute -top-9 left-1 z-30 flex items-center gap-0.5 p-1 rounded-xl bg-background/95 dark:bg-zinc-900/95 backdrop-blur-xl border border-border/80 shadow-lg ring-1 ring-black/5 dark:ring-white/10 animate-in fade-in-50 zoom-in-95 duration-150 select-none"
-          onMouseDown={(e) => e.preventDefault()} // Keeps textarea focused!
+          onClick={handleStartEdit}
+          className="w-full text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap py-1 cursor-text transition-colors rounded-lg hover:bg-muted/15 min-h-[30px]"
+          title="Click to edit paragraph"
         >
-          <button
-            type="button"
-            onClick={() => toggleFormatting("**", "**")}
-            className="h-7 px-2 rounded-lg text-xs font-bold text-muted-foreground hover:text-foreground hover:bg-muted active:scale-95 transition-all flex items-center gap-1 cursor-pointer"
-            title="Bold (Ctrl+B)"
-          >
-            <Bold className="size-3.5" />
-          </button>
-          <button
-            type="button"
-            onClick={() => toggleFormatting("*", "*")}
-            className="h-7 px-2 rounded-lg text-xs font-semibold italic text-muted-foreground hover:text-foreground hover:bg-muted active:scale-95 transition-all flex items-center gap-1 cursor-pointer"
-            title="Italic (Ctrl+I)"
-          >
-            <Italic className="size-3.5" />
-          </button>
-          <button
-            type="button"
-            onClick={() => toggleFormatting("`", "`")}
-            className="h-7 px-2 rounded-lg text-xs font-mono text-muted-foreground hover:text-foreground hover:bg-muted active:scale-95 transition-all flex items-center gap-1 cursor-pointer"
-            title="Inline Code (Ctrl+E)"
-          >
-            <Code className="size-3.5" />
-          </button>
-          <button
-            type="button"
-            onClick={() => toggleFormatting("==", "==")}
-            className="h-7 px-2 rounded-lg text-xs font-semibold text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 active:scale-95 transition-all flex items-center gap-1 cursor-pointer"
-            title="Highlight (Ctrl+Shift+H)"
-          >
-            <Highlighter className="size-3.5" />
-          </button>
-          <div className="w-px h-4 bg-border/60 mx-0.5" />
-          <button
-            type="button"
-            onClick={() => toggleFormatting("$", "$")}
-            className="h-7 px-2 rounded-lg text-xs font-bold text-blue-600 dark:text-blue-400 hover:bg-blue-500/10 active:scale-95 transition-all flex items-center gap-1 cursor-pointer"
-            title="Inline Equation (Ctrl+Shift+M)"
-          >
-            <Sigma className="size-3.5" />
-          </button>
+          {text ? (
+            <InlineMathText text={text} />
+          ) : (
+            <span className="text-muted-foreground/40 italic select-none">
+              Type paragraph content... (select text for formatting, $...$ for math, / for blocks)
+            </span>
+          )}
         </div>
-      )}
+      ) : (
+        /* 2. When focused / user clicks to edit: show textarea + multiline Live Preview card */
+        <div className="flex flex-col gap-1.5 w-full relative">
+          {/* Floating Selection Bubble Toolbar */}
+          {showToolbar && (
+            <div
+              className="absolute -top-9 left-1 z-30 flex items-center gap-0.5 p-1 rounded-xl bg-background/95 dark:bg-zinc-900/95 backdrop-blur-xl border border-border/80 shadow-lg ring-1 ring-black/5 dark:ring-white/10 animate-in fade-in-50 zoom-in-95 duration-150 select-none"
+              onMouseDown={(e) => e.preventDefault()} // Keeps textarea focused!
+            >
+              <button
+                type="button"
+                onClick={() => toggleFormatting("**", "**")}
+                className="h-7 px-2 rounded-lg text-xs font-bold text-muted-foreground hover:text-foreground hover:bg-muted active:scale-95 transition-all flex items-center gap-1 cursor-pointer"
+                title="Bold (Ctrl+B)"
+              >
+                <Bold className="size-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => toggleFormatting("*", "*")}
+                className="h-7 px-2 rounded-lg text-xs font-semibold italic text-muted-foreground hover:text-foreground hover:bg-muted active:scale-95 transition-all flex items-center gap-1 cursor-pointer"
+                title="Italic (Ctrl+I)"
+              >
+                <Italic className="size-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => toggleFormatting("`", "`")}
+                className="h-7 px-2 rounded-lg text-xs font-mono text-muted-foreground hover:text-foreground hover:bg-muted active:scale-95 transition-all flex items-center gap-1 cursor-pointer"
+                title="Inline Code (Ctrl+E)"
+              >
+                <Code className="size-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => toggleFormatting("==", "==")}
+                className="h-7 px-2 rounded-lg text-xs font-semibold text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 active:scale-95 transition-all flex items-center gap-1 cursor-pointer"
+                title="Highlight (Ctrl+Shift+H)"
+              >
+                <Highlighter className="size-3.5" />
+              </button>
+              <div className="w-px h-4 bg-border/60 mx-0.5" />
+              <button
+                type="button"
+                onClick={() => toggleFormatting("$", "$")}
+                className="h-7 px-2 rounded-lg text-xs font-bold text-blue-600 dark:text-blue-400 hover:bg-blue-500/10 active:scale-95 transition-all flex items-center gap-1 cursor-pointer"
+                title="Inline Equation (Ctrl+Shift+M)"
+              >
+                <Sigma className="size-3.5" />
+              </button>
+            </div>
+          )}
 
-      {/* Primary Auto-Resizing Textarea */}
-      <textarea
-        ref={textareaRef}
-        rows={1}
-        value={text}
-        onChange={(e) => {
-          const value = applyMathShortcuts(e.target.value);
-          updateBlock(id, { text: value });
-        }}
-        onSelect={handleSelectionChange}
-        onMouseUp={handleSelectionChange}
-        onKeyUp={handleSelectionChange}
-        onKeyDown={handleKeyDown}
-        onBlur={() => {
-          // Small delay to allow button click before dismissing
-          setTimeout(() => setShowToolbar(false), 200);
-        }}
-        placeholder="Type paragraph content here... (select text for Bold/Italic, use $...$ for inline math, / for blocks)"
-        className="w-full bg-transparent resize-none overflow-hidden border-0 border-b border-transparent hover:border-border/30 focus:border-primary/50 focus:ring-0 focus:outline-none transition-all py-1 text-sm leading-relaxed"
-      />
+          {/* Primary Auto-Resizing Textarea */}
+          <textarea
+            ref={textareaRef}
+            rows={1}
+            value={text}
+            onChange={(e) => {
+              const value = applyMathShortcuts(e.target.value);
+              updateBlock(id, { text: value });
+            }}
+            onSelect={handleSelectionChange}
+            onMouseUp={handleSelectionChange}
+            onKeyUp={handleSelectionChange}
+            onKeyDown={handleKeyDown}
+            onBlur={() => {
+              setTimeout(() => {
+                setShowToolbar(false);
+                setIsFocused(false);
+              }, 150);
+            }}
+            placeholder="Type paragraph content here... (select text for Bold/Italic, use $...$ for inline math, / for blocks, Esc to finish)"
+            className="w-full bg-transparent resize-none overflow-hidden border-0 border-b border-transparent hover:border-border/30 focus:border-primary/50 focus:ring-0 focus:outline-none transition-all py-1 text-sm leading-relaxed"
+          />
 
-      {/* Live Formatted Typography & KaTeX Preview Chip */}
-      {hasFormattingOrMath && (
-        <div className="text-xs py-2 px-3.5 rounded-xl bg-muted/40 border border-border/50 text-foreground/90 flex flex-wrap items-center gap-2 animate-in fade-in-50 duration-150 select-text">
-          <span className="text-[10px] font-extrabold text-primary/70 uppercase tracking-wider shrink-0 flex items-center gap-1">
-            <Sparkles className="size-3 text-primary" />
-            Live Preview:
-          </span>
-          <InlineMathText text={text} />
+          {/* In-place Floating Slash Command Menu */}
+          {isSlashActive && (
+            <div
+              onMouseDown={(e) => e.preventDefault()}
+              className="absolute top-full left-0 mt-1 z-50 animate-in fade-in-0 zoom-in-95 duration-150"
+            >
+              <SlashMenu
+                externalSearch={slashSearch}
+                hideInput={true}
+                selectedIndex={slashSelectedIndex}
+                onSelectedIndexChange={setSlashSelectedIndex}
+                onSelect={(type, blockContent) => {
+                  convertBlock(id, type, blockContent);
+                }}
+                onClose={() => {
+                  updateBlock(id, { text: "" });
+                }}
+              />
+            </div>
+          )}
+
+          {/* Multiline Live Preview Card (Only visible when block is active & contains math/formatting) */}
+          {hasFormattingOrMath && (
+            <div
+              onMouseDown={(e) => e.preventDefault()}
+              className="w-full mt-2 p-3.5 rounded-xl bg-muted/40 border border-border/60 text-foreground/90 select-text animate-in fade-in-50 duration-150"
+            >
+              <div className="flex items-center gap-1.5 text-[10px] font-extrabold text-primary/80 uppercase tracking-wider mb-2 select-none border-b border-border/30 pb-1.5">
+                <Sparkles className="size-3 text-primary" />
+                <span>LIVE PREVIEW:</span>
+              </div>
+              <div className="text-sm leading-relaxed whitespace-pre-wrap break-words">
+                <InlineMathText text={text} />
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

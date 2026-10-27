@@ -27,7 +27,7 @@ export interface NotificationEntityRef {
   type?: string;
   isRead?: boolean;
   link?: string | null;
-  metadata?: Record<string, any> | null;
+  metadata?: Record<string, unknown> | null;
   entityType?: "journal" | "assignment" | "classroom" | string | null;
   entityId?: string | null;
   subEntityId?: string | null;
@@ -41,7 +41,8 @@ export interface NotificationEntityRef {
  * or smart fallback inspection.
  */
 export function resolveNotificationCategory(notif: NotificationEntityRef): NotificationCategory {
-  const rawCat = (notif.category || notif.metadata?.category || "").toLowerCase().trim();
+  const metaCategory = typeof notif.metadata?.category === "string" ? notif.metadata.category : "";
+  const rawCat = (notif.category || metaCategory || "").toLowerCase().trim();
   if (rawCat === "question") return "question";
   if (rawCat === "suggestion") return "suggestion";
   if (rawCat === "warning") return "warning";
@@ -101,11 +102,19 @@ export function resolveNotificationTarget(
   const isTeacher = !!options?.isTeacher;
   const studentJournalId = options?.studentJournalId;
 
+  const meta = notif.metadata;
+  const metaEntityType = typeof meta?.entityType === "string" ? meta.entityType : undefined;
+  const metaJournalId = typeof meta?.journalId === "string" ? meta.journalId : undefined;
+  const metaEntityId = typeof meta?.entityId === "string" ? meta.entityId : undefined;
+  const metaBlockId = typeof meta?.blockId === "string" ? meta.blockId : undefined;
+  const metaClassroomId = typeof meta?.classroomId === "string" ? meta.classroomId : undefined;
+  const metaAssignmentId = typeof meta?.assignmentId === "string" ? meta.assignmentId : undefined;
+
   // 1. Primary Entity Resolution: Journal Documents
   const isJournalEntity =
     notif.entityType === "journal" ||
-    notif.metadata?.entityType === "journal" ||
-    notif.metadata?.entityType === "journals" ||
+    metaEntityType === "journal" ||
+    metaEntityType === "journals" ||
     [
       "question",
       "suggestion",
@@ -120,13 +129,13 @@ export function resolveNotificationTarget(
   if (isJournalEntity) {
     const journalId =
       notif.entityId ||
-      notif.metadata?.journalId ||
-      (notif.metadata?.entityType === "journals" ? notif.metadata?.entityId : null) ||
-      (category === "submission" || category === "late_submission" ? notif.metadata?.entityId : null) ||
+      metaJournalId ||
+      (metaEntityType === "journals" ? metaEntityId : null) ||
+      (category === "submission" || category === "late_submission" ? metaEntityId : null) ||
       studentJournalId;
 
     if (journalId) {
-      const blockId = notif.subEntityId || notif.metadata?.blockId;
+      const blockId = notif.subEntityId || metaBlockId;
       const blockQuery = blockId ? `?blockId=${encodeURIComponent(blockId)}` : "";
       return `/editor/${journalId}${blockQuery}`;
     }
@@ -139,8 +148,8 @@ export function resolveNotificationTarget(
       return `/editor/${studentJournalId}`;
     }
 
-    const classroomId = notif.classroomId || notif.metadata?.classroomId;
-    const assignmentId = notif.entityId || notif.metadata?.assignmentId;
+    const classroomId = notif.classroomId || metaClassroomId;
+    const assignmentId = notif.entityId || metaAssignmentId;
 
     if (classroomId && assignmentId) {
       return `/classrooms/${classroomId}?tab=assignments&assignmentId=${assignmentId}`;
@@ -152,7 +161,7 @@ export function resolveNotificationTarget(
 
   // 3. Primary Entity Resolution: Classroom & Announcements
   if (category === "announcement" || notif.entityType === "classroom") {
-    const classroomId = notif.entityId || notif.classroomId || notif.metadata?.classroomId;
+    const classroomId = notif.entityId || notif.classroomId || metaClassroomId;
     if (classroomId) {
       return `/classrooms/${classroomId}?tab=announcements`;
     }

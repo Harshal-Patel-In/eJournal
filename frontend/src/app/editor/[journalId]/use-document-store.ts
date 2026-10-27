@@ -41,6 +41,7 @@ interface DocumentState {
   setActiveRevisionNumber: (activeRevisionNumber: number) => void;
   setTitle: (title: string) => void;
   addBlock: (index: number, type: string, content?: any) => void;
+  convertBlock: (id: string, type: string, content?: any) => void;
   updateBlock: (id: string, content: any) => void;
   deleteBlock: (id: string) => void;
   duplicateBlock: (id: string) => void;
@@ -184,6 +185,29 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
         isStructureDirty: true,
         syncStatus: "unsaved",
         dirtyBlockIds: Array.from(new Set([...state.dirtyBlockIds, newBlock.id])),
+      };
+    }),
+
+  convertBlock: (id, type, content = {}) =>
+    set((state) => {
+      const updated = state.blocks.map((block) => {
+        if (block.id === id) {
+          return {
+            ...block,
+            type,
+            content,
+            metadata: { ...block.metadata, updatedAt: new Date().toISOString() },
+          };
+        }
+        return block;
+      });
+      saveLocalSnapshot(state.journalId, state.title, updated, state.clientRevision);
+      return {
+        blocks: updated,
+        isDirty: true,
+        isStructureDirty: true,
+        syncStatus: "unsaved",
+        dirtyBlockIds: Array.from(new Set([...state.dirtyBlockIds, id])),
       };
     }),
 

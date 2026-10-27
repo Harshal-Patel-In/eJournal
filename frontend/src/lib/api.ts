@@ -91,7 +91,7 @@ async function request<T>(
       // Do not dispatch session expired modal if logging out, on auth pages, or root
       if (
         typeof window !== "undefined" &&
-        !(window as any).__IS_LOGGING_OUT &&
+        !(window as unknown as { __IS_LOGGING_OUT?: boolean }).__IS_LOGGING_OUT &&
         !endpoint.includes("/auth/logout") &&
         !window.location.pathname.startsWith("/auth") &&
         window.location.pathname !== "/"
@@ -106,7 +106,7 @@ async function request<T>(
           method: "POST",
           credentials: "include",
         });
-      } catch (err) {
+      } catch {
         // Ignore logout network exceptions
       }
     }

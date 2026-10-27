@@ -16,6 +16,7 @@ interface TableBlockProps {
     rows?: string[][];
     columnFormulas?: Record<number, string>;
     columnPrecision?: Record<number, string>;
+    teacherNote?: string;
   };
   previewMode: boolean;
 }
@@ -40,7 +41,7 @@ export default function TableBlock({ id, content, previewMode }: TableBlockProps
   const rows = safeRows;
   const columnFormulas = content?.columnFormulas || {};
   const columnPrecision = content?.columnPrecision || {};
-  const teacherNote = (content as any)?.teacherNote;
+  const teacherNote = content?.teacherNote;
 
   // Helper to dynamically evaluate all active formulas on a single row (O(1) constant time)
   const recomputeRowFormulas = (
@@ -257,16 +258,17 @@ export default function TableBlock({ id, content, previewMode }: TableBlockProps
           </Button>
 
           <Button variant="outline" size="xs" onClick={addColumn} className="gap-1 cursor-pointer">
-            <Plus className="size-3" /> Column
+            <Plus className="size-3" /> Add Column
           </Button>
           <Button
             variant="outline"
             size="xs"
             onClick={removeColumn}
             disabled={headers.length <= 1}
-            className="gap-1 cursor-pointer"
+            className="gap-1 cursor-pointer hover:text-destructive hover:border-destructive/40 disabled:opacity-40"
+            title="Delete the rightmost column"
           >
-            <Trash2 className="size-3" /> Column
+            <Trash2 className="size-3" /> Delete Column
           </Button>
         </div>
       </div>
@@ -280,7 +282,7 @@ export default function TableBlock({ id, content, previewMode }: TableBlockProps
           <button
             onClick={() => {
               const updated = { ...content };
-              delete (updated as any).teacherNote;
+              delete updated.teacherNote;
               updateBlock(id, updated);
             }}
             className="text-[10px] text-amber-600/70 hover:text-amber-700 dark:hover:text-amber-200 cursor-pointer underline"

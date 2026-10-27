@@ -1,9 +1,13 @@
 "use client";
 
-import React, { useEffect, useState, useRef, useCallback } from "react";
+import React, { useEffect, useState, useRef, useCallback, useSyncExternalStore } from "react";
 
 export function LiquidGlassScrollbar() {
-  const [mounted, setMounted] = useState(false);
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
   const [visible, setVisible] = useState(false);
   const [isScrolling, setIsScrolling] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
@@ -51,8 +55,7 @@ export function LiquidGlassScrollbar() {
 
   // Update on scroll & handle auto-fade
   useEffect(() => {
-    setMounted(true);
-    updateScrollMetrics();
+    const initialFrame = requestAnimationFrame(updateScrollMetrics);
 
     const handleScroll = () => {
       setIsScrolling(true);
@@ -81,6 +84,7 @@ export function LiquidGlassScrollbar() {
       window.removeEventListener("scroll", handleScroll);
       window.removeEventListener("resize", handleResize);
       observer.disconnect();
+      cancelAnimationFrame(initialFrame);
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
       if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
     };

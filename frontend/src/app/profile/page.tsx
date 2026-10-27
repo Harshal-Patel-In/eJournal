@@ -27,6 +27,7 @@ import { api } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { AppLoadingScreen } from "@/components/ui/app-loading-screen";
 
 const studentProfileSchema = zod.object({
   name: zod.string().min(2, "Full Name must be at least 2 characters"),
@@ -132,10 +133,10 @@ export default function ProfilePage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-3 bg-background text-foreground">
-        <Loader2 className="size-8 animate-spin text-primary" />
-        <p className="text-sm font-semibold">Loading academic profile...</p>
-      </div>
+      <AppLoadingScreen
+        title="Loading Academic Profile..."
+        subtitle="Retrieving user credentials and departmental records..."
+      />
     );
   }
 

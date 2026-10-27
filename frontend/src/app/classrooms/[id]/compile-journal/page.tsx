@@ -9,6 +9,7 @@ import { api } from "@/lib/api";
 import { formatDateIST } from "@/lib/date";
 import { Button } from "@/components/ui/button";
 import BlockRenderer from "@/app/editor/[journalId]/block-renderer";
+import { AppLoadingScreen } from "@/components/ui/app-loading-screen";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -160,12 +161,10 @@ export default function CompileJournalPage({ params }: PageProps) {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-3 bg-background text-foreground">
-        <Loader2 className="size-8 animate-spin text-primary" />
-        <p className="text-sm font-semibold">
-          {isSingleMode ? "Preparing Lab Report for Export..." : "Compiling Master Lab Journal & Mathematical Records..."}
-        </p>
-      </div>
+      <AppLoadingScreen
+        title={isSingleMode ? "Preparing Lab Report..." : "Compiling Master Lab Journal..."}
+        subtitle="Formatting academic records, equations, and diagrams for export..."
+      />
     );
   }
 

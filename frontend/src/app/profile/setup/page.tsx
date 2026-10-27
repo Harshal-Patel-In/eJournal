@@ -18,6 +18,7 @@ import { AlertCircle, CheckCircle2, Loader2, ShieldAlert } from "lucide-react";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { CustomSelect } from "@/components/ui/custom-select";
+import { AppLoadingScreen } from "@/components/ui/app-loading-screen";
 import {
   CHARUSAT_COLLEGES,
   CHARUSAT_DEPARTMENTS,
@@ -165,9 +166,10 @@ export default function ProfileSetupPage() {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <p className="text-muted-foreground animate-pulse text-sm">Loading setup profile parameters...</p>
-      </div>
+      <AppLoadingScreen
+        title="Loading Profile Setup..."
+        subtitle="Verifying institutional registry and user roles..."
+      />
     );
   }
 

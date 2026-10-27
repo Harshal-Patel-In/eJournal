@@ -22,6 +22,7 @@ import { AnnotationToolbar, AnnotationType } from "@/components/editor/annotatio
 import BlockAnnotations, { getDominantBorderColor } from "@/components/editor/block-annotations";
 import { VersionHistoryDrawer } from "@/components/editor/version-history-drawer";
 import EditorHelpModal from "./editor-help-modal";
+import { AppLoadingScreen } from "@/components/ui/app-loading-screen";
 
 interface PageProps {
   params: Promise<{ journalId: string }>;
@@ -631,12 +632,10 @@ export default function EditorPage({ params }: PageProps) {
     (journalId === "new" && createJournalMutation.isPending)
   ) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-background">
-        <Loader2 className="size-8 animate-spin text-primary mb-3" />
-        <p className="text-sm text-muted-foreground animate-pulse">
-          {journalId === "new" ? "Initializing Document Workspace..." : "Loading Visual Workspace..."}
-        </p>
-      </div>
+      <AppLoadingScreen
+        title={journalId === "new" ? "Initializing Document Workspace..." : "Loading Visual Workspace..."}
+        subtitle="Preparing academic journal canvas and mathematical blocks..."
+      />
     );
   }
 
