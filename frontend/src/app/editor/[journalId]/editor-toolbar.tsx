@@ -12,6 +12,7 @@ import {
   Download,
   History,
   MessageSquare,
+  PanelRight,
   Lock,
   HelpCircle,
   RefreshCw,
@@ -140,7 +141,9 @@ export default function EditorToolbar({
           </span>
           <span className="text-border/80">·</span>
           <span className="text-[10px] font-bold uppercase tracking-wider opacity-85">
-            {status === "approved"
+            {isTeacher
+              ? `v${activeRevisionNumber || 1}`
+              : status === "approved"
               ? "Approved"
               : status === "changes_requested"
               ? `Changes (v${activeRevisionNumber || 1})`
@@ -167,9 +170,9 @@ export default function EditorToolbar({
                     ? "border-indigo-500/60 bg-indigo-500/20 text-indigo-600 dark:text-indigo-300"
                     : "text-muted-foreground hover:text-foreground"
                 )}
-                title="Toggle Teacher Review & Annotation Drawer"
+                title="Toggle Teacher Review Cockpit (Shift + E)"
               >
-                <MessageSquare className={cn("size-3.5", showReviewDrawer && "text-indigo-500")} />
+                <PanelRight className={cn("size-3.5", showReviewDrawer && "text-indigo-500")} />
                 <span className="hidden sm:inline">Review</span>
               </Button>
             )}
@@ -192,7 +195,7 @@ export default function EditorToolbar({
                 : status === "changes_requested"
                 ? "Changes Requested"
                 : status === "late_submitted"
-                ? "Late"
+                ? "Late Submission"
                 : "Submitted"}
             </span>
           </>

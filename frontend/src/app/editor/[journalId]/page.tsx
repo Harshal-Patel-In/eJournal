@@ -611,6 +611,34 @@ export default function EditorPage({ params }: PageProps) {
     };
   }, [user]);
 
+  // Global Keyboard Shortcuts for Teacher Review Cockpit (Shift + E or Cmd+B to toggle review drawer)
+  useEffect(() => {
+    if (user?.role !== "teacher") return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (
+        target?.tagName === "INPUT" ||
+        target?.tagName === "TEXTAREA" ||
+        target?.isContentEditable ||
+        target?.closest("[contenteditable='true']")
+      ) {
+        return;
+      }
+
+      if (
+        (e.shiftKey && (e.key === "E" || e.key === "e")) ||
+        ((e.metaKey || e.ctrlKey) && (e.key === "b" || e.key === "B"))
+      ) {
+        e.preventDefault();
+        setShowReviewDrawer((prev) => !prev);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [user?.role]);
+
   const handleDragStart = () => {
     if (typeof document !== "undefined") {
       document.body.classList.add("is-dragging-block");
@@ -774,12 +802,21 @@ export default function EditorPage({ params }: PageProps) {
         onClose={() => setShowHelpModal(false)}
       />
 
-      <div className="flex-1 flex w-full relative pt-16 print:pt-0">
+      <div className={`flex-1 flex w-full relative pt-16 print:pt-0 ${
+        isTeacher && showReviewDrawer ? "justify-center px-4 gap-6" : "justify-center"
+      }`}>
         {/* Floating Toolbox (Students Only) */}
         {!isTeacher && !previewMode && isEditable && <FloatingToolbox />}
 
+        {/* Teacher Review Mode: Table of Contents on the LEFT */}
+        {isTeacher && showReviewDrawer && (
+          <TableOfContents isInlineSticky position="left" />
+        )}
+
         {/* Editor Main Canvas Wrapper */}
-        <main className="editor-content flex-1 w-full max-w-4xl mx-auto px-4 sm:px-6 lg:pl-20 xl:pl-24 py-8 flex flex-col gap-6 relative z-10 print:p-0 print:m-0 print:max-w-none print:w-full">
+        <main className={`editor-content flex-1 w-full max-w-4xl py-6 flex flex-col gap-6 relative z-10 print:p-0 print:m-0 print:max-w-none print:w-full ${
+          isTeacher && showReviewDrawer ? "px-2" : "mx-auto px-4 sm:px-6 lg:px-8"
+        }`}>
           {/* Academic Print-Only Single Journal Header */}
           <div className="hidden print:flex flex-col border-b-2 border-black pb-4 mb-4 select-none">
             <div className="flex justify-between items-start">
@@ -952,7 +989,7 @@ export default function EditorPage({ params }: PageProps) {
                 </div>
               )}
             </div>
-          ) : (status === "submitted" || status === "late_submitted" || journal?.isRevoked) && (
+          ) : !isTeacher && (status === "submitted" || status === "late_submitted" || journal?.isRevoked) && (
             <div className="p-4 rounded-2xl border border-amber-500/30 bg-amber-500/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
               <div className="flex flex-col gap-1">
                 <span className="text-sm font-bold text-foreground flex items-center gap-2">
@@ -992,7 +1029,53 @@ export default function EditorPage({ params }: PageProps) {
 
           {/* Paper Sheet Document Canvas Container */}
           <div className="w-full bg-white dark:bg-zinc-900/90 border border-slate-200/80 dark:border-zinc-800/80 shadow-2xl rounded-2xl p-6 sm:p-10 md:p-12 min-h-[850px] flex flex-col gap-6">
-            {!previewMode && (
+            {/* Academic Institutional Journal Metadata Header */}
+            {isTeacher && (
+              <div className="p-3.5 rounded-xl bg-slate-50/90 dark:bg-zinc-800/50 border border-slate-200/90 dark:border-zinc-700/60 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 text-xs select-none shadow-2xs">
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  <span className="font-extrabold text-foreground text-xs tracking-tight">
+                    {journal?.studentName || user?.fullName || "Student Submission"}
+                  </span>
+                  {journal?.enrollmentNumber && (
+                    <span className="px-2 py-0.5 rounded-md font-mono text-[10px] font-bold bg-background text-muted-foreground border border-border/60">
+                      {journal.enrollmentNumber}
+                    </span>
+                  )}
+                  <span className="text-muted-foreground/60 hidden sm:inline">•</span>
+                  <span className="text-[11px] font-bold text-foreground/80">
+                    Experiment #{assignment?.experimentNumber || 1}
+                  </span>
+                  {assignment?.title && (
+                    <>
+                      <span className="text-muted-foreground/60 hidden sm:inline">•</span>
+                      <span className="text-[11px] text-muted-foreground font-medium truncate max-w-[200px] hidden sm:inline">
+                        {assignment.title}
+                      </span>
+                    </>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  {status === "late_submitted" ? (
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/25 flex items-center gap-1">
+                      <span>🕒 Late Submission</span>
+                    </span>
+                  ) : status === "submitted" ? (
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/25">
+                      On-Time Submission
+                    </span>
+                  ) : null}
+
+                  {journal?.submittedAt && (
+                    <span className="text-[10px] text-muted-foreground/80 font-mono hidden sm:inline">
+                      Handed in {formatDateTimeIST(journal.submittedAt, false)}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {!previewMode && !isTeacher && (
               <div className="p-3 border border-dashed border-border/80 rounded-xl bg-muted/20 text-xs text-muted-foreground flex justify-between items-center select-none">
                 <span><strong>Practical:</strong> Experiment {assignment?.experimentNumber || 1}</span>
                 <span className="font-semibold text-primary/70">Block-based Structure Active</span>
@@ -1127,12 +1210,9 @@ export default function EditorPage({ params }: PageProps) {
           </div>
         </main>
 
-        {/* Right-Side Table of Contents / Outline Rail */}
-        {(!isTeacher || !showReviewDrawer) && <TableOfContents />}
-
-        {/* Teacher Review Panel — Floating Right Sidebar */}
+        {/* Right-Side Teacher Review Cockpit Drawer */}
         {isTeacher && showReviewDrawer && (
-          <aside className="w-[340px] shrink-0 sticky top-[4.5rem] h-[calc(100vh-5.5rem)] mr-3 my-2 rounded-2xl bg-gradient-to-b from-white/95 via-white/90 to-white/85 dark:from-zinc-900/95 dark:via-zinc-900/90 dark:to-zinc-950/85 backdrop-blur-2xl backdrop-saturate-150 border border-white/80 dark:border-white/10 ring-1 ring-black/5 dark:ring-white/10 shadow-xl z-20 overflow-hidden">
+          <aside className="w-[330px] shrink-0 sticky top-[4.5rem] h-[calc(100vh-6rem)] my-2 rounded-2xl bg-gradient-to-b from-white/95 via-white/90 to-white/85 dark:from-zinc-900/95 dark:via-zinc-900/90 dark:to-zinc-950/85 backdrop-blur-2xl backdrop-saturate-150 border border-white/80 dark:border-white/10 ring-1 ring-black/5 dark:ring-white/10 shadow-xl z-20 overflow-hidden transition-all duration-300">
             <ReviewDrawer
               journalId={journalId}
               classroomId={classroomId}
@@ -1146,6 +1226,10 @@ export default function EditorPage({ params }: PageProps) {
               onClose={() => setShowReviewDrawer(false)}
             />
           </aside>
+        )}
+        {/* Student Mode / Review Closed: Table of Contents on the RIGHT */}
+        {(!isTeacher || !showReviewDrawer) && (
+          <TableOfContents isInlineSticky={false} position="right" />
         )}
       </div>
     </div>

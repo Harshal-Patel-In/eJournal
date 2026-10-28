@@ -83,7 +83,7 @@ const Rail = ({
   );
 };
 
-const SCROLL_OFFSET = 95;
+const SCROLL_OFFSET = 100;
 
 // Color accent definitions for outline items
 const getItemColor = (type: string) => {
@@ -172,7 +172,15 @@ const getItemColor = (type: string) => {
   }
 };
 
-export default function TableOfContents() {
+interface TableOfContentsProps {
+  isInlineSticky?: boolean;
+  position?: "left" | "right";
+}
+
+export default function TableOfContents({
+  isInlineSticky = false,
+  position = "right",
+}: TableOfContentsProps = {}) {
   const { blocks, title } = useDocumentStore();
   const [collapsed, setCollapsed] = useState(false);
   const [activeId, setActiveId] = useState<string>("");
@@ -211,7 +219,10 @@ export default function TableOfContents() {
     if (tooltipTimerRef.current) clearTimeout(tooltipTimerRef.current);
 
     const rect = e.currentTarget.getBoundingClientRect();
-    const targetPos = { top: rect.top + rect.height / 2, left: rect.left - 10 };
+    const targetPos =
+      position === "left"
+        ? { top: rect.top + rect.height / 2, left: rect.right + 12 }
+        : { top: rect.top + rect.height / 2, left: rect.left - 10 };
 
     if (isTooltipActiveRef.current) {
       setTooltipPos(targetPos);
@@ -356,8 +367,16 @@ export default function TableOfContents() {
         opacity: 1,
       });
 
-      // Gently ensure active item stays visible in scrollable TOC rail if list is long
-      el.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      // Safely ensure active item stays visible in scrollable TOC rail without hijacking window scroll
+      const scrollParent = el.closest(".custom-scrollbar") as HTMLElement | null;
+      if (scrollParent) {
+        const parentRect = scrollParent.getBoundingClientRect();
+        if (elRect.bottom > parentRect.bottom) {
+          scrollParent.scrollTop += elRect.bottom - parentRect.bottom + 8;
+        } else if (elRect.top < parentRect.top) {
+          scrollParent.scrollTop -= parentRect.top - elRect.top + 8;
+        }
+      }
     }
   }, [activeId]);
 
@@ -385,7 +404,7 @@ export default function TableOfContents() {
     const isAtBottom = windowHeight + scrollY >= documentHeight - 40;
 
     // 1. DOCUMENT TOP
-    if (scrollY < 80) {
+    if (scrollY < 60) {
       setActiveId(items[0].id);
       return;
     }
@@ -411,7 +430,7 @@ export default function TableOfContents() {
         const el = document.getElementById(`block-${item.id}`);
         if (el) {
           const rect = el.getBoundingClientRect();
-          if (rect.top < windowHeight && rect.bottom > 80) {
+          if (rect.top < windowHeight && rect.bottom > 64) {
             setActiveId(item.id);
             return;
           }
@@ -421,10 +440,25 @@ export default function TableOfContents() {
       return;
     }
 
-    // 3. SECTION-RANGE RESOLUTION:
-    // Every outline item defines a section spanning from its top until the NEXT item's top.
-    // The trigger line sits precisely at the scroll landing line (SCROLL_OFFSET + 15px).
-    const triggerY = scrollY + SCROLL_OFFSET + 15;
+    // 3. TARGET LOCK & ACTIVE TARGET RESOLUTION:
+    if (targetActiveIdRef.current) {
+      const targetEl = document.getElementById(`block-${targetActiveIdRef.current}`);
+      if (targetEl) {
+        const rect = targetEl.getBoundingClientRect();
+        // If the targeted block is currently landing or positioned in view
+        if (rect.top <= SCROLL_OFFSET + 70 && rect.bottom >= SCROLL_OFFSET - 20) {
+          setActiveId(targetActiveIdRef.current);
+          return;
+        }
+      }
+    }
+
+    // 4. NATURAL READING ZONE RESOLUTION:
+    // Sections activate as soon as they reach the upper reading zone (~32% of the viewport).
+    // This allows blocks to activate smoothly while fully visible in view, rather than forcing
+    // them to scroll all the way into the cramped top 100px line under the header.
+    const scrollTriggerOffset = Math.max(SCROLL_OFFSET + 50, Math.round(windowHeight * 0.32));
+    const triggerY = scrollY + scrollTriggerOffset;
     let activeSectionId = items[0].id;
 
     for (let i = 0; i < items.length; i++) {
@@ -535,9 +569,19 @@ export default function TableOfContents() {
   return (
     <aside
       aria-label="Table of Contents"
-      className={`fixed top-24 z-30 hidden xl:flex flex-col select-none transition-all duration-300 ease-out right-6 xl:right-8 2xl:right-[calc(50vw-448px-230px)] print:hidden ${
-        collapsed ? "w-16" : "w-56"
-      }`}
+      className={
+        isInlineSticky
+          ? `sticky top-20 z-20 hidden xl:flex flex-col select-none transition-all duration-300 ease-out print:hidden shrink-0 self-start ${
+              collapsed ? "w-16" : "w-56"
+            }`
+          : position === "left"
+          ? `fixed top-24 z-30 hidden xl:flex flex-col select-none transition-all duration-300 ease-out left-6 xl:left-8 2xl:left-[calc(50vw-448px-230px)] print:hidden ${
+              collapsed ? "w-16" : "w-56"
+            }`
+          : `fixed top-24 z-30 hidden xl:flex flex-col select-none transition-all duration-300 ease-out right-6 xl:right-8 2xl:right-[calc(50vw-448px-248px)] print:hidden ${
+              collapsed ? "w-16" : "w-56"
+            }`
+      }
     >
       {/* Liquid Glass Shell Container with Apple Specular Bevel */}
       <div
@@ -732,7 +776,9 @@ export default function TableOfContents() {
           style={{ top: tooltipPos.top, left: tooltipPos.left }}
           className={`fixed z-[9999] px-3.5 py-2 rounded-2xl bg-white/95 dark:bg-zinc-900/95 backdrop-blur-2xl border ${
             getItemColor(tooltipItem.type).border
-          } ring-1 ring-black/5 dark:ring-white/10 shadow-[0_16px_36px_-6px_rgba(0,0,0,0.35),_inset_0_1px_1px_rgba(255,255,255,0.2)] flex items-center gap-2.5 select-none pointer-events-none transition-all duration-100 ease-out animate-in fade-in-0 zoom-in-95 -translate-x-full -translate-y-1/2`}
+          } ring-1 ring-black/5 dark:ring-white/10 shadow-[0_16px_36px_-6px_rgba(0,0,0,0.35),_inset_0_1px_1px_rgba(255,255,255,0.2)] flex items-center gap-2.5 select-none pointer-events-none transition-all duration-100 ease-out animate-in fade-in-0 zoom-in-95 ${
+            position === "left" ? "-translate-y-1/2" : "-translate-x-full -translate-y-1/2"
+          }`}
         >
           {/* Chromatic Category Icon Chip */}
           <div
@@ -759,8 +805,10 @@ export default function TableOfContents() {
 
           {/* Micro Caret Arrow pointing toward spine */}
           <div
-            className={`absolute right-[-4px] top-1/2 -translate-y-1/2 size-2 rotate-45 bg-white dark:bg-zinc-900 border-t border-r ${
-              getItemColor(tooltipItem.type).border
+            className={`absolute top-1/2 -translate-y-1/2 size-2 rotate-45 bg-white dark:bg-zinc-900 ${
+              position === "left"
+                ? `left-[-4px] border-b border-l ${getItemColor(tooltipItem.type).border}`
+                : `right-[-4px] border-t border-r ${getItemColor(tooltipItem.type).border}`
             }`}
           />
         </div>,
