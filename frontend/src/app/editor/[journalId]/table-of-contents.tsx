@@ -232,7 +232,7 @@ export default function TableOfContents({
         setTooltipPos(targetPos);
         setTooltipItem(item);
         isTooltipActiveRef.current = true;
-      }, 70);
+      }, 140);
     }
   };
 
@@ -571,29 +571,31 @@ export default function TableOfContents({
       aria-label="Table of Contents"
       className={
         isInlineSticky
-          ? `sticky top-20 z-20 hidden xl:flex flex-col select-none transition-all duration-300 ease-out print:hidden shrink-0 self-start ${
-              collapsed ? "w-16" : "w-56"
+          ? `sticky top-20 z-20 hidden xl:flex flex-col select-none transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] print:hidden shrink-0 self-start ${
+              collapsed ? "w-12" : "w-56"
             }`
           : position === "left"
-          ? `fixed top-24 z-30 hidden xl:flex flex-col select-none transition-all duration-300 ease-out left-6 xl:left-8 2xl:left-[calc(50vw-448px-230px)] print:hidden ${
-              collapsed ? "w-16" : "w-56"
+          ? `fixed top-24 z-30 hidden xl:flex flex-col select-none transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] left-6 xl:left-8 2xl:left-[calc(50vw-448px-230px)] print:hidden ${
+              collapsed ? "w-12" : "w-56"
             }`
-          : `fixed top-24 z-30 hidden xl:flex flex-col select-none transition-all duration-300 ease-out right-6 xl:right-8 2xl:right-[calc(50vw-448px-248px)] print:hidden ${
-              collapsed ? "w-16" : "w-56"
+          : `fixed top-24 z-30 hidden xl:flex flex-col select-none transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] right-6 xl:right-8 2xl:right-[calc(50vw-448px-248px)] print:hidden ${
+              collapsed ? "w-12" : "w-56"
             }`
       }
     >
       {/* Liquid Glass Shell Container with Apple Specular Bevel */}
       <div
-        className={`relative flex flex-col bg-gradient-to-b from-white/95 via-white/85 to-white/75 dark:from-zinc-900/95 dark:via-zinc-900/90 dark:to-zinc-950/85 backdrop-blur-2xl backdrop-saturate-180 border border-white/80 dark:border-white/15 ring-1 ring-black/5 dark:ring-white/10 shadow-[0_16px_40px_-8px_rgba(0,0,0,0.12),_inset_0_1px_1px_rgba(255,255,255,0.95)] dark:shadow-[0_20px_50px_-12px_rgba(0,0,0,0.7),_inset_0_1px_1px_rgba(255,255,255,0.18)] overflow-hidden transition-all duration-300 ${
-          collapsed ? "rounded-[26px]" : "rounded-2xl"
+        className={`relative flex flex-col rounded-2xl transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] overflow-hidden ${
+          collapsed
+            ? "py-2 px-1.5 items-center bg-white/85 dark:bg-zinc-900/85 backdrop-blur-xl backdrop-saturate-150 border border-border/70 dark:border-white/10 ring-1 ring-black/5 dark:ring-white/5 shadow-[0_8px_24px_-4px_rgba(0,0,0,0.07),_inset_0_1px_1px_rgba(255,255,255,0.85)] dark:shadow-[0_12px_32px_-6px_rgba(0,0,0,0.5),_inset_0_1px_1px_rgba(255,255,255,0.1)] opacity-85 hover:opacity-100 focus-within:opacity-100"
+            : "bg-gradient-to-b from-white/95 via-white/85 to-white/75 dark:from-zinc-900/95 dark:via-zinc-900/90 dark:to-zinc-950/85 backdrop-blur-2xl backdrop-saturate-180 border border-white/80 dark:border-white/15 ring-1 ring-black/5 dark:ring-white/10 shadow-[0_16px_40px_-8px_rgba(0,0,0,0.12),_inset_0_1px_1px_rgba(255,255,255,0.95)] dark:shadow-[0_20px_50px_-12px_rgba(0,0,0,0.7),_inset_0_1px_1px_rgba(255,255,255,0.18)] opacity-100"
         }`}
       >
         {/* Header */}
         <div
           className={`flex items-center transition-colors duration-200 ${
             collapsed
-              ? "justify-center pt-3 pb-2"
+              ? "justify-center pt-0.5 pb-1 w-full"
               : "justify-between px-2.5 py-1.5 border-b border-border/50 bg-muted/20"
           }`}
         >
@@ -616,12 +618,16 @@ export default function TableOfContents({
             title={collapsed ? "Expand Outline" : "Collapse to Minimap Spine"}
             className={
               collapsed
-                ? "group/nav relative size-8 flex items-center justify-center rounded-xl bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 ring-1 ring-blue-500/20 transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer shadow-[0_0_10px_rgba(59,130,246,0.15)]"
+                ? "group/nav size-6 flex items-center justify-center rounded-full hover:bg-muted/80 text-muted-foreground hover:text-foreground transition-all duration-200 cursor-pointer active:scale-90"
                 : "p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-all cursor-pointer"
             }
           >
             {collapsed ? (
-              <Compass className="size-4 text-blue-500 dark:text-blue-400 transition-transform duration-500 ease-out group-hover/nav:rotate-90" />
+              position === "left" ? (
+                <ChevronRight className="size-3.5 transition-transform duration-200 group-hover/nav:translate-x-0.5" />
+              ) : (
+                <ChevronLeft className="size-3.5 transition-transform duration-200 group-hover/nav:-translate-x-0.5" />
+              )
             ) : (
               <ChevronRight className="size-3.5" />
             )}
@@ -698,31 +704,26 @@ export default function TableOfContents({
             )}
           </div>
         ) : (
-          /* Stepped Minimap Sticks (No Lines, Distinct Hierarchy) */
-          <div className="relative px-3 flex flex-col items-start gap-1.5 py-2 max-h-[calc(100vh-160px)] overflow-y-auto no-scrollbar">
-            <div className="relative z-10 flex flex-col gap-1 w-full">
+          /* Calm Liquid Glass Minimap Spine */
+          <div className="relative w-full flex flex-col items-center py-1 max-h-[calc(100vh-160px)]">
+            {/* Scrollable Node Rail */}
+            <div className="relative z-10 flex flex-col items-center w-full max-h-[calc(100vh-215px)] overflow-y-auto no-scrollbar py-0.5 gap-0.5">
               {items.map((item) => {
                 const isActive = activeId === item.id;
                 const isHovered = tooltipItem?.id === item.id;
                 const isHighlighted = isActive || isHovered;
                 const accent = getItemColor(item.type);
 
-                // Distinct Level-Wise Steps:
-                // Level 1 (Depth 2: Title, H1, Result): Flush left (ml-0), 38px long, 8px tall
-                // Level 2 (Depth 3: H2, Tables, Equations, Images, Code, Observation): Indented 12px (ml-3), 24px long, 6px tall
-                // Level 3 (Depth 4: H3 subsections): Indented 24px (ml-6), 13px long, 6px tall
-                const indentClass =
+                // Unified Cohesive Micro-Bar Hierarchy (All Micro-Bars, No Random Circles):
+                // Level 1 (Depth 2: Document Title, H1, Result): 24px wide x 4px tall
+                // Level 2 (Depth 3: H2, Tables, Equations, Images, Code, Observation): 16px wide x 4px tall
+                // Level 3 (Depth 4+: H3 subsections, Reference): 10px wide x 4px tall
+                const barWidth =
                   item.depth === 2
-                    ? "ml-0"
+                    ? "w-6"
                     : item.depth === 3
-                    ? "ml-3"
-                    : "ml-6";
-                const stickSize =
-                  item.depth === 2
-                    ? "w-[38px] h-2"
-                    : item.depth === 3
-                    ? "w-[24px] h-1.5"
-                    : "w-[13px] h-1.5";
+                    ? "w-4"
+                    : "w-2.5";
 
                 return (
                   <button
@@ -731,14 +732,14 @@ export default function TableOfContents({
                     onClick={() => scrollToItem(item.id)}
                     onMouseEnter={(e) => handleDashMouseEnter(e, item)}
                     onMouseLeave={handleDashMouseLeave}
-                    className="group/dash py-0.5 flex items-center w-full transition-transform active:scale-95 cursor-pointer"
+                    className="relative py-1 flex items-center justify-center w-full cursor-pointer group/node"
                     aria-label={item.label}
                   >
                     <span
-                      className={`rounded-full shrink-0 transition-all duration-200 ease-out ${stickSize} ${indentClass} ${
+                      className={`h-1 rounded-full transition-all duration-200 ease-out ${barWidth} ${
                         isHighlighted
-                          ? `${accent.bg} ${accent.glow} scale-y-115 shadow-md ring-1 ring-white/60 dark:ring-white/30`
-                          : "bg-zinc-300/80 dark:bg-zinc-700/70 hover:bg-zinc-400 dark:hover:bg-zinc-600 hover:scale-y-115"
+                          ? `${accent.bg} ${accent.glow} scale-y-125 ring-2 ring-blue-500/25 shadow-sm`
+                          : "bg-zinc-300 dark:bg-zinc-600 hover:bg-zinc-400 dark:hover:bg-zinc-400"
                       }`}
                     />
                   </button>
@@ -746,10 +747,33 @@ export default function TableOfContents({
               })}
             </div>
 
-            {/* Bottom Progress & Scroll-to-Top Action (Both Coexist Seamlessly) */}
-            <div className="relative z-10 pt-2 pb-2.5 w-full flex flex-col items-center justify-center gap-1.5">
-              {/* Permanent Reading Progress Percentage */}
-              <span className="text-[10px] font-mono font-bold text-muted-foreground/60 select-none tabular-nums tracking-tight">
+            {/* Bottom Progress & Scroll-to-Top Action */}
+            <div className="relative z-10 pt-1.5 pb-1 w-full flex flex-col items-center justify-center gap-1 border-t border-border/40 mt-1">
+              {/* Circular SVG Progress Ring */}
+              <div
+                className="relative size-5 flex items-center justify-center"
+                title={`Reading Progress: ${scrollProgress}%`}
+              >
+                <svg className="size-full -rotate-90" viewBox="0 0 24 24">
+                  <circle
+                    cx="12"
+                    cy="12"
+                    r="9"
+                    className="stroke-border/50 dark:stroke-white/10 fill-none stroke-[2.5]"
+                  />
+                  <circle
+                    cx="12"
+                    cy="12"
+                    r="9"
+                    className="stroke-blue-500 dark:stroke-blue-400 fill-none stroke-[2.5] transition-all duration-300 ease-out"
+                    strokeDasharray={56.5}
+                    strokeDashoffset={56.5 - (56.5 * scrollProgress) / 100}
+                    strokeLinecap="round"
+                  />
+                </svg>
+              </div>
+
+              <span className="text-[9px] font-mono font-bold text-muted-foreground/80 select-none tabular-nums tracking-tight">
                 {scrollProgress}%
               </span>
 
@@ -760,9 +784,9 @@ export default function TableOfContents({
                   onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
                   aria-label="Scroll to top"
                   title="Scroll to top"
-                  className="size-7 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 text-blue-500 ring-1 ring-blue-500/20 flex items-center justify-center transition-all duration-200 hover:scale-110 active:scale-95 cursor-pointer shadow-[0_0_8px_rgba(59,130,246,0.15)] animate-in fade-in-0 zoom-in-95"
+                  className="size-6 rounded-full hover:bg-muted text-muted-foreground hover:text-blue-500 flex items-center justify-center transition-all duration-200 active:scale-90 cursor-pointer animate-in fade-in-0 zoom-in-95 mt-0.5"
                 >
-                  <CircleArrowUp className="size-4" />
+                  <CircleArrowUp className="size-3.5" />
                 </button>
               )}
             </div>
@@ -774,41 +798,39 @@ export default function TableOfContents({
       {mounted && collapsed && tooltipItem && tooltipPos && createPortal(
         <div
           style={{ top: tooltipPos.top, left: tooltipPos.left }}
-          className={`fixed z-[9999] px-3.5 py-2 rounded-2xl bg-white/95 dark:bg-zinc-900/95 backdrop-blur-2xl border ${
+          className={`fixed z-[9999] px-3 py-1.5 rounded-xl bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl border ${
             getItemColor(tooltipItem.type).border
-          } ring-1 ring-black/5 dark:ring-white/10 shadow-[0_16px_36px_-6px_rgba(0,0,0,0.35),_inset_0_1px_1px_rgba(255,255,255,0.2)] flex items-center gap-2.5 select-none pointer-events-none transition-all duration-100 ease-out animate-in fade-in-0 zoom-in-95 ${
+          } ring-1 ring-black/5 dark:ring-white/10 shadow-[0_12px_28px_-6px_rgba(0,0,0,0.18),_inset_0_1px_1px_rgba(255,255,255,0.2)] flex items-center gap-2 select-none pointer-events-none transition-all duration-100 ease-out animate-in fade-in-0 zoom-in-95 ${
             position === "left" ? "-translate-y-1/2" : "-translate-x-full -translate-y-1/2"
           }`}
         >
           {/* Chromatic Category Icon Chip */}
           <div
-            className={`p-1.5 rounded-xl border ${
+            className={`p-1 rounded-lg border ${
               getItemColor(tooltipItem.type).badge
-            } shadow-sm shrink-0 flex items-center justify-center`}
+            } shadow-xs shrink-0 flex items-center justify-center`}
           >
             {getItemIcon(tooltipItem.type) || <Hash className="size-3 text-blue-500" />}
           </div>
 
           {/* Label and Subtitle Metadata */}
-          <div className="flex flex-col min-w-0 pr-1">
-            <span className="text-xs font-bold text-foreground whitespace-nowrap max-w-[210px] truncate leading-tight">
+          <div className="flex flex-col min-w-0 pr-0.5">
+            <span className="text-xs font-semibold text-foreground whitespace-nowrap max-w-[190px] truncate leading-tight">
               {tooltipItem.label}
             </span>
-            <span className="text-[10px] font-semibold text-muted-foreground/80 tracking-wider uppercase mt-0.5 flex items-center gap-1.5">
+            <span className="text-[10px] font-semibold text-muted-foreground/80 tracking-wide uppercase mt-0.5 flex items-center gap-1">
               <span className={getItemColor(tooltipItem.type).text}>
                 {tooltipItem.type}
               </span>
-              <span className="size-0.5 rounded-full bg-muted-foreground/40" />
-              <span>Depth {tooltipItem.depth}</span>
             </span>
           </div>
 
           {/* Micro Caret Arrow pointing toward spine */}
           <div
-            className={`absolute top-1/2 -translate-y-1/2 size-2 rotate-45 bg-white dark:bg-zinc-900 ${
+            className={`absolute top-1/2 -translate-y-1/2 size-1.5 rotate-45 bg-white dark:bg-zinc-900 ${
               position === "left"
-                ? `left-[-4px] border-b border-l ${getItemColor(tooltipItem.type).border}`
-                : `right-[-4px] border-t border-r ${getItemColor(tooltipItem.type).border}`
+                ? `left-[-3px] border-b border-l ${getItemColor(tooltipItem.type).border}`
+                : `right-[-3px] border-t border-r ${getItemColor(tooltipItem.type).border}`
             }`}
           />
         </div>,
