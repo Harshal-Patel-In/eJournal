@@ -1415,6 +1415,7 @@ export default function ClassroomPage({ params }: PageProps) {
                               const pending = asgSubs.filter((s: any) => s.status === "submitted" || s.status === "late_submitted").length;
                               const totalSub = asgSubs.filter((s: any) => s.status !== "draft").length;
                               const draft = asgSubs.filter((s: any) => s.status === "draft").length;
+                              const relatedJournal = journals?.find((j: any) => j.assignmentId === asg.id);
 
                               return (
                                 <div
@@ -1454,7 +1455,7 @@ export default function ClassroomPage({ params }: PageProps) {
                                     <div className="flex items-center justify-between pt-1 border-t border-border/40 mt-0.5">
                                       <span className="text-[10px] text-muted-foreground">Due 11:59 PM</span>
                                       <Link
-                                        href={`/editor/${asg.id}`}
+                                        href={relatedJournal ? `/editor/${relatedJournal.id}` : `/editor/new?assignmentId=${asg.id}`}
                                         className="text-[11px] font-bold text-primary hover:underline shrink-0"
                                       >
                                         Open →
