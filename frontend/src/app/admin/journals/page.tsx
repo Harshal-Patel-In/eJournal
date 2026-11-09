@@ -166,7 +166,7 @@ export default function AdminJournalsPage() {
                       <div className="flex flex-col">
                         <div className="flex items-center gap-1.5">
                           <span className="font-bold text-foreground text-xs">{j.title}</span>
-                          <span className="px-1.5 py-0.2 text-[9px] font-mono font-bold rounded bg-muted border border-border text-muted-foreground">
+                          <span className="px-1.5 py-0.2 text-[9px] font-bold rounded bg-muted border border-border text-muted-foreground">
                             v{j.currentVersion}
                           </span>
                         </div>
@@ -176,7 +176,7 @@ export default function AdminJournalsPage() {
                     <td className="py-3.5 px-4">
                       <div className="flex flex-col">
                         <span className="font-semibold text-foreground text-xs">{j.studentName}</span>
-                        <span className="text-[10px] text-muted-foreground font-mono">{j.enrollmentNumber}</span>
+                        <span className="text-[10px] text-muted-foreground">{j.enrollmentNumber}</span>
                       </div>
                     </td>
                     <td className="py-3.5 px-4 text-muted-foreground text-xs font-medium">
@@ -189,7 +189,7 @@ export default function AdminJournalsPage() {
                       {j.marks !== undefined && j.marks !== null ? (
                         <div className="inline-flex items-center gap-1.5 font-bold text-foreground">
                           <Sparkles className="size-3 text-amber-500" />
-                          <span className="tabular-nums font-mono">{j.marks}</span>
+                          <span className="tabular-nums font-semibold">{j.marks}</span>
                           <span className="text-[10px] text-muted-foreground font-normal">pts</span>
                         </div>
                       ) : (

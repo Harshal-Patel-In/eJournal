@@ -112,16 +112,16 @@ export function CustomSelect({
         aria-controls={listboxId}
         disabled={disabled}
         onClick={() => setIsOpen((prev) => !prev)}
-        className={`w-full min-w-[190px] h-9 px-3.5 rounded-2xl bg-card border border-border/80 text-xs font-medium text-foreground hover:bg-muted/30 focus:outline-none focus:ring-2 focus:ring-primary/20 flex items-center justify-between gap-2.5 shadow-xs transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${triggerClassName}`}
+        className={`w-full min-w-[180px] h-8 px-3 rounded-md bg-card border border-border text-xs font-medium text-foreground hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 flex items-center justify-between gap-2 shadow-2xs transition-[background-color,border-color] duration-120 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${triggerClassName}`}
       >
         <span className="flex items-center gap-2 truncate">
           {icon && <span className="shrink-0 text-muted-foreground">{icon}</span>}
-          <span className={`truncate ${!selectedOption && placeholder ? "text-muted-foreground" : "text-foreground"}`}>
+          <span className={`truncate ${!selectedOption && placeholder ? "text-muted-foreground" : "text-foreground font-semibold"}`}>
             {displayText}
           </span>
         </span>
         <ChevronDown
-          className={`size-3.5 shrink-0 text-muted-foreground transition-transform duration-200 ${
+          className={`size-3.5 shrink-0 text-muted-foreground transition-transform duration-150 ${
             isOpen ? "rotate-180 text-foreground" : ""
           }`}
         />
@@ -132,7 +132,7 @@ export function CustomSelect({
         <div
           id={listboxId}
           role="listbox"
-          className="absolute left-0 right-0 mt-1.5 min-w-[200px] max-h-60 overflow-y-auto rounded-2xl bg-card/95 backdrop-blur-md border border-border/90 shadow-2xl p-1 z-50 animate-in fade-in-0 zoom-in-95 duration-150 origin-top"
+          className="absolute left-0 right-0 mt-1 min-w-[190px] max-h-60 overflow-y-auto rounded-md bg-popover text-popover-foreground border border-border shadow-md p-1 z-50 animate-in fade-in-0 zoom-in-95 duration-120 origin-top"
         >
           {options.map((opt) => {
             const isSelected = opt.value === value;
@@ -142,14 +142,14 @@ export function CustomSelect({
                 role="option"
                 aria-selected={isSelected}
                 onClick={() => handleSelect(opt.value)}
-                className={`w-full px-3 py-2 rounded-xl text-xs flex items-center justify-between gap-2 cursor-pointer transition-colors ${
+                className={`w-full px-2.5 py-1.5 rounded text-xs flex items-center justify-between gap-2 cursor-pointer transition-colors duration-100 ${
                   isSelected
-                    ? "bg-primary/10 text-primary font-semibold"
-                    : "text-foreground hover:bg-muted/60"
+                    ? "bg-primary text-primary-foreground font-semibold"
+                    : "text-foreground hover:bg-muted"
                 }`}
               >
                 <span className="truncate">{opt.label}</span>
-                {isSelected && <Check className="size-3.5 text-primary shrink-0" />}
+                {isSelected && <Check className="size-3.5 text-primary-foreground shrink-0" />}
               </div>
             );
           })}

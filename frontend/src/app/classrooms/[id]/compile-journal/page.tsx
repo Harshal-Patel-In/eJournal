@@ -174,25 +174,25 @@ export default function CompileJournalPage({ params }: PageProps) {
   return (
     <div className="min-h-screen bg-neutral-100 dark:bg-neutral-950 text-foreground">
       {/* Top Navigation & Print Toolbar (Strictly hidden during print) */}
-      <header className="sticky top-0 z-50 flex items-center justify-between px-6 py-3 bg-background/90 backdrop-blur-xl border-b border-border shadow-xs print:hidden">
+      <header className="sticky top-0 z-50 flex items-center justify-between px-4 sm:px-8 py-3 bg-card/95 backdrop-blur-xs border-b border-border shadow-xs print:hidden">
         <div className="flex items-center gap-3">
           <Link
             href={backHref}
-            className="flex items-center justify-center size-8 rounded-xl bg-muted hover:bg-muted/80 text-muted-foreground hover:text-foreground transition-all cursor-pointer"
-            title={isSingleMode ? "Back to Editor" : "Back to Classroom"}
+            className="flex items-center justify-center size-8 rounded-md border border-border bg-card hover:bg-muted text-muted-foreground hover:text-foreground transition-all active:scale-[0.98] cursor-pointer"
+            title={isSingleMode ? "Back to editor" : "Back to classroom"}
           >
             <ArrowLeft className="size-4" />
           </Link>
           <div>
-            <h1 className="text-sm font-bold text-foreground flex items-center gap-2">
+            <h1 className="text-sm font-bold text-foreground flex items-center gap-2 font-serif">
               {isSingleMode ? <FileText className="size-4 text-primary" /> : <BookOpen className="size-4 text-primary" />}
-              <span>{isSingleMode ? "Official Lab Report Export" : "Master Lab Journal Compiler"}</span>
+              <span>{isSingleMode ? "Official lab report export" : "Master lab journal compiler"}</span>
             </h1>
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-[11px] text-muted-foreground font-medium">
               {classroom?.name || "Classroom"} •{" "}
               {isSingleMode
                 ? `Experiment #${singleItem?.index || 1}: ${singleItem?.assignment?.title || "Practical"}`
-                : `${compiledPracticals.length} Laboratory Practicals`}
+                : `${compiledPracticals.length} laboratory practicals`}
             </p>
           </div>
         </div>
@@ -200,10 +200,10 @@ export default function CompileJournalPage({ params }: PageProps) {
         <div className="flex items-center gap-3">
           <Button
             onClick={() => window.print()}
-            className="gap-2 font-semibold transition-all cursor-pointer h-9 px-4 rounded-xl"
+            className="gap-2 text-xs font-semibold transition-all cursor-pointer h-8 px-3.5 rounded-md active:scale-[0.98]"
           >
-            <Printer className="size-4" />
-            <span>{isSingleMode ? "Save as PDF" : "Save Master Journal as PDF"}</span>
+            <Printer className="size-3.5" />
+            <span>{isSingleMode ? "Save as PDF" : "Save master journal as PDF"}</span>
           </Button>
         </div>
       </header>
@@ -356,7 +356,7 @@ export default function CompileJournalPage({ params }: PageProps) {
                 <p className="text-sm font-semibold text-zinc-600 max-w-md">
                   {classroom?.subject ? `Course Subject: ${classroom.subject}` : "Comprehensive Practical Manual & Research Journal"}
                 </p>
-                <div className="flex items-center gap-2 text-xs font-mono font-bold text-zinc-700 bg-zinc-50 px-3 py-1 rounded border border-zinc-300">
+                <div className="flex items-center gap-2 text-xs font-semibold text-zinc-700 bg-zinc-50 px-3 py-1 rounded border border-zinc-300">
                   <span>Code: {classroom?.code || "LAB-101"}</span>
                   <span>•</span>
                   <span>Semester {classroom?.semester || "IV"}</span>
@@ -377,12 +377,12 @@ export default function CompileJournalPage({ params }: PageProps) {
                   <strong className="text-zinc-950 font-mono font-bold">{candidateEnrollment}</strong>
 
                   <span className="font-bold text-zinc-600">Division / Batch:</span>
-                  <strong className="text-zinc-950 font-mono font-bold">
+                  <strong className="text-zinc-950 font-bold">
                     {candidateDivision !== "—" ? `Div ${candidateDivision}` : ""}{candidateBatch !== "—" ? ` • ${candidateBatch}` : (candidateDivision !== "—" ? "" : "—")}
                   </strong>
 
                   <span className="font-bold text-zinc-600">Date of Compilation:</span>
-                  <span className="text-zinc-950 font-medium font-mono">{formatDateIST(new Date())}</span>
+                  <span className="text-zinc-950 font-medium tabular-nums">{formatDateIST(new Date())}</span>
                 </div>
               </div>
 
@@ -485,16 +485,16 @@ export default function CompileJournalPage({ params }: PageProps) {
 
                       return (
                         <tr key={item.index} className="divide-x divide-zinc-800 hover:bg-zinc-50 font-medium">
-                          <td className="px-2 py-3 text-center font-bold font-mono">{item.index}</td>
+                          <td className="px-2 py-3 text-center font-bold tabular-nums">{item.index}</td>
                           <td className="px-4 py-3 text-left font-semibold text-zinc-950">
                             {item.assignment.title}
                           </td>
-                          <td className="px-3 py-3 text-center font-mono text-zinc-600">{perfDate}</td>
-                          <td className="px-3 py-3 text-center font-mono text-zinc-600">{subDate}</td>
-                          <td className="px-2 py-3 text-center font-mono font-bold text-zinc-700">
+                          <td className="px-3 py-3 text-center text-zinc-600 tabular-nums">{perfDate}</td>
+                          <td className="px-3 py-3 text-center text-zinc-600 tabular-nums">{subDate}</td>
+                          <td className="px-2 py-3 text-center font-bold text-zinc-700 tabular-nums">
                             {item.pageRange}
                           </td>
-                          <td className="px-2 py-3 text-center font-mono font-bold text-zinc-950">
+                          <td className="px-2 py-3 text-center font-bold text-zinc-950 tabular-nums">
                             {marksStr}
                           </td>
                           <td className="px-3 py-3 text-center">
@@ -540,13 +540,13 @@ export default function CompileJournalPage({ params }: PageProps) {
                         DEPT. OF {classroom?.department || "COMPUTER & PHYSICAL SCIENCES"}
                       </span>
                     </div>
-                    <div className="font-mono text-[11px] text-zinc-500">
+                    <div className="text-[11px] font-medium text-zinc-500">
                       Code: {classroom?.code || "LAB-101"}
                     </div>
                   </div>
                 )}
 
-                <div className="flex items-center justify-between text-xs text-zinc-600 font-mono mb-1">
+                <div className="flex items-center justify-between text-xs text-zinc-600 font-medium mb-1">
                   <span>PRACTICAL EXPERIMENT #{item.index}</span>
                   {!isSingleMode && <span>Page {item.pageRange}</span>}
                 </div>
@@ -567,7 +567,7 @@ export default function CompileJournalPage({ params }: PageProps) {
                   {item.journal?.marks !== undefined && item.journal?.marks !== null && (
                     <div className="border-2 border-zinc-900 bg-zinc-50 px-3.5 py-1.5 rounded text-center shrink-0 self-start">
                       <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-600">Evaluated Grade</div>
-                      <div className="text-sm font-black font-mono text-zinc-950">
+                      <div className="text-sm font-black text-zinc-950 tabular-nums">
                         {item.journal.marks} / {item.assignment.maxMarks || 10}
                       </div>
                     </div>
@@ -587,13 +587,13 @@ export default function CompileJournalPage({ params }: PageProps) {
                     </div>
                     <div>
                       <span className="text-[10px] font-bold uppercase text-zinc-500 block">Division / Batch</span>
-                      <strong className="text-zinc-950 font-mono font-bold">
+                      <strong className="text-zinc-950 font-bold">
                         {candidateDivision !== "—" ? `Div ${candidateDivision}` : ""}{candidateBatch !== "—" ? ` • ${candidateBatch}` : (candidateDivision !== "—" ? "" : "—")}
                       </strong>
                     </div>
                     <div>
                       <span className="text-[10px] font-bold uppercase text-zinc-500 block">Submission Date</span>
-                      <span className="text-zinc-950 font-medium font-mono">
+                      <span className="text-zinc-950 font-medium tabular-nums">
                         {formatDateIST(item.journal?.submittedAt || new Date())}
                       </span>
                     </div>
@@ -603,7 +603,7 @@ export default function CompileJournalPage({ params }: PageProps) {
 
               {/* Render all journal blocks with KaTeX, Auto-Fitted Tables & Cartesian Graphs */}
               {blocks.length === 0 ? (
-                <div className="p-8 border border-dashed border-zinc-300 rounded-xl text-center text-zinc-400 text-xs font-mono">
+                <div className="p-8 border border-dashed border-zinc-300 rounded-xl text-center text-zinc-400 text-xs font-medium">
                   No observation data recorded for this practical experiment.
                 </div>
               ) : (

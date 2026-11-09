@@ -1,5 +1,7 @@
+import type { CSSProperties } from "react";
+
 /**
- * Deterministic Classroom Visual Identity & Color Tokens.
+ * Deterministic Classroom Visual Identity & Dynamic Environment Canvas Tokens.
  *
  * Grounded in Apple HIG (Color as Identity & Visual Continuity)
  * and Impeccable UI standards.
@@ -17,6 +19,10 @@ export interface ClassroomTheme {
   accentText: string;
   accentBg: string;
   activeBadge: string;
+  // Dynamic Procedural Canvas Environment Variables
+  envAuraPrimary: string;
+  envAuraSecondary: string;
+  envGridColor: string;
 }
 
 export const CLASSROOM_THEMES: ClassroomTheme[] = [
@@ -33,6 +39,9 @@ export const CLASSROOM_THEMES: ClassroomTheme[] = [
     accentText: "text-sky-600 dark:text-sky-400",
     accentBg: "bg-sky-500/10",
     activeBadge: "bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-500/30",
+    envAuraPrimary: "rgba(14, 165, 233, 0.16)",
+    envAuraSecondary: "rgba(99, 102, 241, 0.12)",
+    envGridColor: "rgba(14, 165, 233, 0.15)",
   },
   {
     id: "emerald",
@@ -47,6 +56,9 @@ export const CLASSROOM_THEMES: ClassroomTheme[] = [
     accentText: "text-emerald-600 dark:text-emerald-400",
     accentBg: "bg-emerald-500/10",
     activeBadge: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30",
+    envAuraPrimary: "rgba(16, 185, 129, 0.15)",
+    envAuraSecondary: "rgba(20, 184, 166, 0.12)",
+    envGridColor: "rgba(16, 185, 129, 0.15)",
   },
   {
     id: "violet",
@@ -61,6 +73,9 @@ export const CLASSROOM_THEMES: ClassroomTheme[] = [
     accentText: "text-violet-600 dark:text-violet-400",
     accentBg: "bg-violet-500/10",
     activeBadge: "bg-violet-500/15 text-violet-700 dark:text-violet-300 border-violet-500/30",
+    envAuraPrimary: "rgba(139, 92, 246, 0.16)",
+    envAuraSecondary: "rgba(99, 102, 241, 0.14)",
+    envGridColor: "rgba(139, 92, 246, 0.15)",
   },
   {
     id: "amber",
@@ -75,6 +90,9 @@ export const CLASSROOM_THEMES: ClassroomTheme[] = [
     accentText: "text-amber-600 dark:text-amber-400",
     accentBg: "bg-amber-500/10",
     activeBadge: "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30",
+    envAuraPrimary: "rgba(245, 158, 11, 0.14)",
+    envAuraSecondary: "rgba(234, 88, 12, 0.10)",
+    envGridColor: "rgba(245, 158, 11, 0.14)",
   },
   {
     id: "rose",
@@ -89,6 +107,9 @@ export const CLASSROOM_THEMES: ClassroomTheme[] = [
     accentText: "text-rose-600 dark:text-rose-400",
     accentBg: "bg-rose-500/10",
     activeBadge: "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/30",
+    envAuraPrimary: "rgba(244, 63, 94, 0.14)",
+    envAuraSecondary: "rgba(217, 70, 239, 0.10)",
+    envGridColor: "rgba(244, 63, 94, 0.14)",
   },
 ];
 
@@ -99,4 +120,15 @@ export function getClassroomTheme(id?: string | null, fallbackIndex = 0): Classr
   if (!id) return CLASSROOM_THEMES[fallbackIndex % CLASSROOM_THEMES.length];
   const charSum = id.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
   return CLASSROOM_THEMES[charSum % CLASSROOM_THEMES.length];
+}
+
+/**
+ * Injects the classroom's dynamic procedural canvas variables into React inline styles.
+ */
+export function getClassroomCanvasStyle(theme: ClassroomTheme): CSSProperties {
+  return {
+    ["--env-aura-primary" as any]: theme.envAuraPrimary,
+    ["--env-aura-secondary" as any]: theme.envAuraSecondary,
+    ["--env-grid-color" as any]: theme.envGridColor,
+  };
 }

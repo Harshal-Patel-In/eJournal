@@ -5,74 +5,50 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
 const buttonVariants = cva(
-  "group/button glass-btn inline-flex shrink-0 items-center justify-center rounded-xl border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "group/button inline-flex shrink-0 items-center justify-center rounded-md border border-transparent text-xs font-semibold whitespace-nowrap transition-[transform,box-shadow,background-color,border-color,color] duration-75 ease-out outline-none select-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 active:translate-y-[1px] active:scale-[0.985] active:shadow-none disabled:pointer-events-none disabled:opacity-50 cursor-pointer [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5",
   {
     variants: {
       variant: {
         default:
-          "hover:scale-[1.02] active:scale-[0.98] transition-all duration-200",
+          "bg-gradient-to-b from-indigo-600 to-indigo-700 text-white border border-white/20 shadow-[0_1px_3px_0_rgba(79,70,229,0.35),inset_0_1px_0_0_rgba(255,255,255,0.28)] hover:from-indigo-700 hover:to-indigo-800 hover:shadow-[0_2px_6px_0_rgba(79,70,229,0.45),inset_0_1px_0_0_rgba(255,255,255,0.35)]",
         outline:
-          "border hover:scale-[1.02] active:scale-[0.98] transition-all duration-200",
+          "glass-btn-elevated",
         secondary:
-          "hover:scale-[1.02] active:scale-[0.98] transition-all duration-200",
+          "glass-btn-secondary",
         ghost:
-          "bg-transparent shadow-none border-transparent hover:scale-[1.02] active:scale-[0.98] transition-all duration-200",
+          "bg-transparent text-foreground hover:bg-muted/70 hover:text-foreground shadow-none border-transparent active:translate-y-[0.5px]",
         destructive:
-          "glass-btn-destructive hover:scale-[1.02] active:scale-[0.98] transition-all duration-200",
-        link: "text-primary underline-offset-4 hover:underline !shadow-none !backdrop-filter-none",
+          "bg-gradient-to-b from-rose-600 to-rose-700 text-white border border-white/20 shadow-[0_1px_3px_0_rgba(225,29,72,0.35),inset_0_1px_0_0_rgba(255,255,255,0.25)] hover:from-rose-700 hover:to-rose-800",
+        link: "text-primary underline-offset-4 hover:underline !shadow-none !border-none !p-0 !h-auto !transform-none",
       },
       color: {
         default: "",
-        blue: "glass-btn-blue",
-        indigo: "glass-btn-indigo",
-        cyan: "glass-btn-cyan",
-        emerald: "glass-btn-emerald",
-        amber: "glass-btn-amber",
-        rose: "glass-btn-destructive",
-        violet: "glass-btn-violet",
-        neutral: "border-border/80 text-foreground/80 hover:text-foreground hover:bg-muted/50",
+        blue: "",
+        indigo: "",
+        cyan: "",
+        emerald: "",
+        amber: "",
+        rose: "",
+        violet: "",
+        neutral: "border-border text-foreground/80 hover:text-foreground hover:bg-muted/50",
       },
       size: {
-        default:
-          "h-8 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
-        xs: "h-6 gap-1 rounded-[min(var(--radius-md),10px)] px-2 text-xs in-data-[slot=button-group]:rounded-lg has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3",
-        sm: "h-7 gap-1 rounded-[min(var(--radius-md),12px)] px-2.5 text-[0.8rem] in-data-[slot=button-group]:rounded-lg has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3.5",
-        lg: "h-9 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
+        default: "h-8 gap-1.5 px-3",
+        xs: "h-6 gap-1 px-2 text-[11px] [&_svg:not([class*='size-'])]:size-3",
+        sm: "h-7 gap-1 px-2.5 text-xs [&_svg:not([class*='size-'])]:size-3",
+        lg: "h-9 gap-2 px-4 text-sm [&_svg:not([class*='size-'])]:size-4",
         icon: "size-8",
-        "icon-xs":
-          "size-6 rounded-[min(var(--radius-md),10px)] in-data-[slot=button-group]:rounded-lg [&_svg:not([class*='size-'])]:size-3",
-        "icon-sm":
-          "size-7 rounded-[min(var(--radius-md),12px)] in-data-[slot=button-group]:rounded-lg",
-        "icon-lg": "size-9",
+        "icon-xs": "size-6 [&_svg:not([class*='size-'])]:size-3",
+        "icon-sm": "size-7 [&_svg:not([class*='size-'])]:size-3.5",
+        "icon-lg": "size-9 [&_svg:not([class*='size-'])]:size-4",
       },
     },
     compoundVariants: [
-       // Backward compatibility defaults when no explicit color is set
-      {
-        variant: "default",
-        color: "default",
-        className: "glass-btn-blue",
-      },
-      {
-        variant: "outline",
-        color: "default",
-        className: "glass-btn-indigo",
-      },
-      {
-        variant: "secondary",
-        color: "default",
-        className: "glass-btn-indigo",
-      },
-      {
-        variant: "ghost",
-        color: "default",
-        className: "hover:glass-btn-indigo",
-      },
-      // Solid variant colored overrides
+      // Solid colored overrides
       {
         variant: "default",
         color: "rose",
-        className: "glass-btn-destructive-solid",
+        className: "bg-gradient-to-b from-rose-600 to-rose-700 text-white border-white/20 shadow-[0_1px_3px_0_rgba(225,29,72,0.35),inset_0_1px_0_0_rgba(255,255,255,0.25)] hover:from-rose-700 hover:to-rose-800",
       },
       {
         variant: "default",
@@ -81,40 +57,85 @@ const buttonVariants = cva(
       },
       {
         variant: "default",
+        color: "amber",
+        className: "bg-gradient-to-b from-amber-600 to-amber-700 text-white border-white/20 shadow-[0_1px_3px_0_rgba(217,119,6,0.35),inset_0_1px_0_0_rgba(255,255,255,0.25)] hover:from-amber-700 hover:to-amber-800",
+      },
+      {
+        variant: "default",
         color: "indigo",
-        className: "glass-btn-indigo-solid",
+        className: "bg-primary text-primary-foreground border-primary hover:bg-primary/90",
       },
       {
         variant: "default",
         color: "blue",
-        className: "glass-btn-blue-solid",
+        className: "bg-primary text-primary-foreground border-primary hover:bg-primary/90",
       },
-      // Ghost variant colored hover overrides
+      // Ghost colored overrides
       {
         variant: "ghost",
         color: "rose",
-        className: "text-rose-600 dark:text-rose-400 hover:glass-btn-destructive",
+        className: "text-rose-600 dark:text-rose-400 hover:bg-rose-500/10",
       },
       {
         variant: "ghost",
         color: "amber",
-        className: "text-amber-600 dark:text-amber-400 hover:glass-btn-amber",
+        className: "text-amber-600 dark:text-amber-400 hover:bg-amber-500/10",
       },
       {
         variant: "ghost",
         color: "emerald",
-        className: "text-emerald-600 dark:text-emerald-400 hover:glass-btn-emerald",
+        className: "text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10",
+      },
+      {
+        variant: "ghost",
+        color: "indigo",
+        className: "text-indigo-600 dark:text-indigo-400 hover:bg-indigo-500/10",
       },
       {
         variant: "ghost",
         color: "neutral",
-        className: "text-muted-foreground hover:text-foreground hover:bg-muted/40",
+        className: "text-muted-foreground hover:text-foreground hover:bg-muted/50",
       },
-      // Outline neutral variant
+      // Outline colored overrides
+      {
+        variant: "outline",
+        color: "default",
+        className: "text-foreground",
+      },
       {
         variant: "outline",
         color: "neutral",
-        className: "border-border/80 text-foreground/80 hover:text-foreground hover:bg-muted/50 hover:border-border",
+        className: "border-border text-foreground/90 hover:text-foreground hover:bg-muted/60",
+      },
+      {
+        variant: "outline",
+        color: "emerald",
+        className: "glass-btn-emerald-outline",
+      },
+      {
+        variant: "outline",
+        color: "amber",
+        className: "glass-btn-amber-outline",
+      },
+      {
+        variant: "outline",
+        color: "rose",
+        className: "glass-btn-rose-outline",
+      },
+      {
+        variant: "outline",
+        color: "indigo",
+        className: "glass-btn-accent-outline",
+      },
+      {
+        variant: "outline",
+        color: "blue",
+        className: "glass-btn-accent-outline",
+      },
+      {
+        variant: "outline",
+        color: "cyan",
+        className: "glass-btn-cyan-outline",
       },
     ],
     defaultVariants: {

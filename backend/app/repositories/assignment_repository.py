@@ -12,9 +12,22 @@ class AssignmentRepository(BaseRepository):
 
     collection_name = "assignments"
 
-    async def find_by_classroom_id(self, classroom_id: str) -> list[dict]:
-        """List assignments published for a specific classroom."""
-        cursor = self.collection.find({"classroomId": classroom_id})
+    async def find_by_classroom_id(
+        self, classroom_id: str, include_scheduled: bool = True
+    ) -> list[dict]:
+        """List assignments published for a specific classroom.
+        
+        If include_scheduled is False (e.g. for students), excludes future scheduled assignments.
+        """
+        query: dict = {"classroomId": classroom_id}
+        if not include_scheduled:
+            from datetime import datetime, timezone
+            now = datetime.now(timezone.utc)
+            query["$or"] = [
+                {"publishDate": None},
+                {"publishDate": {"$lte": now}},
+            ]
+        cursor = self.collection.find(query).sort("experimentNumber", 1)
         docs = await cursor.to_list(length=200)
         return [self._to_str_id(doc) for doc in docs]
 

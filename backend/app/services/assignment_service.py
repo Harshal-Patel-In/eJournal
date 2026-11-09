@@ -70,6 +70,12 @@ class AssignmentService:
             "instructions": request.instructions.strip(),
             "maxMarks": request.maxMarks,
             "deadline": request.deadline,
+            "publishDate": request.publishDate,
+            "conductedDate": request.conductedDate,
+            "allowLateSubmissions": request.allowLateSubmissions,
+            "lateGraceDays": request.lateGraceDays,
+            "hardCutoffDate": request.hardCutoffDate,
+            "targetBatches": request.targetBatches,
             "references": request.references.strip() if request.references else None,
             "additionalNotes": request.additionalNotes.strip() if request.additionalNotes else None,
             "clusterName": request.clusterName.strip() if request.clusterName else None,
@@ -216,7 +222,174 @@ class AssignmentService:
                 status_code=status.HTTP_403_FORBIDDEN,
             )
 
-        return await self.assignment_repo.find_by_classroom_id(classroom_id)
+        include_scheduled = (role == "teacher")
+        return await self.assignment_repo.find_by_classroom_id(
+            classroom_id, include_scheduled=include_scheduled
+        )
+
+    async def update_assignment(
+        self, teacher_id: str, classroom_id: str, assignment_id: str, payload
+    ) -> dict:
+        """Safely update assignment metadata, temporal dates, or rubrics (Teacher only)."""
+        classroom = await self.classroom_repo.find_by_id(classroom_id)
+        if not classroom:
+            raise AppException(
+                code=ErrorCode.CLASSROOM_NOT_FOUND,
+                message="Classroom not found",
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+
+        if classroom["teacherId"] != teacher_id:
+            raise AppException(
+                code=ErrorCode.FORBIDDEN,
+                message="You are not authorized to modify assignments in this classroom",
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+
+        assignment = await self.assignment_repo.find_by_id(assignment_id)
+        if not assignment or assignment.get("classroomId") != classroom_id:
+            raise AppException(
+                code=ErrorCode.ASSIGNMENT_NOT_FOUND,
+                message="Practical Assignment not found in this classroom",
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+
+        update_fields: dict = {"updatedAt": datetime.now(timezone.utc)}
+
+        if payload.title is not None:
+            update_fields["title"] = payload.title.strip()
+        if payload.aim is not None:
+            update_fields["aim"] = payload.aim.strip()
+        if payload.instructions is not None:
+            update_fields["instructions"] = payload.instructions.strip()
+        if payload.conductedDate is not None:
+            update_fields["conductedDate"] = payload.conductedDate
+        if payload.publishDate is not None:
+            update_fields["publishDate"] = payload.publishDate
+        if payload.allowLateSubmissions is not None:
+            update_fields["allowLateSubmissions"] = payload.allowLateSubmissions
+        if payload.lateGraceDays is not None:
+            update_fields["lateGraceDays"] = payload.lateGraceDays
+        if payload.hardCutoffDate is not None:
+            update_fields["hardCutoffDate"] = payload.hardCutoffDate
+        if payload.references is not None:
+            update_fields["references"] = payload.references.strip() if payload.references else None
+        if payload.additionalNotes is not None:
+            update_fields["additionalNotes"] = payload.additionalNotes.strip() if payload.additionalNotes else None
+        if payload.clusterName is not None:
+            update_fields["clusterName"] = payload.clusterName.strip() if payload.clusterName else None
+        if payload.targetBatches is not None:
+            update_fields["targetBatches"] = payload.targetBatches
+
+        # Guardrail: Check rubric modification safety
+        if payload.rubric is not None:
+            from app.repositories.journal_repository import JournalRepository
+            journal_repo = JournalRepository()
+            evaluated_count = await journal_repo.collection.count_documents({
+                "assignmentId": assignment_id,
+                "status": {"$in": ["approved", "changes_requested"]}
+            })
+            if evaluated_count > 0:
+                raise AppException(
+                    code=ErrorCode.VALIDATION_ERROR,
+                    message="Scoring rubric cannot be modified because student submissions have already been evaluated",
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                )
+            if len(payload.rubric) > 0:
+                total_rubric = sum(c.maxMarks for c in payload.rubric)
+                if abs(total_rubric - assignment["maxMarks"]) > 0.05:
+                    raise AppException(
+                        code=ErrorCode.VALIDATION_ERROR,
+                        message=f"Rubric criteria marks sum ({total_rubric}) must equal total maxMarks ({assignment['maxMarks']})",
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                    )
+            update_fields["rubric"] = [r.model_dump() for r in payload.rubric] if payload.rubric else None
+
+        # Check deadline extension / modification
+        deadline_changed = False
+        if payload.deadline is not None:
+            old_deadline = assignment.get("deadline")
+            new_deadline = payload.deadline
+            if old_deadline != new_deadline:
+                deadline_changed = True
+                update_fields["deadline"] = new_deadline
+
+        await self.assignment_repo.update_by_id(assignment_id, {"$set": update_fields})
+
+        # Broadcast notification if deadline was updated and notifyStudents is true
+        if deadline_changed and payload.notifyStudents:
+            from app.repositories.notification_repository import NotificationRepository
+            from app.core.websocket_manager import websocket_manager
+
+            notification_repo = NotificationRepository()
+
+            new_deadline_formatted = (
+                payload.deadline.strftime("%d %b %Y, %I:%M %p")
+                if hasattr(payload.deadline, "strftime")
+                else str(payload.deadline)
+            )
+            reason_suffix = f" (Reason: {payload.changeReason})" if payload.changeReason else ""
+            msg = f"Experiment #{assignment['experimentNumber']} ({assignment['title']}) submission deadline has been updated to {new_deadline_formatted}{reason_suffix}."
+            link = f"/classrooms/{classroom_id}?tab=assignments&assignmentId={assignment_id}"
+            metadata = {
+                "entityType": "classrooms",
+                "entityId": classroom_id,
+                "assignmentId": assignment_id,
+                "experimentNumber": assignment["experimentNumber"],
+                "actionUrl": link,
+                "category": "assignment",
+            }
+
+            enrolled_students = await self.membership_repo.find_members_by_classroom_id(classroom_id)
+            for student_member in enrolled_students:
+                student_id = student_member["studentId"]
+                notif_doc = await notification_repo.create_notification(
+                    user_id=student_id,
+                    title="Assignment Deadline Updated",
+                    message=msg,
+                    type_str="assignment",
+                    link=link,
+                    metadata=metadata,
+                    entity_type="assignment",
+                    entity_id=assignment_id,
+                    classroom_id=classroom_id,
+                    category="assignment",
+                )
+                try:
+                    await websocket_manager.send_personal_notification(
+                        student_id,
+                        {
+                            "type": "NEW_NOTIFICATION",
+                            "notification": {
+                                "id": notif_doc["id"],
+                                "userId": student_id,
+                                "title": "Assignment Deadline Updated",
+                                "message": msg,
+                                "type": "assignment",
+                                "isRead": False,
+                                "link": link,
+                                "metadata": metadata,
+                                "entityType": "assignment",
+                                "entityId": assignment_id,
+                                "classroomId": classroom_id,
+                                "category": "assignment",
+                                "createdAt": notif_doc["createdAt"].isoformat(),
+                            },
+                        },
+                    )
+                except Exception:
+                    pass
+
+        # Audit log
+        await self.audit_repo.log_event(
+            user_id=teacher_id,
+            action="ASSIGNMENT_UPDATED",
+            entity="assignments",
+            entity_id=assignment_id,
+            metadata={"deadlineChanged": deadline_changed, "fieldsUpdated": list(update_fields.keys())},
+        )
+
+        return await self.assignment_repo.find_by_id(assignment_id)
 
     async def get_assignment(
         self, assignment_id: str, user_id: str, role: str

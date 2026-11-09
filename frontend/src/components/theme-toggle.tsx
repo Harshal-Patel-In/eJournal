@@ -18,9 +18,9 @@ export function ThemeToggle({ className }: { className?: string }) {
   if (!mounted) {
     return (
       <Button
-        variant="ghost"
+        variant="outline"
         size="icon"
-        className={`size-8 rounded-full bg-card/60 border border-border/60 ${className}`}
+        className={`size-8 rounded-md glass-btn-elevated ${className || ""}`}
       >
         <span className="size-3.5" />
       </Button>
@@ -49,7 +49,7 @@ export function ThemeToggle({ className }: { className?: string }) {
 
     isTransitioningRef.current = true;
 
-    // Geometric center of the toggle button as origin
+    // Center of the toggle button as origin
     const rect = e.currentTarget.getBoundingClientRect();
     const x = rect.left + rect.width / 2;
     const y = rect.top + rect.height / 2;
@@ -76,7 +76,7 @@ export function ThemeToggle({ className }: { className?: string }) {
             ],
           },
           {
-            duration: 650,
+            duration: 350,
             easing: "cubic-bezier(0.16, 1, 0.3, 1)",
             pseudoElement: "::view-transition-new(root)",
           }
@@ -102,17 +102,14 @@ export function ThemeToggle({ className }: { className?: string }) {
       data-tooltip={isDark ? "Switch to Day Mode" : "Switch to Night Mode"}
       data-tooltip-subtext={isDark ? "Click for Day Mode" : "Click for Night Mode"}
       data-tooltip-side="bottom"
-      className={`size-8 rounded-full ${
-        isDark ? "glass-btn-cyan" : "glass-btn-amber"
-      } hover:scale-105 active:scale-95 transition-all cursor-pointer ${className}`}
+      className={`size-8 rounded-md glass-btn-elevated text-foreground cursor-pointer ${className || ""}`}
     >
       {isDark ? (
-        <Moon className="size-3.5 text-sky-400 transition-all" />
+        <Moon className="size-3.5 text-foreground transition-transform duration-150" />
       ) : (
-        <Sun className="size-3.5 text-amber-500 transition-all" />
+        <Sun className="size-3.5 text-foreground transition-transform duration-150" />
       )}
       <span className="sr-only">Toggle theme</span>
     </Button>
   );
 }
-

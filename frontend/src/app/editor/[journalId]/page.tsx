@@ -4,7 +4,7 @@ import { use, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
-import { Loader2, Plus, MessageSquare, History, CheckCircle2, Sparkles, AlertTriangle } from "lucide-react";
+import { Loader2, Plus, MessageSquare, History, CheckCircle2, Sparkles, AlertTriangle, Lock } from "lucide-react";
 
 import { api } from "@/lib/api";
 import { toast } from "@/lib/toast";
@@ -24,6 +24,7 @@ import BlockAnnotations, { getDominantBorderColor } from "@/components/editor/bl
 import { VersionHistoryDrawer } from "@/components/editor/version-history-drawer";
 import EditorHelpModal from "./editor-help-modal";
 import { AppLoadingScreen } from "@/components/ui/app-loading-screen";
+import { TermSealedDialog } from "./term-sealed-dialog";
 
 interface PageProps {
   params: Promise<{ journalId: string }>;
@@ -42,6 +43,7 @@ export default function EditorPage({ params }: PageProps) {
   const [showReviewDrawer, setShowReviewDrawer] = useState(true);
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [showVersionDrawer, setShowVersionDrawer] = useState(false);
+  const [showTermSealedModal, setShowTermSealedModal] = useState(false);
   const [activeAnnotationBlockId, setActiveAnnotationBlockId] = useState<string | null>(null);
   const [localRecoverySnapshot, setLocalRecoverySnapshot] = useState<any>(null);
   const [highlightedRevNumber, setHighlightedRevNumber] = useState<number | null>(null);
@@ -360,7 +362,37 @@ export default function EditorPage({ params }: PageProps) {
     },
     onError: (err: any) => {
       setSaving(false);
-      if (typeof navigator !== "undefined" && !navigator.onLine) {
+      const is423 =
+        err?.status === 423 ||
+        err?.code === "LOCKED" ||
+        err?.message?.includes("423") ||
+        err?.message?.toLowerCase().includes("sealed") ||
+        err?.message?.toLowerCase().includes("frozen");
+
+      if (is423) {
+        setSyncStatus("unsaved");
+        if (typeof window !== "undefined") {
+          try {
+            const state = useDocumentStore.getState();
+            localStorage.setItem(
+              `ejournal_recovery_${journalId}`,
+              JSON.stringify({
+                journalId,
+                title: state.title,
+                blocks: state.blocks,
+                timestamp: new Date().toISOString(),
+                sealedReason: err?.message || "Academic term officially sealed",
+              })
+            );
+          } catch (e) {
+            console.error("Local recovery backup failed:", e);
+          }
+        }
+        setShowTermSealedModal(true);
+        toast.error("Academic term is officially sealed. Remote saves are locked.", {
+          title: "🔒 Term Sealed",
+        });
+      } else if (typeof navigator !== "undefined" && !navigator.onLine) {
         setSyncStatus("offline");
       } else if (err.status === 409 || err.code === "REVISION_CONFLICT" || err.message?.includes("409")) {
         setSyncStatus("conflict");
@@ -381,7 +413,20 @@ export default function EditorPage({ params }: PageProps) {
       toast.success("Journal handed in successfully! It is now locked for review.", { title: "🎉 Handed In" });
     },
     onError: (err: any) => {
-      toast.error(err.message || "Failed to hand in journal.");
+      const is423 =
+        err?.status === 423 ||
+        err?.code === "LOCKED" ||
+        err?.message?.includes("423") ||
+        err?.message?.toLowerCase().includes("sealed") ||
+        err?.message?.toLowerCase().includes("frozen");
+
+      if (is423) {
+        setShowSubmitModal(false);
+        setShowTermSealedModal(true);
+        toast.error("Academic term has been sealed. Submission locked.", { title: "🔒 Term Sealed" });
+      } else {
+        toast.error(err.message || "Failed to hand in journal.");
+      }
     },
   });
 
@@ -543,7 +588,8 @@ export default function EditorPage({ params }: PageProps) {
     },
   });
 
-  const isEditable = (status === "draft" || status === "changes_requested") && user?.role === "student";
+  const isTermFrozen = Boolean(journal?.classroom?.is_frozen || journal?.is_frozen || journal?.classroom?.isArchived);
+  const isEditable = (status === "draft" || status === "changes_requested") && user?.role === "student" && !isTermFrozen;
   const saveMutationRef = useRef(saveMutation);
   useEffect(() => {
     saveMutationRef.current = saveMutation;
@@ -802,6 +848,16 @@ export default function EditorPage({ params }: PageProps) {
         onClose={() => setShowHelpModal(false)}
       />
 
+      {/* Academic Term Sealed Institutional Freeze Dialog */}
+      <TermSealedDialog
+        isOpen={showTermSealedModal}
+        onClose={() => setShowTermSealedModal(false)}
+        journalId={journalId}
+        journalTitle={title}
+        classroomId={classroomId}
+        blocks={blocks}
+      />
+
       <div className={`flex-1 flex w-full relative pt-16 print:pt-0 ${
         isTeacher && showReviewDrawer ? "justify-center px-4 gap-6" : "justify-center"
       }`}>
@@ -887,6 +943,31 @@ export default function EditorPage({ params }: PageProps) {
                   Restore
                 </Button>
               </div>
+            </div>
+          )}
+
+          {/* Academic Term Sealed Notification Banner */}
+          {isTermFrozen && (
+            <div className="p-4 rounded-2xl border border-amber-500/30 bg-amber-500/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-in fade-in duration-200">
+              <div className="flex items-center gap-2.5">
+                <div className="size-8 rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center font-bold shrink-0">
+                  <Lock className="size-4" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-foreground">Academic Term Officially Sealed</h4>
+                  <p className="text-xs text-muted-foreground">
+                    This classroom is permanently frozen for university records. Journal content is locked in read-only mode.
+                  </p>
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowTermSealedModal(true)}
+                className="rounded-xl text-xs font-semibold cursor-pointer border-amber-500/40 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 shrink-0"
+              >
+                Print / Export
+              </Button>
             </div>
           )}
 

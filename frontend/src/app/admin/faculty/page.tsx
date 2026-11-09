@@ -18,6 +18,8 @@ import {
   Crown,
   Trash2,
   AlertTriangle,
+  UserCheck,
+  UserX,
 } from "lucide-react";
 
 import { api } from "@/lib/api";
@@ -290,7 +292,7 @@ export default function AdminFacultyPage() {
                               </span>
                             )}
                           </div>
-                          <span className="text-[11px] text-muted-foreground font-mono">{f.email}</span>
+                          <span className="text-[11px] text-muted-foreground">{f.email}</span>
                         </div>
                       </td>
                       <td className="py-3.5 px-4">
@@ -370,12 +372,17 @@ export default function AdminFacultyPage() {
                                   disabled={statusMutation.isPending}
                                   className="h-7 px-2.5 rounded-xl text-[11px] font-semibold cursor-pointer"
                                 >
+                                  {isSuspended ? (
+                                    <UserCheck className="size-3 mr-1" />
+                                  ) : (
+                                    <UserX className="size-3 mr-1" />
+                                  )}
                                   <span>{isSuspended ? "Reactivate" : "Suspend"}</span>
                                 </Button>
 
                                 <Button
                                   variant="outline"
-                                  color="neutral"
+                                  color="indigo"
                                   size="sm"
                                   onClick={() => resetMutation.mutate(f.id)}
                                   disabled={resetMutation.isPending}
@@ -445,10 +452,11 @@ export default function AdminFacultyPage() {
                     A welcome email was dispatched to <strong>{createdResult.email}</strong>. Below is their temporary password:
                   </p>
                   <div className="flex items-center justify-between bg-card p-3 rounded-xl border border-border mt-2">
-                    <code className="text-xs font-mono font-bold text-foreground">{createdResult.initialPassword}</code>
+                    <span className="text-xs font-semibold tracking-wider text-foreground select-all">{createdResult.initialPassword}</span>
                     <Button
                       size="sm"
                       variant="outline"
+                      color="indigo"
                       onClick={() => copyToClipboard(createdResult.initialPassword)}
                       className="rounded-xl text-xs gap-1.5 h-7 cursor-pointer"
                     >
@@ -572,10 +580,11 @@ export default function AdminFacultyPage() {
               Please share this temporary credential with the faculty member. They will be forced to update it upon logging in:
             </p>
             <div className="flex items-center justify-between bg-muted/40 p-3 rounded-xl border border-border">
-              <code className="text-xs font-mono font-bold text-foreground">{showResetModal.temporaryPassword}</code>
+              <span className="text-xs font-semibold tracking-wider text-foreground select-all">{showResetModal.temporaryPassword}</span>
               <Button
                 size="sm"
                 variant="outline"
+                color="indigo"
                 onClick={() => copyToClipboard(showResetModal.temporaryPassword)}
                 className="rounded-xl text-xs gap-1.5 h-7 cursor-pointer"
               >
@@ -610,7 +619,7 @@ export default function AdminFacultyPage() {
             <div className="p-3.5 rounded-2xl bg-rose-500/5 border border-rose-500/20 text-xs text-foreground space-y-1.5">
               <p>
                 Are you sure you want to permanently delete faculty member{" "}
-                <strong className="font-mono text-rose-600 dark:text-rose-400">
+                <strong className="font-semibold text-rose-600 dark:text-rose-400">
                   {deleteConfirmUser.email}
                 </strong>
                 ?

@@ -24,6 +24,8 @@ class AuditLogRepository(BaseRepository):
         entity: str,
         entity_id: str | None,
         ip_address: str | None = None,
+        metadata: dict | None = None,
+        **kwargs,
     ) -> str:
         """Create a secure system audit log entry."""
         log_entry = {
@@ -34,6 +36,10 @@ class AuditLogRepository(BaseRepository):
             "timestamp": datetime.now(timezone.utc),
             "ipAddress": ip_address,
         }
+        if metadata is not None:
+            log_entry["metadata"] = metadata
+        for k, v in kwargs.items():
+            log_entry[k] = v
         return await self.insert_one(log_entry)
 
     # Prevent updates and deletes to protect audit integrity (RULE-SEC10)

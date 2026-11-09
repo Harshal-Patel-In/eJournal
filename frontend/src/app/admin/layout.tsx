@@ -21,12 +21,16 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   ArrowLeft,
+  Megaphone,
+  Activity,
+  Split,
 } from "lucide-react";
 
 import { api } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { NotificationBell } from "@/components/notification-bell";
 
 const NAV_ITEMS = [
   {
@@ -62,12 +66,36 @@ const NAV_ITEMS = [
     hoverIcon: "group-hover:text-emerald-500",
   },
   {
+    label: "Defaulters Radar",
+    href: "/admin/analytics",
+    icon: Activity,
+    activeBg: "bg-amber-500/12 text-amber-700 dark:text-amber-400 border-amber-500/30",
+    activeIcon: "text-amber-600 dark:text-amber-400",
+    hoverIcon: "group-hover:text-amber-500",
+  },
+  {
+    label: "Academic Integrity",
+    href: "/admin/integrity",
+    icon: Split,
+    activeBg: "bg-rose-500/12 text-rose-700 dark:text-rose-400 border-rose-500/30",
+    activeIcon: "text-rose-600 dark:text-rose-400",
+    hoverIcon: "group-hover:text-rose-500",
+  },
+  {
     label: "Global Journals",
     href: "/admin/journals",
     icon: FileText,
     activeBg: "bg-rose-500/12 text-rose-700 dark:text-rose-400 border-rose-500/30",
     activeIcon: "text-rose-600 dark:text-rose-400",
     hoverIcon: "group-hover:text-rose-500",
+  },
+  {
+    label: "Campus Broadcasts",
+    href: "/admin/announcements",
+    icon: Megaphone,
+    activeBg: "bg-blue-500/12 text-blue-700 dark:text-blue-400 border-blue-500/30",
+    activeIcon: "text-blue-600 dark:text-blue-400",
+    hoverIcon: "group-hover:text-blue-500",
   },
   {
     label: "Security Audit Logs",
@@ -115,6 +143,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     queryFn: () => api.get("/profile"),
     retry: false,
   });
+
+  // Live pending profile correction requests count for sidebar badge
+  const { data: pendingRequestsData } = useQuery<any>({
+    queryKey: ["admin-pending-profile-requests"],
+    queryFn: () => api.get("/admin/profile-requests"),
+    refetchInterval: 15000,
+  });
+
+  const pendingCorrectionCount: number =
+    pendingRequestsData?.total ?? pendingRequestsData?.items?.length ?? 0;
 
   // Password Change Mutation
   const passwordMutation = useMutation({
@@ -241,31 +279,48 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                   ? pathname === "/admin"
                   : pathname.startsWith(item.href);
               const Icon = item.icon;
+              const isStudents = item.href === "/admin/students";
+              const hasPendingBadge = isStudents && pendingCorrectionCount > 0;
 
               return (
                 <div key={item.href} className="relative group">
                   <Link
                     href={item.href}
                     className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200 active:scale-[0.98] ${
-                      isCollapsed ? "justify-center px-0" : ""
+                      isCollapsed ? "justify-center px-0 relative" : ""
                     } ${
                       isActive
                         ? `${item.activeBg} font-bold shadow-xs border`
                         : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
                     }`}
                   >
-                    <Icon
-                      className={`size-4.5 shrink-0 transition-transform group-hover:scale-105 ${
-                        isActive ? item.activeIcon : item.hoverIcon
-                      }`}
-                    />
-                    {!isCollapsed && <span className="truncate">{item.label}</span>}
+                    <div className="relative shrink-0">
+                      <Icon
+                        className={`size-4.5 transition-transform group-hover:scale-105 ${
+                          isActive ? item.activeIcon : item.hoverIcon
+                        }`}
+                      />
+                      {isCollapsed && hasPendingBadge && (
+                        <span className="absolute -top-1 -right-1 size-2 rounded-full bg-amber-500 ring-2 ring-card animate-pulse" />
+                      )}
+                    </div>
+                    {!isCollapsed && (
+                      <>
+                        <span className="truncate">{item.label}</span>
+                        {hasPendingBadge && (
+                          <span className="ml-auto px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30">
+                            {pendingCorrectionCount}
+                          </span>
+                        )}
+                      </>
+                    )}
                   </Link>
 
                   {/* Apple HIG Floating Glass Tooltip in Collapsed Mode */}
                   {isCollapsed && (
                     <div className="absolute left-full ml-3 top-1/2 -translate-y-1/2 px-2.5 py-1 rounded-xl bg-popover/95 dark:bg-zinc-800/95 backdrop-blur-xl border border-border text-foreground text-xs font-bold whitespace-nowrap shadow-xl opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-150 pointer-events-none z-50">
                       {item.label}
+                      {hasPendingBadge && ` (${pendingCorrectionCount} pending)`}
                     </div>
                   )}
                 </div>
@@ -327,10 +382,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </div>
           )}
 
-          {/* Quick Sign Out & Theme Bar */}
+          {/* Quick Sign Out, Notifications & Theme Bar */}
           <div
             className={`flex items-center ${
-              isCollapsed ? "flex-col gap-2 justify-center" : "justify-between px-1"
+              isCollapsed ? "flex-col gap-2.5 justify-center" : "justify-between px-1"
             }`}
           >
             <Button
@@ -344,7 +399,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <LogOut className="size-3.5" />
               {!isCollapsed && <span>Sign Out</span>}
             </Button>
-            <ThemeToggle />
+            <div className="flex items-center gap-1.5">
+              <NotificationBell />
+              <ThemeToggle />
+            </div>
           </div>
         </div>
       </aside>
@@ -356,6 +414,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <span className="text-sm font-bold text-foreground">eJournal Admin</span>
         </div>
         <div className="flex items-center gap-2">
+          <NotificationBell />
           <ThemeToggle />
           <Button
             variant="ghost"
@@ -394,6 +453,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                       ? pathname === "/admin"
                       : pathname.startsWith(item.href);
                   const Icon = item.icon;
+                  const isStudents = item.href === "/admin/students";
+                  const hasPendingBadge = isStudents && pendingCorrectionCount > 0;
+
                   return (
                     <Link
                       key={item.href}
@@ -405,8 +467,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                           : "text-muted-foreground hover:bg-muted"
                       }`}
                     >
-                      <Icon className="size-4" />
+                      <Icon className="size-4 shrink-0" />
                       <span>{item.label}</span>
+                      {hasPendingBadge && (
+                        <span className="ml-auto px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30">
+                          {pendingCorrectionCount}
+                        </span>
+                      )}
                     </Link>
                   );
                 })}

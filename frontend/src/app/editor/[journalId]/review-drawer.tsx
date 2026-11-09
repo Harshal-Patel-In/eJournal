@@ -7,17 +7,29 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircle,
   ArrowRight,
+  Calculator,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  Clock,
+  Code2,
   CornerDownRight,
+  FileSpreadsheet,
+  FileText,
   Folder,
+  Heading,
+  ImageIcon,
+  Lightbulb,
   Loader2,
   Lock,
   MessageSquare,
   Send,
   Sparkles,
+  Table,
+  Target,
+  TrendingUp,
   X,
+  Zap,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { toast } from "@/lib/toast";
@@ -39,25 +51,25 @@ interface ReviewDrawerProps {
 const getBlockTypeMeta = (type?: string) => {
   switch (type) {
     case "table":
-      return { label: "Table Block", icon: "📊", color: "text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border-emerald-500/25" };
+      return { label: "Table Block", icon: Table, color: "text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border-emerald-500/25" };
     case "graph":
-      return { label: "Graph Plot", icon: "📈", color: "text-cyan-600 dark:text-cyan-400 bg-cyan-500/10 border-cyan-500/25" };
+      return { label: "Graph Plot", icon: TrendingUp, color: "text-cyan-600 dark:text-cyan-400 bg-cyan-500/10 border-cyan-500/25" };
     case "code":
-      return { label: "Code Block", icon: "💻", color: "text-violet-600 dark:text-violet-400 bg-violet-500/10 border-violet-500/25" };
+      return { label: "Code Block", icon: Code2, color: "text-violet-600 dark:text-violet-400 bg-violet-500/10 border-violet-500/25" };
     case "equation":
-      return { label: "Math Block", icon: "🧮", color: "text-fuchsia-600 dark:text-fuchsia-400 bg-fuchsia-500/10 border-fuchsia-500/25" };
+      return { label: "Math Block", icon: Calculator, color: "text-fuchsia-600 dark:text-fuchsia-400 bg-fuchsia-500/10 border-fuchsia-500/25" };
     case "observation":
-      return { label: "Observation", icon: "📋", color: "text-amber-600 dark:text-amber-400 bg-amber-500/10 border-amber-500/25" };
+      return { label: "Observation", icon: FileSpreadsheet, color: "text-amber-600 dark:text-amber-400 bg-amber-500/10 border-amber-500/25" };
     case "result":
-      return { label: "Result Block", icon: "🎯", color: "text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border-emerald-500/25" };
+      return { label: "Result Block", icon: Target, color: "text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border-emerald-500/25" };
     case "heading":
-      return { label: "Heading Block", icon: "📑", color: "text-blue-600 dark:text-blue-400 bg-blue-500/10 border-blue-500/25" };
+      return { label: "Heading Block", icon: Heading, color: "text-blue-600 dark:text-blue-400 bg-blue-500/10 border-blue-500/25" };
     case "callout":
-      return { label: "Callout Block", icon: "💡", color: "text-amber-600 dark:text-amber-400 bg-amber-500/10 border-amber-500/25" };
+      return { label: "Callout Block", icon: Lightbulb, color: "text-amber-600 dark:text-amber-400 bg-amber-500/10 border-amber-500/25" };
     case "image":
-      return { label: "Image Block", icon: "🖼️", color: "text-sky-600 dark:text-sky-400 bg-sky-500/10 border-sky-500/25" };
+      return { label: "Image Block", icon: ImageIcon, color: "text-sky-600 dark:text-sky-400 bg-sky-500/10 border-sky-500/25" };
     default:
-      return { label: "Document Block", icon: "📄", color: "text-muted-foreground bg-muted/60 border-border/60" };
+      return { label: "Document Block", icon: FileText, color: "text-muted-foreground bg-muted/60 border-border/60" };
   }
 };
 
@@ -90,6 +102,12 @@ export default function ReviewDrawer({
     assignment?.rubric && assignment.rubric.length > 0 ? "rubric" : "flat"
   );
   const [rubricScores, setRubricScores] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    if (assignment?.rubric && assignment.rubric.length > 0) {
+      setGradingMode("rubric");
+    }
+  }, [assignment?.rubric]);
 
   // 1. Fetch Comments Thread
   const { data: comments, isLoading: commentsLoading } = useQuery<any[]>({
@@ -381,7 +399,7 @@ export default function ReviewDrawer({
           <span className="font-extrabold text-xs text-foreground truncate max-w-[145px]">
             {currentSub?.studentName || "Student Review"}
           </span>
-          <span className="text-[10px] text-muted-foreground font-mono">
+          <span className="text-[10px] text-muted-foreground font-medium tabular-nums">
             {currentStudentIndex >= 0 ? `${currentStudentIndex + 1} of ${assignmentQueue.length}` : "Queue"}
             {currentSub?.enrollmentNumber ? ` • ${currentSub.enrollmentNumber}` : ""}
           </span>
@@ -423,7 +441,7 @@ export default function ReviewDrawer({
                 <Folder className="size-3 shrink-0" />
                 <span className="truncate">{assignment.clusterName}</span>
               </span>
-              <span className="text-[9px] font-bold text-muted-foreground shrink-0">
+              <span className="text-[9px] font-bold text-muted-foreground shrink-0 tabular-nums">
                 {studentClusterJournals.filter((j) => j.status === "approved").length}/{studentClusterJournals.length} approved
               </span>
             </div>
@@ -449,11 +467,11 @@ export default function ReviewDrawer({
                   >
                     <span>Exp #{j.experimentNumber}</span>
                     {isSubApproved ? (
-                      <span title="Approved">✅</span>
+                      <CheckCircle2 className="size-3 text-emerald-500" />
                     ) : isSubSubmitted ? (
-                      <span title="Submitted">⚡</span>
+                      <Zap className="size-3 text-sky-500" />
                     ) : isSubRevoked ? (
-                      <span title="Draft / Revoked">⏳</span>
+                      <Clock className="size-3 text-amber-500" />
                     ) : null}
                   </button>
                 );
@@ -493,7 +511,7 @@ export default function ReviewDrawer({
                 <Sparkles className="size-3.5 text-primary" />
                 Resolution Progress
               </span>
-              <span className="text-xs font-extrabold text-primary font-mono">
+              <span className="text-xs font-bold text-primary tabular-nums">
                 {satisfactionRate}%
               </span>
             </div>
@@ -515,7 +533,7 @@ export default function ReviewDrawer({
             <div className="flex items-center justify-between text-[10px] text-muted-foreground font-medium pt-0.5">
               <span>{satisfiedCount} of {totalFeedback} feedback satisfied</span>
               {totalActionItems > 0 && (
-                <span className="font-semibold text-foreground/90">
+                <span className="font-semibold text-foreground/90 tabular-nums">
                   {addressedActionItems}/{totalActionItems} action items
                 </span>
               )}
@@ -582,8 +600,8 @@ export default function ReviewDrawer({
                   >
                     <div className="flex items-center justify-between gap-1.5">
                       {/* Block Type Tag with Icon */}
-                      <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider border ${blockMeta.color}`}>
-                        <span>{blockMeta.icon}</span>
+                      <span className={`inline-flex items-center gap-1.5 px-1.5 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider border ${blockMeta.color}`}>
+                        <blockMeta.icon className="size-3" />
                         <span>{blockMeta.label}</span>
                       </span>
 
@@ -604,7 +622,7 @@ export default function ReviewDrawer({
                     </p>
 
                     {c.suggestedContent && (
-                      <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-[10px] font-mono text-amber-800 dark:text-amber-200">
+                      <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-[10px] text-amber-800 dark:text-amber-200">
                         Suggestion: {JSON.stringify(c.suggestedContent.text || c.suggestedContent)}
                       </div>
                     )}
@@ -631,7 +649,7 @@ export default function ReviewDrawer({
                 <AlertCircle className="size-3" />
                 Removed Blocks ({removedBlockComments.length})
               </span>
-              <span className="text-[9px] font-mono text-muted-foreground">Preserved Audit</span>
+              <span className="text-[9px] font-medium text-muted-foreground">Preserved Audit</span>
             </div>
             <div className="flex flex-col gap-2">
               {removedBlockComments.map((c) => (
@@ -649,7 +667,7 @@ export default function ReviewDrawer({
                     {c.content || c.message}
                   </p>
                   {c.suggestedContent && (
-                    <div className="p-1.5 rounded bg-background/80 text-[10px] font-mono text-muted-foreground">
+                    <div className="p-1.5 rounded bg-background/80 text-[10px] text-muted-foreground font-medium">
                       Instruction: {JSON.stringify(c.suggestedContent.text || c.suggestedContent)}
                     </div>
                   )}
@@ -734,9 +752,14 @@ export default function ReviewDrawer({
                         key={crit.id}
                         className="flex items-center justify-between gap-2 p-2 rounded-xl bg-background/80 border border-border/60 text-xs"
                       >
-                        <div className="flex flex-col min-w-0">
+                        <div className="flex flex-col min-w-0 pr-1">
                           <span className="font-bold text-foreground truncate">{crit.title}</span>
-                          <span className="text-[9px] text-muted-foreground">Max {crit.maxMarks} marks</span>
+                          {crit.description && (
+                            <span className="text-[10px] text-muted-foreground/80 line-clamp-1">
+                              {crit.description}
+                            </span>
+                          )}
+                          <span className="text-[9px] text-muted-foreground font-medium tabular-nums">Max {crit.maxMarks} marks</span>
                         </div>
                         <input
                           type="number"
@@ -750,7 +773,7 @@ export default function ReviewDrawer({
                           }}
                           placeholder={`0–${crit.maxMarks}`}
                           disabled={isGradingLocked}
-                          className="w-16 px-2 py-1 text-xs font-bold text-center bg-background border border-input rounded-lg focus:ring-1 focus:ring-primary focus:outline-none"
+                          className="w-16 px-2 py-1 text-xs font-semibold tabular-nums text-center bg-background border border-input rounded-lg focus:ring-1 focus:ring-primary focus:outline-none"
                         />
                       </div>
                     );
@@ -771,9 +794,9 @@ export default function ReviewDrawer({
                     onChange={(e) => setMarks(e.target.value)}
                     placeholder={`0–${maxMarks}`}
                     disabled={isGradingLocked}
-                    className="w-20 px-2 py-1 text-sm font-black text-center bg-background text-foreground border border-input rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-primary focus:outline-none disabled:opacity-40 transition-all"
+                    className="w-20 px-2 py-1 text-sm font-bold tabular-nums text-center bg-background text-foreground border border-input rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-primary focus:outline-none disabled:opacity-40 transition-all"
                   />
-                  <span className="text-xs text-muted-foreground font-bold">/ {maxMarks}</span>
+                  <span className="text-xs text-muted-foreground font-bold tabular-nums">/ {maxMarks}</span>
                 </div>
               </div>
 
@@ -812,7 +835,7 @@ export default function ReviewDrawer({
                   >
                     <ArrowRight className="size-3.5" />
                     <span>Next Student in Queue</span>
-                    <span className="text-[10px] font-mono font-bold opacity-75">(Shift + ])</span>
+                    <span className="text-[10px] font-medium opacity-75 tabular-nums">(Shift + ])</span>
                   </button>
                 ) : (
                   <div className="w-full py-2 px-3 rounded-full bg-amber-500/10 border border-amber-500/25 text-amber-700 dark:text-amber-300 text-xs font-semibold flex items-center justify-center gap-2">
@@ -851,7 +874,7 @@ export default function ReviewDrawer({
                       : "Approve & Complete"}
                   </span>
                   {!isApproved && (
-                    <span className="text-[10px] font-mono font-bold opacity-75 ml-1">
+                    <span className="text-[10px] font-medium opacity-75 ml-1">
                       (Shift + ])
                     </span>
                   )}
@@ -942,6 +965,7 @@ export default function ReviewDrawer({
                 Cancel
               </Button>
               <Button
+                variant="outline"
                 size="sm"
                 onClick={handleRequestChanges}
                 disabled={requestChangesMutation.isPending}

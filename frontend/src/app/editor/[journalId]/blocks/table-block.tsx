@@ -182,34 +182,34 @@ export default function TableBlock({ id, content, previewMode }: TableBlockProps
 
   if (previewMode) {
     return (
-      <div className="overflow-x-auto w-full my-4 border border-border rounded-xl shadow-xs custom-scrollbar bg-card print:overflow-visible print:border-none print:shadow-none print:my-2 page-break-avoid">
+      <div className="overflow-x-auto w-full my-4 border border-border/70 rounded-xl shadow-xs custom-scrollbar bg-card/85 backdrop-blur-md p-4 print:p-0 print:overflow-visible print:border-none print:shadow-none print:my-2 page-break-avoid">
         {teacherNote && (
-          <div className="mx-3 mt-3 px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs font-medium flex items-center gap-2">
+          <div className="mb-3 px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs font-medium flex items-center gap-2">
             <span className="font-extrabold uppercase text-[10px] tracking-wider px-1.5 py-0.5 rounded bg-amber-500/20">Teacher Note</span>
             <span>{teacherNote}</span>
           </div>
         )}
-        <table className="min-w-full divide-y divide-border text-xs print:min-w-0 print:w-full print:table-auto print:border-collapse print:divide-zinc-400">
-          <thead className="bg-muted/40 print:bg-zinc-100">
-            <tr className="print:border-b print:border-zinc-400">
-              <th className="w-10 px-3 py-2.5 text-center font-bold text-muted-foreground/70 border-r border-border/40 select-none bg-muted/60 print:w-7 print:px-1 print:py-1 print:text-[10px] print:border-zinc-400">
+        <table className="min-w-full text-xs border-collapse border-t-2 border-b-2 border-foreground/60 print:min-w-0 print:w-full print:table-auto print:border-zinc-800">
+          <thead className="border-b border-foreground/30 bg-muted/30 print:bg-transparent print:border-zinc-800">
+            <tr className="print:border-b print:border-zinc-800">
+              <th className="w-10 px-3 py-2.5 text-center font-mono font-medium text-muted-foreground/60 select-none print:w-7 print:px-1 print:py-1 print:text-[10px]">
                 #
               </th>
               {headers.map((h, i) => (
-                <th key={i} className="px-4 py-2.5 text-center font-bold text-foreground border-r border-border/40 last:border-0 min-w-[120px] print:min-w-0 print:px-1.5 print:py-1 print:border-zinc-400 print:text-[10px]">
+                <th key={i} className="px-4 py-2.5 text-center font-bold text-foreground font-serif tracking-tight min-w-[120px] print:min-w-0 print:px-1.5 print:py-1 print:text-[10px]">
                   <InlineMathText text={h} />
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-border bg-background print:divide-zinc-300">
+          <tbody className="divide-y divide-border/30 bg-transparent print:divide-zinc-200">
             {rows.map((row, rIdx) => (
               <tr key={rIdx} className="hover:bg-muted/10 transition-colors print:border-b print:border-zinc-200">
-                <td className="w-10 px-3 py-2 text-center font-mono font-semibold text-muted-foreground/60 border-r border-border/40 select-none bg-muted/10 print:w-7 print:px-1 print:py-1 print:border-zinc-400 print:text-[10px]">
+                <td className="w-10 px-3 py-2 text-center font-mono text-muted-foreground/50 select-none tabular-nums print:w-7 print:px-1 print:py-1 print:text-[10px]">
                   {rIdx + 1}
                 </td>
                 {row.map((cell, cIdx) => (
-                  <td key={cIdx} className="px-4 py-2 text-center border-r border-border/40 last:border-0 whitespace-nowrap print:whitespace-normal text-foreground/90 font-mono print:px-1.5 print:py-1 print:border-zinc-300 print:text-[10px]">
+                  <td key={cIdx} className="px-4 py-2 text-center whitespace-nowrap print:whitespace-normal text-foreground/90 font-mono tabular-nums print:px-1.5 print:py-1 print:text-[10px]">
                     {cell ? <InlineMathText text={cell} /> : <span className="text-muted-foreground/30">-</span>}
                   </td>
                 ))}
@@ -222,14 +222,14 @@ export default function TableBlock({ id, content, previewMode }: TableBlockProps
   }
 
   return (
-    <div className="flex flex-col gap-3 w-full border border-border p-4 rounded-xl bg-card shadow-xs">
+    <div className="flex flex-col gap-3 w-full border border-border/70 p-4 rounded-xl bg-card/85 backdrop-blur-md shadow-xs">
       {/* Table Toolbar */}
       <div className="flex items-center justify-between border-b border-border/60 pb-2.5">
         <div className="flex items-center gap-2">
-          <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+          <span className="text-xs font-bold text-foreground font-mono uppercase tracking-wider">
             Data Grid Table
           </span>
-          <span className="text-[11px] px-2 py-0.5 rounded-md bg-muted/60 text-muted-foreground font-mono">
+          <span className="text-[11px] px-2 py-0.5 rounded-md bg-muted/80 text-muted-foreground font-mono border border-border/40 tabular-nums">
             {rows.length}R × {headers.length}C
           </span>
         </div>
@@ -240,7 +240,7 @@ export default function TableBlock({ id, content, previewMode }: TableBlockProps
             variant="outline"
             size="xs"
             onClick={addGraphFromTable}
-            className="gap-1.5 cursor-pointer bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-500/25 font-semibold"
+            className="gap-1.5 cursor-pointer bg-teal-500/10 hover:bg-teal-500/20 text-teal-700 dark:text-teal-300 border-teal-500/30 font-semibold shadow-2xs active:scale-[0.98] transition-all"
             title="Plot an experimental graph using this table's readings"
           >
             <LineChart className="size-3" /> Plot Graph
@@ -251,13 +251,18 @@ export default function TableBlock({ id, content, previewMode }: TableBlockProps
             variant="outline"
             size="xs"
             onClick={() => setIsModalOpen(true)}
-            className="gap-1.5 cursor-pointer bg-primary/5 hover:bg-primary/10 text-primary border-primary/20 hover:border-primary/40 font-semibold"
+            className="gap-1.5 cursor-pointer bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 border-indigo-500/30 font-semibold shadow-2xs active:scale-[0.98] transition-all"
             title="Open distraction-free fullscreen spreadsheet editor"
           >
             <Maximize2 className="size-3" /> Focus Spreadsheet
           </Button>
 
-          <Button variant="outline" size="xs" onClick={addColumn} className="gap-1 cursor-pointer">
+          <Button
+            variant="outline"
+            size="xs"
+            onClick={addColumn}
+            className="gap-1 cursor-pointer bg-card hover:bg-muted text-foreground border-border font-medium shadow-2xs active:scale-[0.98] transition-all"
+          >
             <Plus className="size-3" /> Add Column
           </Button>
           <Button
@@ -265,7 +270,7 @@ export default function TableBlock({ id, content, previewMode }: TableBlockProps
             size="xs"
             onClick={removeColumn}
             disabled={headers.length <= 1}
-            className="gap-1 cursor-pointer hover:text-destructive hover:border-destructive/40 disabled:opacity-40"
+            className="gap-1 cursor-pointer hover:bg-rose-500/10 hover:text-rose-600 dark:hover:text-rose-400 hover:border-rose-500/30 text-muted-foreground border-border font-medium disabled:opacity-40 shadow-2xs active:scale-[0.98] transition-all"
             title="Delete the rightmost column"
           >
             <Trash2 className="size-3" /> Delete Column
@@ -292,16 +297,16 @@ export default function TableBlock({ id, content, previewMode }: TableBlockProps
         </div>
       )}
 
-      {/* Grid Canvas with Math Render & Inline Inputs */}
-      <div className="overflow-x-auto border border-border/60 rounded-xl custom-scrollbar bg-background">
-        <table className="min-w-full divide-y divide-border text-xs border-collapse">
-          <thead className="bg-muted/50">
+      {/* Grid Canvas following Scientific Booktabs Conventions (Zero Vertical Rules, \toprule, \midrule, \bottomrule) */}
+      <div className="overflow-x-auto custom-scrollbar bg-card/40 rounded-lg p-0.5">
+        <table className="min-w-full text-xs border-collapse border-t-2 border-b-2 border-foreground/60">
+          <thead className="border-b border-foreground/30 bg-muted/40">
             <tr>
-              <th className="w-10 px-2 py-2 text-center font-bold text-muted-foreground/60 border-r border-border/50 select-none">
+              <th className="w-10 px-2 py-2 text-center font-mono font-medium text-muted-foreground/60 select-none">
                 #
               </th>
               {headers.map((header, colIdx) => (
-                <th key={colIdx} className="p-1 border-r border-border/50 last:border-0 min-w-[130px]">
+                <th key={colIdx} className="p-1 min-w-[130px]">
                   {editingHeaderIdx === colIdx ? (
                     <input
                       autoFocus
@@ -312,13 +317,13 @@ export default function TableBlock({ id, content, previewMode }: TableBlockProps
                       onKeyDown={(e) => {
                         if (e.key === "Enter") setEditingHeaderIdx(null);
                       }}
-                      className="w-full bg-background border border-primary font-bold focus:outline-none focus:ring-1 focus:ring-primary text-center text-xs py-1 px-1 rounded"
+                      className="w-full bg-background border border-primary font-bold focus:outline-none focus:ring-1 focus:ring-primary text-center text-xs py-1 px-1 rounded font-serif"
                     />
                   ) : (
                     <div className="flex items-center justify-center gap-1 group/header relative">
                       <div
                         onClick={() => setEditingHeaderIdx(colIdx)}
-                        className="flex-1 py-1 px-1 cursor-pointer hover:bg-primary/5 rounded transition-colors text-center font-bold text-foreground flex items-center justify-center min-h-[28px] truncate"
+                        className="flex-1 py-1 px-1 cursor-pointer hover:bg-primary/5 rounded transition-colors text-center font-bold text-foreground flex items-center justify-center min-h-[28px] truncate font-serif"
                         title="Click to edit column label"
                       >
                         <InlineMathText text={header} />
@@ -331,7 +336,7 @@ export default function TableBlock({ id, content, previewMode }: TableBlockProps
                             setInitialFormulaCol(colIdx);
                             setIsModalOpen(true);
                           }}
-                          className="px-1.5 py-0.5 rounded-md bg-primary/10 text-primary border border-primary/25 font-mono text-[9px] font-bold shrink-0 cursor-pointer hover:bg-primary/20 transition-colors shadow-2xs"
+                          className="px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-700 dark:text-violet-300 border border-violet-500/30 font-mono text-[9px] font-bold shrink-0 cursor-pointer hover:bg-violet-500/20 transition-colors shadow-2xs"
                           title={`Active formula: = ${columnFormulas[colIdx]}`}
                         >
                           fx
@@ -343,7 +348,7 @@ export default function TableBlock({ id, content, previewMode }: TableBlockProps
                             setInitialFormulaCol(colIdx);
                             setIsModalOpen(true);
                           }}
-                          className="size-5 rounded hover:bg-primary/10 hover:text-primary text-muted-foreground/60 opacity-0 group-hover/header:opacity-100 transition-opacity flex items-center justify-center text-[10px] font-mono font-bold shrink-0 cursor-pointer"
+                          className="size-5 rounded hover:bg-violet-500/10 hover:text-violet-600 text-muted-foreground/60 opacity-0 group-hover/header:opacity-100 transition-opacity flex items-center justify-center text-[10px] font-mono font-bold shrink-0 cursor-pointer"
                           title="Calculate this column in Spreadsheet Mode (fx)"
                         >
                           fx
@@ -356,17 +361,17 @@ export default function TableBlock({ id, content, previewMode }: TableBlockProps
               <th className="w-10"></th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-border bg-card">
+          <tbody className="divide-y divide-border/30 bg-card/25">
             {rows.map((row, rowIdx) => (
               <tr key={rowIdx} className="hover:bg-muted/10 transition-colors">
-                <td className="w-10 px-2 py-1 text-center font-mono font-semibold text-muted-foreground/60 border-r border-border/50 select-none bg-muted/20">
+                <td className="w-10 px-2 py-1.5 text-center font-mono text-muted-foreground/50 select-none tabular-nums">
                   {rowIdx + 1}
                 </td>
                 {row.map((cell, colIdx) => {
                   const isEditing = editingCell?.r === rowIdx && editingCell?.c === colIdx;
 
                   return (
-                    <td key={colIdx} className="p-0.5 border-r border-border/50 last:border-0 min-w-[130px]">
+                    <td key={colIdx} className="p-0.5 min-w-[130px]">
                       {isEditing ? (
                         <input
                           autoFocus
@@ -391,12 +396,12 @@ export default function TableBlock({ id, content, previewMode }: TableBlockProps
                             }
                           }}
                           placeholder="-"
-                          className="w-full bg-background border border-primary focus:outline-none focus:ring-1 focus:ring-primary text-center py-1 px-2 text-xs rounded font-mono"
+                          className="w-full bg-background border border-primary focus:outline-none focus:ring-1 focus:ring-primary text-center py-1 px-2 text-xs rounded font-mono tabular-nums"
                         />
                       ) : (
                         <div
                           onClick={() => setEditingCell({ r: rowIdx, c: colIdx })}
-                          className="w-full min-h-[30px] px-2 py-1 text-center text-xs text-foreground/90 cursor-pointer hover:bg-primary/5 transition-colors flex items-center justify-center font-mono"
+                          className="w-full min-h-[30px] px-2 py-1 text-center text-xs text-foreground/90 cursor-pointer hover:bg-primary/5 rounded transition-colors flex items-center justify-center font-mono tabular-nums"
                         >
                           {cell ? <InlineMathText text={cell} /> : <span className="text-muted-foreground/30">-</span>}
                         </div>
@@ -408,7 +413,7 @@ export default function TableBlock({ id, content, previewMode }: TableBlockProps
                   <button
                     onClick={() => removeRow(rowIdx)}
                     disabled={rows.length <= 1}
-                    className="p-1 hover:bg-muted text-muted-foreground hover:text-destructive rounded transition-colors disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer"
+                    className="p-1 hover:bg-rose-500/10 text-muted-foreground hover:text-rose-600 rounded transition-colors disabled:opacity-20 disabled:hover:bg-transparent cursor-pointer"
                     title="Delete Row"
                   >
                     <Trash2 className="size-3.5" />
@@ -420,7 +425,12 @@ export default function TableBlock({ id, content, previewMode }: TableBlockProps
         </table>
       </div>
 
-      <Button variant="outline" size="sm" onClick={addRow} className="gap-1.5 w-full mt-1 cursor-pointer">
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={addRow}
+        className="gap-1.5 w-full mt-1 cursor-pointer bg-card hover:bg-muted/80 border border-border/70 font-medium text-xs rounded-lg shadow-2xs active:scale-[0.99] transition-all"
+      >
         <Plus className="size-3.5" /> Add Row
       </Button>
 

@@ -1,7 +1,7 @@
 /**
- * OTP Verification view.
+ * OTP Verification view — Almanac Archival Monograph.
  *
- * Checks user email parameters and verifies ownership via 6-digit box controls.
+ * Verifies account ownership via 6-digit code with tabular monospace figures.
  */
 
 "use client";
@@ -72,7 +72,7 @@ function VerifyContent() {
   const resendMutation = useMutation({
     mutationFn: () => api.post("/auth/resend-otp", { email: emailParam }),
     onSuccess: () => {
-      setSuccessMsg("A new verification code has been sent!");
+      setSuccessMsg("A new verification code has been dispatched to your email.");
       setErrorMsg(null);
     },
     onError: (error: any) => {
@@ -87,42 +87,43 @@ function VerifyContent() {
   };
 
   return (
-    <div className="w-full max-w-[400px] p-8 rounded-3xl glass-card flex flex-col gap-6 relative transition-all duration-300">
+    <div className="w-full max-w-[400px] p-6 sm:p-8 rounded-2xl bg-card text-card-foreground border border-border/80 shadow-lg flex flex-col gap-5 relative select-none">
       {/* Header */}
-      <div className="flex flex-col items-center gap-1 text-center">
+      <div className="flex flex-col items-center gap-1.5 text-center">
         <img
           src="/logo.png"
           alt="eJournal Logo"
-          className="h-16 w-auto object-contain mb-2"
+          className="h-12 w-auto object-contain mb-1"
         />
-        <h2 className="text-2xl font-bold tracking-tight">Verify Account</h2>
-        <p className="text-sm text-muted-foreground">
-          We sent a verification code to <span className="font-semibold text-foreground">{emailParam}</span>
+        <h2 className="text-xl font-bold tracking-tight text-foreground font-serif">Verify account</h2>
+        <p className="text-xs text-muted-foreground">
+          We sent a verification code to{" "}
+          <span className="font-semibold text-foreground">{emailParam || "your email"}</span>
         </p>
       </div>
 
       {/* Form */}
       <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
         {errorMsg && (
-          <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm font-medium border border-destructive/20">
+          <div className="p-3 rounded-xl bg-destructive/10 text-destructive text-xs font-medium border border-destructive/20">
             {errorMsg}
           </div>
         )}
         {successMsg && (
-          <div className="p-3 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-sm font-medium border border-emerald-500/20">
+          <div className="p-3 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-medium border border-emerald-500/20">
             {successMsg}
           </div>
         )}
 
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-semibold text-muted-foreground text-center mb-1">
-            Enter 6-Digit OTP Code
+          <label className="text-xs font-medium text-muted-foreground text-center">
+            Enter 6-digit verification code
           </label>
           <input
             type="text"
             placeholder="123456"
             maxLength={6}
-            className="h-12 text-center text-xl font-bold tracking-[6px] rounded-md border border-input bg-background px-3 py-2 ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+            className="h-12 text-center text-xl font-mono font-bold tracking-[8px] rounded-xl border border-input bg-muted/40 focus:bg-background px-3 py-2 text-foreground placeholder:text-muted-foreground/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary transition-all disabled:cursor-not-allowed disabled:opacity-50"
             {...register("otp")}
           />
           {errors.otp && (
@@ -130,13 +131,18 @@ function VerifyContent() {
           )}
         </div>
 
-        <Button type="submit" size="lg" className="w-full mt-2" disabled={verifyMutation.isPending}>
-          {verifyMutation.isPending ? "Verifying..." : "Verify & Log In"}
+        <Button
+          type="submit"
+          size="default"
+          className="w-full mt-2 h-10 rounded-xl font-semibold text-xs glass-btn-indigo-solid active:scale-[0.98] transition-all cursor-pointer shadow-xs"
+          disabled={verifyMutation.isPending}
+        >
+          {verifyMutation.isPending ? "Verifying..." : "Verify & proceed"}
         </Button>
       </form>
 
       {/* Resend button */}
-      <div className="text-center text-sm text-muted-foreground">
+      <div className="text-center text-xs text-muted-foreground pt-1 border-t border-border/60">
         Didn&apos;t receive code?{" "}
         <button
           type="button"
@@ -144,7 +150,7 @@ function VerifyContent() {
           disabled={resendMutation.isPending}
           className="font-semibold text-primary hover:underline bg-transparent border-0 p-0 cursor-pointer disabled:opacity-50"
         >
-          {resendMutation.isPending ? "Resending..." : "Resend Code"}
+          {resendMutation.isPending ? "Resending..." : "Resend code"}
         </button>
       </div>
     </div>
@@ -153,8 +159,8 @@ function VerifyContent() {
 
 export default function VerifyPage() {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center p-6 bg-background">
-      <Suspense fallback={<div>Loading verification...</div>}>
+    <div className="flex min-h-screen flex-col items-center justify-center p-4 sm:p-6 bg-background select-none">
+      <Suspense fallback={<div className="text-xs text-muted-foreground">Loading verification...</div>}>
         <VerifyContent />
       </Suspense>
     </div>

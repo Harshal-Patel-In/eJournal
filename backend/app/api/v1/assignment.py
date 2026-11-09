@@ -12,6 +12,7 @@ from app.schemas.assignment import (
     AssignmentClusterUpdateRequest,
     AssignmentCreateRequest,
     AssignmentResponse,
+    AssignmentUpdateRequest,
 )
 from app.schemas.response import ApiResponse, success_response
 from app.services.assignment_service import AssignmentService
@@ -64,6 +65,24 @@ async def get_assignment(
         id, user["id"], user["role"]
     )
     return success_response(assignment)
+
+
+@router.patch(
+    "/classrooms/{classroomId}/assignments/{assignmentId}",
+    response_model=ApiResponse[AssignmentResponse],
+)
+async def update_assignment(
+    classroomId: str,
+    assignmentId: str,
+    payload: AssignmentUpdateRequest,
+    user: dict = Depends(RoleChecker(["teacher"])),
+    assignment_service: AssignmentService = Depends(),
+):
+    """Safely update practical assignment metadata, dates, or rubrics (Teacher only)."""
+    updated = await assignment_service.update_assignment(
+        user["id"], classroomId, assignmentId, payload
+    )
+    return success_response(updated)
 
 
 @router.patch(

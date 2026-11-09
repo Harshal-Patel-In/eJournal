@@ -14,12 +14,19 @@ import {
   X,
   ShieldCheck,
   RefreshCw,
+  Lock,
+  Unlock,
+  Trash2,
+  CheckCircle2,
+  Award,
 } from "lucide-react";
 
 import { api } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
 import { CustomSelect } from "@/components/ui/custom-select";
+import { DeepPurgeClassroomModal } from "@/components/admin/deep-purge-classroom-modal";
+import { AccreditationPortfolioModal } from "@/components/admin/accreditation-portfolio-modal";
 
 export default function AdminClassroomsPage() {
   const queryClient = useQueryClient();
@@ -27,6 +34,8 @@ export default function AdminClassroomsPage() {
   const [page, setPage] = useState(1);
   const [reassignTarget, setReassignTarget] = useState<any>(null);
   const [selectedTeacherId, setSelectedTeacherId] = useState("");
+  const [purgeTarget, setPurgeTarget] = useState<any>(null);
+  const [portfolioTarget, setPortfolioTarget] = useState<any>(null);
 
   // Fetch Classrooms
   const { data, isLoading, refetch, isRefetching } = useQuery<any>({
@@ -63,6 +72,22 @@ export default function AdminClassroomsPage() {
     },
   });
 
+  // Freeze / Unseal Term Mutation
+  const freezeMutation = useMutation({
+    mutationFn: ({ classroomId, isFrozen }: { classroomId: string; isFrozen: boolean }) =>
+      api.post<any>(`/admin/classrooms/${classroomId}/freeze`, { isFrozen }),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ["admin-classrooms"] });
+      const isSealed = Boolean(res?.is_frozen ?? res?.isFrozen);
+      toast.success(res?.message || (isSealed ? "Academic term officially sealed for this classroom." : "Academic term officially unsealed for this classroom."), {
+        title: isSealed ? "🔒 Academic Term Sealed" : "🔓 Academic Term Unsealed",
+      });
+    },
+    onError: (err: any) => {
+      toast.error(err.message || "Failed to update classroom term seal status.");
+    },
+  });
+
   const handleReassignSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedTeacherId) {
@@ -82,7 +107,7 @@ export default function AdminClassroomsPage() {
         <div>
           <h1 className="text-2xl font-black tracking-tight text-foreground">Classroom Supervision & Academic Continuity</h1>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Oversee university lab practical courses, student enrollments, and transfer instructors
+            Oversee university lab practical courses, student enrollments, seal academic terms, and reclaim storage
           </p>
         </div>
 
@@ -130,14 +155,29 @@ export default function AdminClassroomsPage() {
               <div className="space-y-3">
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <span className="px-2 py-0.5 rounded-md bg-muted text-[10px] font-mono font-bold text-muted-foreground border border-border">
+                    <span className="px-2 py-0.5 rounded-md bg-muted text-[10px] font-bold tracking-wider text-muted-foreground border border-border">
                       {c.subjectCode || "LAB"}
                     </span>
                     <h3 className="text-sm font-bold text-foreground mt-1.5 leading-snug">{c.name}</h3>
                   </div>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 shrink-0">
-                    {c.joinCode}
-                  </span>
+                  <div className="flex flex-col items-end gap-1 shrink-0">
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                      {c.joinCode}
+                    </span>
+                    {c.is_frozen || c.isFrozen ? (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/25 flex items-center gap-1">
+                        <Lock className="size-2.5" /> Sealed Term
+                      </span>
+                    ) : c.isArchived ? (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-zinc-500/10 text-zinc-500 border border-zinc-500/25">
+                        Archived
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25 flex items-center gap-1">
+                        <CheckCircle2 className="size-2.5" /> Active Term
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 <div className="p-3 rounded-2xl bg-muted/30 border border-border/60 space-y-1.5">
@@ -165,18 +205,79 @@ export default function AdminClassroomsPage() {
                 </div>
               </div>
 
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setReassignTarget(c);
-                  setSelectedTeacherId("");
-                }}
-                className="w-full rounded-xl text-xs font-semibold gap-1.5 cursor-pointer hover:border-amber-500/40"
-              >
-                <ArrowRightLeft className="size-3.5" />
-                <span>Reassign Instructor</span>
-              </Button>
+              {/* Action Buttons Row */}
+              <div className="space-y-2 pt-2 border-t border-border/40">
+                <Button
+                  variant="outline"
+                  color="indigo"
+                  size="sm"
+                  onClick={() => setPortfolioTarget(c)}
+                  className="w-full rounded-xl text-xs font-semibold gap-1.5 cursor-pointer shadow-xs"
+                  title="Generate NBA / NAAC Accreditation Course Portfolio (Zero Server CPU)"
+                >
+                  <Award className="size-3.5" />
+                  <span>NBA / NAAC Portfolio Package</span>
+                </Button>
+
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    color="neutral"
+                    size="sm"
+                    onClick={() => {
+                      setReassignTarget(c);
+                      setSelectedTeacherId("");
+                    }}
+                    className="flex-1 rounded-xl text-xs font-semibold gap-1.5 cursor-pointer hover:border-slate-400"
+                    title="Reassign course instructor"
+                  >
+                    <ArrowRightLeft className="size-3.5" />
+                    <span>Reassign</span>
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    color={c.is_frozen || c.isFrozen ? "cyan" : "amber"}
+                    size="sm"
+                    onClick={() =>
+                      freezeMutation.mutate({
+                        classroomId: c.id,
+                        isFrozen: !(c.is_frozen || c.isFrozen),
+                      })
+                    }
+                    disabled={freezeMutation.isPending}
+                    className="flex-1 rounded-xl text-xs font-semibold gap-1.5 cursor-pointer"
+                    title={
+                      c.is_frozen || c.isFrozen
+                        ? "Unseal classroom term"
+                        : "Seal classroom term (read-only for journals)"
+                    }
+                  >
+                    {c.is_frozen || c.isFrozen ? (
+                      <>
+                        <Unlock className="size-3.5" />
+                        <span>Unseal</span>
+                      </>
+                    ) : (
+                      <>
+                        <Lock className="size-3.5" />
+                        <span>Seal Term</span>
+                      </>
+                    )}
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    color="rose"
+                    size="sm"
+                    onClick={() => setPurgeTarget(c)}
+                    className="rounded-xl text-xs font-semibold cursor-pointer px-2.5"
+                    title="Deep Storage Purge (Irreversible)"
+                  >
+                    <Trash2 className="size-3.5" />
+                  </Button>
+                </div>
+              </div>
             </div>
           ))
         )}
@@ -262,6 +363,20 @@ export default function AdminClassroomsPage() {
           </div>
         </div>
       )}
+
+      {/* Deep Storage Purge & Asset Cleanup Modal */}
+      <DeepPurgeClassroomModal
+        isOpen={!!purgeTarget}
+        classroom={purgeTarget}
+        onClose={() => setPurgeTarget(null)}
+      />
+
+      {/* NBA / NAAC Accreditation Course Portfolio Modal */}
+      <AccreditationPortfolioModal
+        isOpen={!!portfolioTarget}
+        classroom={portfolioTarget}
+        onClose={() => setPortfolioTarget(null)}
+      />
     </div>
   );
 }

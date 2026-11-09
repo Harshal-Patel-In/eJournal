@@ -181,8 +181,8 @@ export function GlassDropdown({
   };
 
   const defaultButtonStyles = isSmall
-    ? "h-8 px-2.5 rounded-lg gap-1.5 text-xs font-bold"
-    : "h-9 px-3 rounded-xl gap-2 text-xs font-semibold";
+    ? "h-7 px-2.5 rounded-lg gap-1.5 text-xs font-semibold"
+    : "h-8 px-3 rounded-lg gap-2 text-xs font-semibold";
 
   const defaultContainerStyles = isSmall
     ? "w-auto min-w-fit"
@@ -212,14 +212,14 @@ export function GlassDropdown({
           }
           setIsOpen(!isOpen);
         }}
-        className={`w-full ${buttonClassName || defaultButtonStyles} bg-muted/50 dark:bg-zinc-800/60 hover:bg-muted/80 dark:hover:bg-zinc-700/60 border border-border/80 dark:border-white/10 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 ${
-          isOpen ? "ring-2 ring-primary/25 border-primary/40 bg-muted/80 dark:bg-zinc-700/70" : ""
-        } flex items-center justify-between transition-all cursor-pointer select-none shadow-2xs whitespace-nowrap active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed`}
+        className={`w-full rounded-lg ${buttonClassName || defaultButtonStyles} bg-card hover:bg-muted/60 border border-border text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 ${
+          isOpen ? "ring-2 ring-ring border-primary bg-muted/50" : ""
+        } flex items-center justify-between transition-[background-color,border-color] duration-120 cursor-pointer select-none shadow-2xs whitespace-nowrap active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed`}
       >
-        <div className="flex items-center gap-1.5 truncate text-left">
+        <div className="flex items-center gap-1.5 min-w-0 flex-1 truncate text-left">
           {icon || selectedOption?.icon}
           {shouldShowBadgeInTrigger && selectedOption?.badge && (
-            <span className="px-1.5 py-0.5 rounded-md bg-primary/10 text-primary font-mono font-bold text-[10px] shrink-0 border border-primary/20">
+            <span className="px-1.5 py-0.2 rounded bg-primary/10 text-primary font-mono font-bold text-[10px] shrink-0 border border-primary/20">
               {selectedOption.badge}
             </span>
           )}
@@ -227,13 +227,13 @@ export function GlassDropdown({
             {selectedOption ? renderLabel(selectedOption.label) : placeholder}
           </span>
           {selectedOption?.count !== undefined && (
-            <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-black/10 dark:bg-white/10 font-mono font-bold">
+            <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-muted font-mono font-semibold shrink-0">
               {selectedOption.count}
             </span>
           )}
         </div>
         <ChevronDown
-          className={`${isSmall ? "size-3" : "size-3.5"} text-muted-foreground transition-transform duration-200 shrink-0 ${
+          className={`${isSmall ? "size-3" : "size-3.5"} text-muted-foreground transition-transform duration-120 shrink-0 ${
             isOpen ? "rotate-180" : ""
           }`}
         />
@@ -249,11 +249,11 @@ export function GlassDropdown({
             tabIndex={-1}
             onKeyDown={handleKeyDown}
             style={menuStyle}
-            className={`p-1.5 rounded-xl bg-popover/95 dark:bg-zinc-900/95 text-popover-foreground backdrop-blur-2xl border border-border/80 dark:border-white/12 shadow-2xl shadow-black/10 dark:shadow-black/40 ring-1 ring-black/5 animate-in fade-in-0 zoom-in-95 duration-150 select-none ${
+            className={`p-1 rounded-md bg-popover text-popover-foreground border border-border shadow-md animate-in fade-in-0 zoom-in-95 duration-120 select-none ${
               menuClassName || defaultMenuStyles
             }`}
           >
-            <div className="max-h-64 overflow-y-auto space-y-1 custom-scrollbar p-0.5">
+            <div className="max-h-64 overflow-y-auto space-y-0.5 custom-scrollbar p-0.5">
               {options.map((opt, idx) => {
                 const isSelected = opt.value === value;
                 const isHighlighted = idx === highlightedIndex;
@@ -269,22 +269,22 @@ export function GlassDropdown({
                       setIsOpen(false);
                       buttonRef.current?.focus();
                     }}
-                    className={`w-full px-2.5 py-1.5 rounded-lg text-xs flex items-center justify-between gap-2.5 text-left transition-all cursor-pointer ${
+                    className={`w-full px-2.5 py-1.5 rounded text-xs flex items-center justify-between gap-2.5 text-left transition-colors duration-100 cursor-pointer ${
                       isSelected
-                        ? "bg-primary/10 text-primary dark:bg-primary/15 font-bold shadow-2xs"
+                        ? "bg-primary text-primary-foreground font-semibold"
                         : isHighlighted
-                        ? "bg-muted/70 dark:bg-zinc-800/80 text-foreground font-medium"
-                        : "text-foreground hover:bg-muted/60 dark:hover:bg-zinc-800/60 font-medium"
+                        ? "bg-muted text-foreground font-medium"
+                        : "text-foreground hover:bg-muted font-medium"
                     }`}
                   >
                     <div className="flex items-center gap-2 truncate min-w-0">
                       {opt.icon}
                       {opt.badge && (
                         <span
-                          className={`px-1.5 py-0.5 rounded font-mono font-bold text-[10px] shrink-0 border ${
+                          className={`px-1.5 py-0.2 rounded font-mono font-bold text-[10px] shrink-0 border ${
                             isSelected
-                              ? "bg-primary/20 text-primary border-primary/30"
-                              : "bg-muted dark:bg-zinc-800 text-muted-foreground border-border/70 dark:border-white/10"
+                              ? "bg-primary-foreground/20 text-primary-foreground border-primary-foreground/30"
+                              : "bg-muted text-muted-foreground border-border"
                           }`}
                         >
                           {opt.badge}
@@ -293,7 +293,7 @@ export function GlassDropdown({
                       <div className="flex flex-col min-w-0">
                         <span className="truncate">{renderLabel(opt.label)}</span>
                         {opt.description && (
-                          <span className="text-[10px] text-muted-foreground font-normal leading-tight truncate">
+                          <span className={`text-[10px] font-normal leading-tight truncate ${isSelected ? "text-primary-foreground/80" : "text-muted-foreground"}`}>
                             {opt.description}
                           </span>
                         )}
@@ -301,11 +301,11 @@ export function GlassDropdown({
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
                       {opt.count !== undefined && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted dark:bg-zinc-800 font-mono font-bold text-muted-foreground">
+                        <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold ${isSelected ? "bg-primary-foreground/20 text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
                           {opt.count}
                         </span>
                       )}
-                      {isSelected && <Check className="size-3.5 text-primary shrink-0 stroke-[2.5]" />}
+                      {isSelected && <Check className="size-3.5 text-primary-foreground shrink-0 stroke-[2.5]" />}
                     </div>
                   </button>
                 );

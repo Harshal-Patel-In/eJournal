@@ -1,7 +1,8 @@
 /**
- * Profile Setup Wizard.
+ * Profile Setup Wizard — Almanac Archival Monograph.
  *
- * Enforces role-specific profiles with strict academic formatting and validation.
+ * Enforces role-specific academic profiles with strict institutional formatting,
+ * tabular monospace enrollment codes, and crisp paper card styling.
  * RULE-AUTH06: redirect to profile setup if incomplete.
  */
 
@@ -13,7 +14,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as zod from "zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { AlertCircle, CheckCircle2, Loader2, ShieldAlert } from "lucide-react";
+import { AlertCircle, CheckCircle2, Loader2, Lock, ShieldAlert } from "lucide-react";
 
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -49,6 +50,7 @@ export default function ProfileSetupPage() {
   const [enrollmentError, setEnrollmentError] = useState<string | null>(null);
   const [isCheckingEnrollment, setIsCheckingEnrollment] = useState(false);
   const [isEnrollmentAvailable, setIsEnrollmentAvailable] = useState<boolean | null>(null);
+  const [isEnrollmentLocked, setIsEnrollmentLocked] = useState(false);
 
   // Fetch current user details
   const { data: user, isLoading, error } = useQuery<any>({
@@ -81,6 +83,7 @@ export default function ProfileSetupPage() {
     handleSubmit,
     setValue,
     watch,
+    reset,
     formState: { errors },
   } = useForm<ProfileFields>({
     resolver: zodResolver(profileSchema),
@@ -91,6 +94,28 @@ export default function ProfileSetupPage() {
       college: "",
     },
   });
+
+  // Synchronize and pre-populate profile form with admin-provisioned data
+  useEffect(() => {
+    if (user) {
+      const existingEnrollment = user.profile?.enrollmentNumber || "";
+      if (existingEnrollment) {
+        setIsEnrollmentLocked(true);
+      }
+      reset({
+        name: user.profile?.name || user.name || "",
+        department: user.profile?.department || "",
+        semester: user.profile?.semester ? String(user.profile.semester) : "",
+        division: user.profile?.division || "",
+        batch: user.profile?.batch || "",
+        enrollmentNumber: existingEnrollment,
+        facultyId: user.profile?.facultyId || "",
+        designation: user.profile?.designation || "",
+        college: user.profile?.college || "",
+        university: user.profile?.university || CHARUSAT_UNIVERSITY_NAME,
+      });
+    }
+  }, [user, reset]);
 
   const departmentValue = watch("department");
   const semesterValue = watch("semester");
@@ -103,6 +128,13 @@ export default function ProfileSetupPage() {
   useEffect(() => {
     if (!enrollmentValue || enrollmentValue.length < 3) {
       setIsEnrollmentAvailable(null);
+      setEnrollmentError(null);
+      return;
+    }
+
+    // Bypass check if enrollment matches student's own pre-allocated institutional number
+    if (user?.profile?.enrollmentNumber && enrollmentValue.toUpperCase() === user.profile.enrollmentNumber.toUpperCase()) {
+      setIsEnrollmentAvailable(true);
       setEnrollmentError(null);
       return;
     }
@@ -126,7 +158,7 @@ export default function ProfileSetupPage() {
     }, 400);
 
     return () => clearTimeout(timer);
-  }, [enrollmentValue]);
+  }, [enrollmentValue, user]);
 
   const mutation = useMutation({
     mutationFn: (data: ProfileFields) => api.put<any>("/profile", data),
@@ -180,20 +212,17 @@ export default function ProfileSetupPage() {
   const isStudent = user.role === "student";
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center p-6 bg-background relative overflow-hidden">
-      {/* Ambient glow */}
-      <div className="absolute size-[500px] rounded-full bg-blue-500/10 blur-[100px] pointer-events-none" />
-
-      <div className="w-full max-w-[540px] p-8 rounded-3xl glass-card flex flex-col gap-6 relative transition-all duration-300">
+    <div className="flex min-h-screen flex-col items-center justify-center p-4 sm:p-6 bg-background relative select-none">
+      <div className="w-full max-w-[540px] p-6 sm:p-8 rounded-2xl bg-card text-card-foreground border border-border/80 shadow-lg flex flex-col gap-5 relative">
         {/* Header */}
-        <div className="flex flex-col items-center gap-1 text-center">
+        <div className="flex flex-col items-center gap-1.5 text-center">
           <img
             src="/logo.png"
             alt="eJournal Logo"
-            className="h-16 w-auto object-contain mb-2"
+            className="h-12 w-auto object-contain mb-1"
           />
-          <h2 className="text-2xl font-bold tracking-tight">Setup Profile</h2>
-          <p className="text-sm text-muted-foreground">
+          <h2 className="text-xl font-bold tracking-tight text-foreground font-serif">Setup profile</h2>
+          <p className="text-xs text-muted-foreground">
             Complete your academic information as a{" "}
             <span className="font-semibold text-foreground capitalize">{user.role}</span>
           </p>
@@ -202,7 +231,7 @@ export default function ProfileSetupPage() {
         {/* Form */}
         <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
           {errorMsg && (
-            <div className="p-3 rounded-xl bg-destructive/10 text-destructive text-xs font-semibold border border-destructive/20 flex items-center gap-2">
+            <div className="p-2.5 rounded-md bg-destructive/10 text-destructive text-xs font-medium border border-destructive/20 flex items-center gap-2">
               <AlertCircle className="size-4 shrink-0" />
               <span>{errorMsg}</span>
             </div>
@@ -210,24 +239,26 @@ export default function ProfileSetupPage() {
 
           {/* Full Name */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold text-muted-foreground">Full Name</label>
+            <label className="text-xs font-medium text-muted-foreground">Full name</label>
             <input
               type="text"
               placeholder="e.g. John Doe"
-              className="h-10 rounded-2xl border border-input bg-card px-3.5 py-2 text-xs ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              className="h-10 rounded-xl border border-input bg-muted/40 focus:bg-background px-3.5 py-2 text-xs text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary transition-all"
               {...register("name")}
             />
-            {errors.name && <span className="text-xs text-destructive">{errors.name.message}</span>}
+            {errors.name && (
+              <span className="text-xs text-destructive">{errors.name.message}</span>
+            )}
           </div>
 
-          {/* Department (Dropdown with all CHARUSAT departments) */}
+          {/* Department Dropdown */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold text-muted-foreground">Academic Department</label>
+            <label className="text-xs font-medium text-muted-foreground">Academic department</label>
             <CustomSelect
               value={departmentValue || ""}
               onChange={(val) => setValue("department", val, { shouldValidate: true })}
               options={CHARUSAT_DEPARTMENTS}
-              placeholder="Select Academic Department"
+              placeholder="Select Department"
               className="w-full text-xs"
             />
             {errors.department && (
@@ -235,13 +266,13 @@ export default function ProfileSetupPage() {
             )}
           </div>
 
-          {/* Student-Specific Academic Fields */}
+          {/* Student-Specific Fields */}
           {isStudent && (
             <>
               {/* Semester & Division */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-semibold text-muted-foreground">Semester</label>
+                  <label className="text-xs font-medium text-muted-foreground">Current semester</label>
                   <CustomSelect
                     value={semesterValue || ""}
                     onChange={(val) => setValue("semester", val, { shouldValidate: true })}
@@ -255,17 +286,16 @@ export default function ProfileSetupPage() {
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-semibold text-muted-foreground">Division (Numeric Only)</label>
+                  <label className="text-xs font-medium text-muted-foreground">Class division</label>
                   <input
                     type="text"
-                    inputMode="numeric"
-                    placeholder="e.g. 1, 2, 3"
+                    placeholder="e.g. 5CE-IT, D1"
                     value={divisionValue}
                     onChange={(e) => {
-                      const digits = e.target.value.replace(/[^0-9]/g, "");
-                      setValue("division", digits, { shouldValidate: true });
+                      const clean = e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, "");
+                      setValue("division", clean, { shouldValidate: true });
                     }}
-                    className="h-10 rounded-2xl border border-input bg-card px-3.5 py-2 text-xs ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary font-mono"
+                    className="h-10 rounded-xl border border-input bg-muted/40 focus:bg-background px-3.5 py-2 text-xs text-foreground uppercase font-mono font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary transition-all"
                   />
                   {errors.division && (
                     <span className="text-xs text-destructive">{errors.division.message}</span>
@@ -274,10 +304,10 @@ export default function ProfileSetupPage() {
               </div>
 
               {/* Enrollment Number & Academic Batch */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="flex flex-col gap-1.5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div className="flex flex-col gap-1">
                   <div className="flex items-center justify-between">
-                    <label className="text-xs font-semibold text-muted-foreground">Enrollment Number</label>
+                    <label className="text-xs font-medium text-muted-foreground">Enrollment number</label>
                     {isCheckingEnrollment && (
                       <span className="text-[10px] text-muted-foreground flex items-center gap-1">
                         <Loader2 className="size-3 animate-spin text-primary" />
@@ -290,7 +320,9 @@ export default function ProfileSetupPage() {
                       type="text"
                       placeholder="e.g. 24CS064"
                       value={enrollmentValue}
+                      readOnly={isEnrollmentLocked}
                       onChange={(e) => {
+                        if (isEnrollmentLocked) return;
                         const clean = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "");
                         setValue("enrollmentNumber", clean, { shouldValidate: true });
                         setIsEnrollmentAvailable(null);
@@ -302,22 +334,30 @@ export default function ProfileSetupPage() {
                           setEnrollmentError(null);
                         }
                       }}
-                      className={`w-full h-10 rounded-2xl border bg-card px-3.5 pr-8 py-2 text-xs ring-offset-background focus-visible:outline-none focus-visible:ring-2 uppercase font-mono font-semibold transition-colors ${
-                        enrollmentError
-                          ? "border-destructive text-destructive focus-visible:ring-destructive"
+                      className={`w-full h-10 rounded-xl border px-3.5 pr-8 py-2 text-xs uppercase font-mono font-medium transition-colors ${
+                        isEnrollmentLocked
+                          ? "bg-muted/70 border-border text-muted-foreground cursor-not-allowed select-none"
+                          : enrollmentError
+                          ? "bg-background border-destructive text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive"
                           : isEnrollmentAvailable
-                          ? "border-emerald-500/50 text-emerald-600 focus-visible:ring-emerald-500"
-                          : "border-input text-foreground focus-visible:ring-primary"
+                          ? "bg-background border-emerald-500/50 text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+                          : "bg-muted/40 focus:bg-background border-input text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary"
                       }`}
                     />
-                    {isEnrollmentAvailable && !enrollmentError && (
-                      <CheckCircle2 className="size-4 text-emerald-500 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                    )}
-                    {enrollmentError && (
-                      <AlertCircle className="size-4 text-destructive absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                    )}
+                    {isEnrollmentLocked ? (
+                      <Lock className="size-3.5 text-muted-foreground absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    ) : isEnrollmentAvailable && !enrollmentError ? (
+                      <CheckCircle2 className="size-3.5 text-emerald-600 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    ) : enrollmentError ? (
+                      <AlertCircle className="size-3.5 text-destructive absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    ) : null}
                   </div>
-                  {enrollmentError ? (
+                  {isEnrollmentLocked ? (
+                    <span className="text-[10px] text-muted-foreground font-medium flex items-center gap-1">
+                      <Lock className="size-2.5 shrink-0 text-primary" />
+                      Assigned by university administration (Read-only)
+                    </span>
+                  ) : enrollmentError ? (
                     <span className="text-[11px] text-destructive font-medium flex items-center gap-1">
                       <ShieldAlert className="size-3 shrink-0" />
                       {enrollmentError}
@@ -328,7 +368,7 @@ export default function ProfileSetupPage() {
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-semibold text-muted-foreground">Academic Batch</label>
+                  <label className="text-xs font-medium text-muted-foreground">Academic batch</label>
                   <input
                     type="text"
                     placeholder="e.g. A1, B2"
@@ -337,7 +377,7 @@ export default function ProfileSetupPage() {
                       const clean = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "");
                       setValue("batch", clean, { shouldValidate: true });
                     }}
-                    className="h-10 rounded-2xl border border-input bg-card px-3.5 py-2 text-xs ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary uppercase font-mono font-semibold"
+                    className="h-10 rounded-xl border border-input bg-muted/40 focus:bg-background px-3.5 py-2 text-xs text-foreground uppercase font-mono font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary transition-all"
                   />
                   <span className="text-[10px] text-muted-foreground">Uppercase alphanumeric only (e.g. A1)</span>
                 </div>
@@ -347,22 +387,22 @@ export default function ProfileSetupPage() {
 
           {/* Teacher-Specific Fields */}
           {!isStudent && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-muted-foreground">Faculty ID</label>
+                <label className="text-xs font-medium text-muted-foreground">Faculty ID</label>
                 <input
                   type="text"
                   placeholder="e.g. FT1029"
-                  className="h-10 rounded-2xl border border-input bg-card px-3.5 py-2 text-xs uppercase font-mono font-semibold ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  className="h-10 rounded-xl border border-input bg-muted/40 focus:bg-background px-3.5 py-2 text-xs uppercase font-mono font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary transition-all"
                   {...register("facultyId")}
                 />
               </div>
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-muted-foreground">Designation</label>
+                <label className="text-xs font-medium text-muted-foreground">Designation</label>
                 <input
                   type="text"
                   placeholder="e.g. Assistant Professor"
-                  className="h-10 rounded-2xl border border-input bg-card px-3.5 py-2 text-xs ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  className="h-10 rounded-xl border border-input bg-muted/40 focus:bg-background px-3.5 py-2 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary transition-all"
                   {...register("designation")}
                 />
               </div>
@@ -371,7 +411,7 @@ export default function ProfileSetupPage() {
 
           {/* Constituent Institute (Dropdown with all 9 CHARUSAT Institutes) */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold text-muted-foreground">Constituent Institute (College)</label>
+            <label className="text-xs font-medium text-muted-foreground">Constituent institute (College)</label>
             <CustomSelect
               value={collegeValue || ""}
               onChange={(val) => setValue("college", val, { shouldValidate: true })}
@@ -386,28 +426,28 @@ export default function ProfileSetupPage() {
 
           {/* University (Locked to CHARUSAT) */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold text-muted-foreground">University</label>
+            <label className="text-xs font-medium text-muted-foreground">University</label>
             <input
               type="text"
               readOnly
               value={CHARUSAT_UNIVERSITY_NAME}
-              className="h-10 rounded-2xl border border-border/80 bg-muted/40 px-3.5 py-2 text-xs text-muted-foreground select-none cursor-not-allowed font-medium"
+              className="h-10 rounded-xl border border-border bg-muted/60 px-3.5 py-2 text-xs text-muted-foreground select-none cursor-not-allowed font-medium"
             />
           </div>
 
           <Button
             type="submit"
-            size="lg"
-            className="w-full mt-4 rounded-2xl font-bold cursor-pointer transition-all"
+            size="default"
+            className="w-full mt-3 h-10 rounded-xl font-semibold text-xs glass-btn-indigo-solid active:scale-[0.98] transition-all cursor-pointer shadow-xs"
             disabled={mutation.isPending || isCheckingEnrollment || !!enrollmentError}
           >
             {mutation.isPending ? (
               <span className="flex items-center gap-2">
-                <Loader2 className="size-4 animate-spin" />
-                Saving Profile...
+                <Loader2 className="size-3.5 animate-spin" />
+                Saving profile...
               </span>
             ) : (
-              "Save Profile & Continue"
+              "Save profile & continue"
             )}
           </Button>
         </form>

@@ -1,6 +1,7 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Users,
   GraduationCap,
@@ -15,12 +16,15 @@ import {
   ArrowUpRight,
   ShieldCheck,
   RefreshCw,
+  ArrowRight,
+  FileEdit,
 } from "lucide-react";
 import Link from "next/link";
 
 import { api } from "@/lib/api";
-import { formatTimeIST, formatDateTimeIST } from "@/lib/date";
+import { formatTimeIST, formatDateTimeIST, formatRelativeTimeIST } from "@/lib/date";
 import { Button } from "@/components/ui/button";
+import { AdminProfileEditorModal } from "@/components/admin/admin-profile-editor-modal";
 
 function getActionBadge(action: string) {
   const act = (action || "").toUpperCase();
@@ -28,14 +32,14 @@ function getActionBadge(action: string) {
   // 1. Session & Auth
   if (act.includes("LOGGED_IN") || act.includes("LOGIN")) {
     return (
-      <span className="px-2.5 py-0.5 rounded-md bg-emerald-500/12 text-emerald-700 dark:text-emerald-400 font-mono text-[10px] font-extrabold border border-emerald-500/30">
+      <span className="px-2.5 py-0.5 rounded-md bg-emerald-500/12 text-emerald-700 dark:text-emerald-400 text-[10px] font-bold tracking-wide uppercase border border-emerald-500/30">
         {action}
       </span>
     );
   }
   if (act.includes("LOGGED_OUT") || act.includes("LOGOUT")) {
     return (
-      <span className="px-2.5 py-0.5 rounded-md bg-slate-500/12 text-slate-700 dark:text-slate-400 font-mono text-[10px] font-bold border border-slate-500/25">
+      <span className="px-2.5 py-0.5 rounded-md bg-slate-500/12 text-slate-700 dark:text-slate-400 text-[10px] font-bold tracking-wide uppercase border border-slate-500/25">
         {action}
       </span>
     );
@@ -44,7 +48,7 @@ function getActionBadge(action: string) {
   // 2. Security & Credentials
   if (act.includes("PASSWORD") || act.includes("RESET")) {
     return (
-      <span className="px-2.5 py-0.5 rounded-md bg-sky-500/12 text-sky-700 dark:text-sky-400 font-mono text-[10px] font-extrabold border border-sky-500/30">
+      <span className="px-2.5 py-0.5 rounded-md bg-sky-500/12 text-sky-700 dark:text-sky-400 text-[10px] font-bold tracking-wide uppercase border border-sky-500/30">
         {action}
       </span>
     );
@@ -53,7 +57,7 @@ function getActionBadge(action: string) {
   // 3. Faculty Onboarding / Provisioning
   if (act.includes("FACULTY")) {
     return (
-      <span className="px-2.5 py-0.5 rounded-md bg-purple-500/12 text-purple-700 dark:text-purple-400 font-mono text-[10px] font-extrabold border border-purple-500/30">
+      <span className="px-2.5 py-0.5 rounded-md bg-purple-500/12 text-purple-700 dark:text-purple-400 text-[10px] font-bold tracking-wide uppercase border border-purple-500/30">
         {action}
       </span>
     );
@@ -62,7 +66,7 @@ function getActionBadge(action: string) {
   // 4. Classroom Operations & Management
   if (act.includes("CLASSROOM") || act.includes("REASSIGNED")) {
     return (
-      <span className="px-2.5 py-0.5 rounded-md bg-amber-500/12 text-amber-700 dark:text-amber-400 font-mono text-[10px] font-extrabold border border-amber-500/30">
+      <span className="px-2.5 py-0.5 rounded-md bg-amber-500/12 text-amber-700 dark:text-amber-400 text-[10px] font-bold tracking-wide uppercase border border-amber-500/30">
         {action}
       </span>
     );
@@ -71,7 +75,7 @@ function getActionBadge(action: string) {
   // 5. Account Lifecycle / Suspension
   if (act.includes("STATUS") || act.includes("SUSPEND") || act.includes("DELETE") || act.includes("ARCHIVE")) {
     return (
-      <span className="px-2.5 py-0.5 rounded-md bg-rose-500/12 text-rose-700 dark:text-rose-400 font-mono text-[10px] font-extrabold border border-rose-500/30">
+      <span className="px-2.5 py-0.5 rounded-md bg-rose-500/12 text-rose-700 dark:text-rose-400 text-[10px] font-bold tracking-wide uppercase border border-rose-500/30">
         {action}
       </span>
     );
@@ -80,7 +84,7 @@ function getActionBadge(action: string) {
   // 6. Journal & Academic Workflows
   if (act.includes("JOURNAL") || act.includes("SUBMITTED") || act.includes("APPROVED")) {
     return (
-      <span className="px-2.5 py-0.5 rounded-md bg-blue-500/12 text-blue-700 dark:text-blue-400 font-mono text-[10px] font-extrabold border border-blue-500/30">
+      <span className="px-2.5 py-0.5 rounded-md bg-blue-500/12 text-blue-700 dark:text-blue-400 text-[10px] font-bold tracking-wide uppercase border border-blue-500/30">
         {action}
       </span>
     );
@@ -89,25 +93,41 @@ function getActionBadge(action: string) {
   // 7. General Registration
   if (act.includes("REGISTER")) {
     return (
-      <span className="px-2.5 py-0.5 rounded-md bg-indigo-500/12 text-indigo-700 dark:text-indigo-400 font-mono text-[10px] font-extrabold border border-indigo-500/30">
+      <span className="px-2.5 py-0.5 rounded-md bg-indigo-500/12 text-indigo-700 dark:text-indigo-400 text-[10px] font-bold tracking-wide uppercase border border-indigo-500/30">
         {action}
       </span>
     );
   }
 
   return (
-    <span className="px-2.5 py-0.5 rounded-md bg-muted text-foreground font-mono text-[10px] font-semibold border border-border">
+    <span className="px-2.5 py-0.5 rounded-md bg-muted text-foreground text-[10px] font-semibold tracking-wide uppercase border border-border">
       {action}
     </span>
   );
 }
 
 export default function AdminDashboardPage() {
+  const queryClient = useQueryClient();
+
   const { data: stats, isLoading, refetch, isRefetching } = useQuery<any>({
     queryKey: ["admin-stats"],
     queryFn: () => api.get("/admin/stats"),
     refetchInterval: 15000, // Auto-refresh every 15s
   });
+
+  // Query pending profile correction requests
+  const { data: pendingRequestsData, refetch: refetchRequests } = useQuery<any>({
+    queryKey: ["admin-pending-profile-requests"],
+    queryFn: () => api.get("/admin/profile-requests"),
+    refetchInterval: 15000,
+  });
+
+  const pendingRequestsList: any[] = pendingRequestsData?.items || [];
+
+  // Profile Editor modal states
+  const [selectedStudentForEdit, setSelectedStudentForEdit] = useState<any>(null);
+  const [selectedPendingRequest, setSelectedPendingRequest] = useState<any>(null);
+  const [showProfileEditorModal, setShowProfileEditorModal] = useState(false);
 
   const kpis = [
     {
@@ -216,6 +236,121 @@ export default function AdminDashboardPage() {
         </div>
       </div>
 
+      {/* Action Required: Profile Correction Requests Under Administrative Review */}
+      {pendingRequestsList.length > 0 && (
+        <div className="rounded-3xl border border-amber-500/30 bg-amber-500/[0.08] dark:bg-amber-500/[0.04] p-5 space-y-4 animate-in fade-in duration-200">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-amber-500/20 pb-3">
+            <div className="flex items-center gap-2.5">
+              <div className="size-8 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-700 dark:text-amber-400 shrink-0">
+                <Clock className="size-4" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h2 className="text-sm font-bold text-foreground">
+                    Action Required: Profile Correction Requests
+                  </h2>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold font-mono uppercase bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-500/30">
+                    {pendingRequestsList.length} Pending Review
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Students have requested corrections to governed academic identity credentials
+                </p>
+              </div>
+            </div>
+
+            <Link
+              href="/admin/students?filter=pending_correction"
+              className="text-xs font-semibold text-amber-700 dark:text-amber-400 hover:underline flex items-center gap-1 self-start sm:self-auto"
+            >
+              <span>View in Student Directory</span>
+              <ArrowUpRight className="size-3.5" />
+            </Link>
+          </div>
+
+          {/* Cards for pending requests */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+            {pendingRequestsList.map((req: any) => (
+              <div
+                key={req.id}
+                className="p-4 rounded-2xl bg-card border border-border/80 shadow-xs flex flex-col justify-between gap-3 text-xs"
+              >
+                <div className="space-y-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <span className="font-bold text-foreground text-sm font-serif">
+                        {req.studentName || "Student"}
+                      </span>
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-mono mt-0.5">
+                        <span className="font-semibold text-foreground">{req.currentEnrollmentNumber || "—"}</span>
+                        <span>•</span>
+                        <span className="font-sans truncate">{req.department || "General"}</span>
+                      </div>
+                    </div>
+                    <span className="text-[10px] text-muted-foreground font-medium shrink-0">
+                      {formatRelativeTimeIST(req.createdAt)}
+                    </span>
+                  </div>
+
+                  {/* Diff Badge */}
+                  <div className="p-2.5 rounded-xl bg-muted/40 border border-border/60 flex flex-col gap-1">
+                    <span className="text-[10px] text-muted-foreground uppercase font-semibold">
+                      Requested {req.field} Modification
+                    </span>
+                    <div className="flex items-center gap-2 font-mono text-xs flex-wrap">
+                      <span className="line-through text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded">
+                        {req.currentValue || "(Empty)"}
+                      </span>
+                      <ArrowRight className="size-3 text-muted-foreground" />
+                      <span className="text-emerald-700 dark:text-emerald-400 font-bold bg-emerald-500/15 border border-emerald-500/30 px-1.5 py-0.5 rounded">
+                        {req.requestedValue}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Student Reason */}
+                  {req.reason && (
+                    <p className="text-xs text-muted-foreground italic line-clamp-2">
+                      &ldquo;{req.reason}&rdquo;
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-between pt-2 border-t border-border/60">
+                  <span className="text-[10px] text-muted-foreground">
+                    {req.bumpCount > 0 ? `${req.bumpCount} reminder(s) sent` : "Awaiting initial review"}
+                  </span>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      setSelectedPendingRequest(req);
+                      setSelectedStudentForEdit({
+                        id: req.userId,
+                        email: req.studentEmail || "",
+                        profile: {
+                          name: req.studentName,
+                          enrollmentNumber: req.currentEnrollmentNumber,
+                          department: req.department,
+                          college: req.college,
+                          semester: req.semester,
+                          division: req.division,
+                          batch: req.batch,
+                        },
+                      });
+                      setShowProfileEditorModal(true);
+                    }}
+                    className="h-7.5 px-3 rounded-lg text-xs font-semibold gap-1.5 cursor-pointer bg-amber-600 hover:bg-amber-700 text-white shadow-xs active:scale-[0.98]"
+                  >
+                    <FileEdit className="size-3" />
+                    <span>Review & Resolve</span>
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* KPI Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {kpis.map((kpi, idx) => {
@@ -272,14 +407,14 @@ export default function AdminDashboardPage() {
                   <p className="text-xs font-bold text-foreground truncate">
                     MongoDB {stats?.health?.database?.name ? `(${stats.health.database.name})` : "Atlas"}
                   </p>
-                  <p className="text-[10px] text-muted-foreground font-mono truncate">
+                  <p className="text-[10px] text-muted-foreground truncate">
                     {stats?.health?.database?.host || "eJournal Primary Datastore"}
                   </p>
                 </div>
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 {stats?.health?.database?.latencyMs != null && (
-                  <span className="px-1.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] font-mono font-bold border border-emerald-500/20">
+                  <span className="px-1.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold tabular-nums border border-emerald-500/20">
                     {stats.health.database.latencyMs}ms
                   </span>
                 )}
@@ -301,14 +436,14 @@ export default function AdminDashboardPage() {
                 <Zap className="size-4 text-amber-500 shrink-0" />
                 <div className="min-w-0">
                   <p className="text-xs font-bold text-foreground truncate">Redis Cache & Rate Limiter</p>
-                  <p className="text-[10px] text-muted-foreground font-mono truncate">
+                  <p className="text-[10px] text-muted-foreground truncate">
                     {stats?.health?.redis?.host || "Session storage"}
                   </p>
                 </div>
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 {stats?.health?.redis?.latencyMs != null && (
-                  <span className="px-1.5 py-0.5 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[10px] font-mono font-bold border border-amber-500/20">
+                  <span className="px-1.5 py-0.5 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[10px] font-bold tabular-nums border border-amber-500/20">
                     {stats.health.redis.latencyMs}ms
                   </span>
                 )}
@@ -384,13 +519,13 @@ export default function AdminDashboardPage() {
                       by <strong className="text-foreground">{event.userEmail || "System"}</strong>
                     </span>
                     {event.ipAddress && (
-                      <span className="text-[10px] text-muted-foreground/60 hidden sm:inline font-mono">
+                      <span className="text-[10px] text-muted-foreground/60 hidden sm:inline">
                         ({event.ipAddress})
                       </span>
                     )}
                   </div>
                   <span
-                    className="text-[11px] text-muted-foreground shrink-0 font-medium font-mono"
+                    className="text-[11px] text-muted-foreground shrink-0 font-medium"
                     title={formatDateTimeIST(event.timestamp)}
                   >
                     {formatTimeIST(event.timestamp, false)}
@@ -401,6 +536,26 @@ export default function AdminDashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* Admin Profile Editor & Correction Modal */}
+      {showProfileEditorModal && selectedStudentForEdit && (
+        <AdminProfileEditorModal
+          isOpen={showProfileEditorModal}
+          onClose={() => {
+            setShowProfileEditorModal(false);
+            setSelectedStudentForEdit(null);
+            setSelectedPendingRequest(null);
+          }}
+          student={selectedStudentForEdit}
+          pendingRequest={selectedPendingRequest}
+          onSuccess={() => {
+            refetchRequests();
+            queryClient.invalidateQueries({ queryKey: ["admin-pending-profile-requests"] });
+            queryClient.invalidateQueries({ queryKey: ["admin-students"] });
+            queryClient.invalidateQueries({ queryKey: ["admin-stats"] });
+          }}
+        />
+      )}
     </div>
   );
 }

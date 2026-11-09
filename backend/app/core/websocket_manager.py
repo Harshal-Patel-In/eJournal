@@ -71,6 +71,21 @@ class ConnectionManager:
         if tasks:
             await asyncio.gather(*tasks, return_exceptions=True)
 
+    async def close_all(self) -> None:
+        """Gracefully close all active WebSockets on server reload or shutdown."""
+        async with self._lock:
+            all_sockets = [
+                ws for sockets in self.active_connections.values() for ws in sockets
+            ]
+            self.active_connections.clear()
+
+        for ws in all_sockets:
+            try:
+                await ws.close(code=1001, reason="Server reloading or shutting down")
+            except Exception:
+                pass
+        logger.info(f"Closed {len(all_sockets)} active WebSockets for server shutdown.")
+
 
 # Global singleton instance
 websocket_manager = ConnectionManager()

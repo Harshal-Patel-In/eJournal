@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   GraduationCap,
@@ -14,6 +15,10 @@ import {
   AlertTriangle,
   AlertCircle,
   Clock,
+  UserPlus,
+  UserCheck,
+  UserX,
+  FileEdit,
 } from "lucide-react";
 
 import { api } from "@/lib/api";
@@ -21,6 +26,8 @@ import { toast } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
 import { CustomSelect } from "@/components/ui/custom-select";
 import { CHARUSAT_DEPARTMENTS } from "@/lib/academic-constants";
+import { BulkStudentImportModal } from "@/components/admin/bulk-student-import-modal";
+import { AdminProfileEditorModal } from "@/components/admin/admin-profile-editor-modal";
 
 const DEPARTMENT_OPTIONS = [
   { value: "", label: "All Academic Departments" },
@@ -29,6 +36,7 @@ const DEPARTMENT_OPTIONS = [
 
 const STATUS_OPTIONS = [
   { value: "", label: "All Account Statuses" },
+  { value: "pending_correction", label: "Correction Requested (Profile)" },
   { value: "active", label: "Active" },
   { value: "pending_setup", label: "Setup Pending (Incomplete Profile)" },
   { value: "unverified", label: "Unverified (Pending OTP)" },
@@ -44,10 +52,45 @@ export default function AdminStudentsPage() {
   const [showResetModal, setShowResetModal] = useState<any>(null);
   const [deleteConfirmUser, setDeleteConfirmUser] = useState<any>(null);
   const [copiedKey, setCopiedKey] = useState(false);
+  const [showBulkModal, setShowBulkModal] = useState(false);
+
+  // Profile Editor modal states
+  const [selectedStudentForEdit, setSelectedStudentForEdit] = useState<any>(null);
+  const [selectedPendingRequest, setSelectedPendingRequest] = useState<any>(null);
+  const [showProfileEditorModal, setShowProfileEditorModal] = useState(false);
+
+  const searchParams = useSearchParams();
+  const requestIdParam = searchParams.get("requestId");
+  const handledRequestIdRef = useRef<string | null>(null);
+
+  // Helper to cleanly purge requestId from browser URL state
+  const clearRequestIdFromUrl = useCallback(() => {
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    if (url.searchParams.has("requestId")) {
+      url.searchParams.delete("requestId");
+      window.history.replaceState(null, "", url.pathname + (url.search ? url.search : ""));
+    }
+  }, []);
+
+  // Fetch pending correction requests
+  const { data: pendingRequestsData } = useQuery<any>({
+    queryKey: ["admin-pending-profile-requests"],
+    queryFn: () => api.get("/admin/profile-requests"),
+  });
+
+  const pendingRequestsList: any[] = pendingRequestsData?.items || [];
+  const pendingRequestByUserId = useMemo(() => {
+    const map = new Map<string, any>();
+    for (const req of pendingRequestsList) {
+      if (req.userId) map.set(req.userId, req);
+    }
+    return map;
+  }, [pendingRequestsList]);
 
   // Fetch students
   const { data, isLoading, refetch, isRefetching } = useQuery<any>({
-    queryKey: ["admin-students", search, department, statusFilter, page],
+    queryKey: ["admin-students", search, department, statusFilter === "pending_correction" ? "" : statusFilter, page],
     queryFn: () => {
       const params = new URLSearchParams({
         role: "student",
@@ -56,10 +99,53 @@ export default function AdminStudentsPage() {
       });
       if (search) params.set("search", search);
       if (department) params.set("department", department);
-      if (statusFilter) params.set("status", statusFilter);
+      if (statusFilter && statusFilter !== "pending_correction") {
+        params.set("status", statusFilter);
+      }
       return api.get(`/admin/users?${params.toString()}`);
     },
   });
+
+  // Auto-open modal if requestId is passed in URL (fires once per requestId, never on search typing)
+  useEffect(() => {
+    if (!requestIdParam) return;
+    if (handledRequestIdRef.current === requestIdParam) return;
+
+    if (pendingRequestsList.length > 0) {
+      const match = pendingRequestsList.find((r) => r.id === requestIdParam);
+      if (match) {
+        handledRequestIdRef.current = requestIdParam;
+        setSelectedPendingRequest(match);
+        const matchingUser = data?.users?.find((u: any) => u.id === match.userId);
+        setSelectedStudentForEdit(
+          matchingUser || {
+            id: match.userId,
+            email: match.studentEmail || "",
+            profile: {
+              name: match.studentName || "",
+              enrollmentNumber: match.currentEnrollmentNumber || "",
+              department: match.department || "",
+              college: match.college || "",
+              semester: match.semester || "",
+              division: match.division || "",
+              batch: match.batch || "",
+            },
+          }
+        );
+        setShowProfileEditorModal(true);
+        clearRequestIdFromUrl();
+      }
+    }
+  }, [requestIdParam, pendingRequestsList, data?.users, clearRequestIdFromUrl]);
+
+  // Filter users client-side if pending_correction is selected
+  const displayedUsers = useMemo(() => {
+    const users = data?.users || [];
+    if (statusFilter === "pending_correction") {
+      return users.filter((u: any) => pendingRequestByUserId.has(u.id));
+    }
+    return users;
+  }, [data?.users, statusFilter, pendingRequestByUserId]);
 
   // Toggle Status Mutation
   const statusMutation = useMutation({
@@ -120,16 +206,27 @@ export default function AdminStudentsPage() {
           </p>
         </div>
 
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => refetch()}
-          disabled={isRefetching}
-          className="rounded-xl text-xs font-semibold gap-1.5 cursor-pointer self-start sm:self-auto"
-        >
-          <RefreshCw className={`size-3.5 ${isRefetching ? "animate-spin" : ""}`} />
-          <span>Refresh Directory</span>
-        </Button>
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+          <Button
+            size="sm"
+            onClick={() => setShowBulkModal(true)}
+            className="rounded-xl text-xs font-bold gap-1.5 cursor-pointer shadow-xs"
+          >
+            <UserPlus className="size-3.5" />
+            <span>Bulk Onboard Students</span>
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => refetch()}
+            disabled={isRefetching}
+            className="rounded-xl text-xs font-semibold gap-1.5 cursor-pointer"
+          >
+            <RefreshCw className={`size-3.5 ${isRefetching ? "animate-spin" : ""}`} />
+            <span>Refresh</span>
+          </Button>
+        </div>
       </div>
 
       {/* Search, Department & Status Filters */}
@@ -194,18 +291,24 @@ export default function AdminStudentsPage() {
                     Loading student directory...
                   </td>
                 </tr>
-              ) : !data?.users || data.users.length === 0 ? (
+              ) : !displayedUsers || displayedUsers.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="py-12 text-center text-muted-foreground">
                     No students found matching your search.
                   </td>
                 </tr>
               ) : (
-                data.users.map((s: any) => {
+                displayedUsers.map((s: any) => {
                   const isSuspended = s.status === "suspended";
                   const isUnverified = s.is_verified === false;
                   const profile = s.profile || {};
-                  const isPendingSetup = !isUnverified && (!profile.enrollmentNumber || s.is_profile_complete === false);
+                  const isPendingSetup =
+                    !isUnverified &&
+                    (s.status === "pending_setup" ||
+                      s.must_change_password === true ||
+                      s.is_profile_complete === false ||
+                      !profile.enrollmentNumber);
+                  const pendingReq = pendingRequestByUserId.get(s.id);
                   return (
                     <tr
                       key={s.id}
@@ -216,7 +319,22 @@ export default function AdminStudentsPage() {
                       <td className="py-3.5 px-5">
                         <div className="flex flex-col">
                           <span className="font-bold text-foreground text-xs">{profile.name || "Enrolled Student"}</span>
-                          <span className="text-[11px] text-muted-foreground font-mono">{s.email}</span>
+                          <span className="text-[11px] text-muted-foreground">{s.email}</span>
+                          {pendingReq && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedStudentForEdit(s);
+                                setSelectedPendingRequest(pendingReq);
+                                setShowProfileEditorModal(true);
+                              }}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30 hover:bg-amber-500/25 transition-colors cursor-pointer w-fit mt-1"
+                              title="Click to review requested correction"
+                            >
+                              <Clock className="size-2.5" />
+                              <span>Correction Requested ({pendingReq.field})</span>
+                            </button>
+                          )}
                           {isUnverified && (
                             <span className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold mt-0.5">
                               Unverified registration (No OTP submitted)
@@ -225,21 +343,20 @@ export default function AdminStudentsPage() {
                           {isPendingSetup && (
                             <span className="inline-flex items-center gap-1 text-[10px] text-amber-600 dark:text-amber-400 font-semibold mt-0.5">
                               <AlertCircle className="size-3 shrink-0" />
-                              Academic onboarding incomplete
+                              {s.must_change_password
+                                ? "Awaiting first login & password change"
+                                : "Academic onboarding incomplete"}
                             </span>
                           )}
                         </div>
                       </td>
-                      <td className="py-3.5 px-4 font-mono text-xs font-semibold text-foreground">
-                        {isUnverified ? (
-                          <span className="text-muted-foreground font-normal">—</span>
-                        ) : isPendingSetup ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/25">
-                            <AlertCircle className="size-3 shrink-0" />
-                            Pending Setup
+                      <td className="py-3.5 px-4 text-xs font-semibold tracking-tight text-foreground">
+                        {profile.enrollmentNumber || profile.rollNumber ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-muted/60 text-foreground font-semibold text-[11px]">
+                            {profile.enrollmentNumber || profile.rollNumber}
                           </span>
                         ) : (
-                          profile.enrollmentNumber || profile.rollNumber || "—"
+                          <span className="text-muted-foreground font-normal">—</span>
                         )}
                       </td>
                       <td className="py-3.5 px-4">
@@ -275,6 +392,21 @@ export default function AdminStudentsPage() {
                       </td>
                       <td className="py-3.5 px-5 text-right whitespace-nowrap">
                         <div className="flex items-center justify-end gap-1.5">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedStudentForEdit(s);
+                              setSelectedPendingRequest(pendingReq || null);
+                              setShowProfileEditorModal(true);
+                            }}
+                            className="h-7 px-2.5 rounded-xl text-[11px] font-semibold cursor-pointer"
+                            title="Edit Academic Profile"
+                          >
+                            <FileEdit className="size-3 mr-1 text-primary" />
+                            <span>Edit</span>
+                          </Button>
+
                           {!isUnverified && (
                             <Button
                               variant="outline"
@@ -289,6 +421,11 @@ export default function AdminStudentsPage() {
                               disabled={statusMutation.isPending}
                               className="h-7 px-2.5 rounded-xl text-[11px] font-semibold cursor-pointer"
                             >
+                              {isSuspended ? (
+                                <UserCheck className="size-3 mr-1" />
+                              ) : (
+                                <UserX className="size-3 mr-1" />
+                              )}
                               <span>{isSuspended ? "Reactivate" : "Suspend"}</span>
                             </Button>
                           )}
@@ -296,7 +433,7 @@ export default function AdminStudentsPage() {
                           {!isUnverified && (
                             <Button
                               variant="outline"
-                              color="neutral"
+                              color="indigo"
                               size="sm"
                               onClick={() => resetMutation.mutate(s.id)}
                               disabled={resetMutation.isPending}
@@ -377,10 +514,11 @@ export default function AdminStudentsPage() {
               A temporary password has been issued and dispatched via email to the student:
             </p>
             <div className="flex items-center justify-between bg-muted/40 p-3 rounded-xl border border-border">
-              <code className="text-xs font-mono font-bold text-foreground">{showResetModal.temporaryPassword}</code>
+              <span className="text-xs font-semibold tracking-wider text-foreground select-all">{showResetModal.temporaryPassword}</span>
               <Button
                 size="sm"
                 variant="outline"
+                color="indigo"
                 onClick={() => copyToClipboard(showResetModal.temporaryPassword)}
                 className="rounded-xl text-xs gap-1.5 h-7 cursor-pointer"
               >
@@ -415,7 +553,7 @@ export default function AdminStudentsPage() {
             <div className="p-3.5 rounded-2xl bg-rose-500/5 border border-rose-500/20 text-xs text-foreground space-y-1.5">
               <p>
                 Are you sure you want to permanently delete student{" "}
-                <strong className="font-mono text-rose-600 dark:text-rose-400">
+                <strong className="font-semibold text-rose-600 dark:text-rose-400">
                   {deleteConfirmUser.email}
                 </strong>
                 ?
@@ -448,6 +586,38 @@ export default function AdminStudentsPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Bulk Student Onboarding & Data Staging Modal */}
+      {showBulkModal && (
+        <BulkStudentImportModal
+          isOpen={showBulkModal}
+          onClose={() => setShowBulkModal(false)}
+          onSuccess={() => {
+            refetch();
+            queryClient.invalidateQueries({ queryKey: ["admin-stats"] });
+          }}
+        />
+      )}
+
+      {/* Admin Profile Editor & Correction Modal */}
+      {showProfileEditorModal && selectedStudentForEdit && (
+        <AdminProfileEditorModal
+          isOpen={showProfileEditorModal}
+          onClose={() => {
+            setShowProfileEditorModal(false);
+            setSelectedStudentForEdit(null);
+            setSelectedPendingRequest(null);
+            clearRequestIdFromUrl();
+          }}
+          student={selectedStudentForEdit}
+          pendingRequest={selectedPendingRequest}
+          onSuccess={() => {
+            refetch();
+            queryClient.invalidateQueries({ queryKey: ["admin-pending-profile-requests"] });
+            queryClient.invalidateQueries({ queryKey: ["admin-students"] });
+          }}
+        />
       )}
     </div>
   );

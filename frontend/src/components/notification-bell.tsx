@@ -104,6 +104,16 @@ function getNotificationIntent(notif: any, isTeacher: boolean = true, hasJournal
 function getNormalizedExperimentGroup(notif: any): { id: string; name: string; sortIndex: number } {
   const text = `${notif.title || ""} ${notif.message || ""}`;
 
+  // 1. High-priority Administrative Action Requests (Always pinned to top)
+  if (
+    notif.category === "admin_request" ||
+    notif.type === "admin_request" ||
+    notif.entityType === "profile_change_request" ||
+    text.toLowerCase().includes("profile correction")
+  ) {
+    return { id: "admin_requests", name: "Administrative Action Requests", sortIndex: -1 };
+  }
+
   const expMatch = text.match(/Experiment\s*#?\s*(\d+)/i);
   if (expMatch && expMatch[1]) {
     const num = parseInt(expMatch[1], 10);
@@ -206,7 +216,7 @@ function getStudentAvatarInfo(name: string) {
   return { initials, ...palette };
 }
 
-export default function NotificationBell() {
+export function NotificationBell() {
   const [isOpen, setIsOpen] = useState(false);
   const [filterMode, setFilterMode] = useState<"all" | "unread">("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -403,6 +413,14 @@ export default function NotificationBell() {
                 if (targetJournalId) {
                   queryClient.invalidateQueries({ queryKey: ["annotations", targetJournalId] });
                 }
+              } else if (
+                notifType === "admin_request" ||
+                notif.category === "admin_request" ||
+                notif.entityType === "profile_change_request"
+              ) {
+                queryClient.invalidateQueries({ queryKey: ["admin-pending-profile-requests"] });
+                queryClient.invalidateQueries({ queryKey: ["admin-students"] });
+                queryClient.invalidateQueries({ queryKey: ["admin-stats"] });
               } else {
                 if (classroomId) {
                   queryClient.invalidateQueries({ queryKey: ["classroom", classroomId] });
@@ -771,6 +789,21 @@ export default function NotificationBell() {
               {cleanedMessage}
             </p>
           )}
+          {(notif.category === "admin_request" || notif.type === "admin_request" || notif.entityType === "profile_change_request") && (
+            <div className="mt-2 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleNotificationClick(notif);
+                }}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-amber-500/15 hover:bg-amber-500/25 text-amber-800 dark:text-amber-300 border border-amber-500/30 transition-all cursor-pointer active:scale-[0.98] shadow-xs"
+              >
+                <FileEdit className="size-3 text-amber-600 dark:text-amber-400" />
+                <span>Review & Edit Profile</span>
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Quick Actions & Trailing Affordance */}
@@ -882,6 +915,21 @@ export default function NotificationBell() {
                   {cleanedMessage}
                 </p>
               )}
+              {(topNotif.category === "admin_request" || topNotif.type === "admin_request" || topNotif.entityType === "profile_change_request") && (
+                <div className="mt-2 flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleNotificationClick(topNotif);
+                    }}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-amber-500/15 hover:bg-amber-500/25 text-amber-800 dark:text-amber-300 border border-amber-500/30 transition-all cursor-pointer active:scale-[0.98] shadow-xs"
+                  >
+                    <FileEdit className="size-3 text-amber-600 dark:text-amber-400" />
+                    <span>Review & Edit Profile</span>
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Quick Actions & Trailing Affordance */}
@@ -961,13 +1009,15 @@ export default function NotificationBell() {
         ref={triggerRef}
         onClick={() => setIsOpen(!isOpen)}
         aria-label="Open notifications"
-        className={`relative size-8 rounded-full glass-btn-violet flex items-center justify-center hover:scale-105 active:scale-95 transition-all cursor-pointer focus:outline-none ${
-          bellPulsing ? "ring-2 ring-violet-500 scale-110 shadow-[0_0_15px_rgba(139,92,246,0.6)]" : ""
+        className={`relative size-8 rounded-md glass-btn-elevated text-foreground flex items-center justify-center cursor-pointer focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 ${
+          bellPulsing ? "ring-2 ring-ring scale-105" : ""
         }`}
       >
-        <Bell className={`size-4 text-violet-600 dark:text-violet-400 ${bellPulsing ? "rotate-12 transition-transform" : ""}`} />
+        <Bell className={`size-4 text-foreground ${
+          bellPulsing ? "rotate-12 transition-transform" : ""
+        }`} />
         {unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-bold text-white shadow-[0_0_10px_rgba(244,63,94,0.6)] animate-pulse">
+          <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-mono font-bold text-primary-foreground shadow-2xs">
             {unreadCount}
           </span>
         )}
@@ -981,16 +1031,16 @@ export default function NotificationBell() {
             {/* Dimmed Backdrop */}
             <div
               onClick={() => setIsOpen(false)}
-              className="fixed inset-0 bg-black/40 backdrop-blur-md transition-opacity duration-300 animate-in fade-in pointer-events-auto"
+              className="fixed inset-0 bg-black/50 transition-opacity duration-200 animate-in fade-in pointer-events-auto"
             />
 
             {/* Apple Floating Island Drawer Panel: Continuous squircle curvature, perimeter border & layered depth */}
             <div
               ref={dropdownRef}
-              className="relative z-10 w-full sm:w-[480px] h-full max-h-[calc(100vh-20px)] sm:max-h-[calc(100vh-28px)] rounded-3xl bg-[#f8f9fa] dark:bg-[#0c0d0e] border border-zinc-200/90 dark:border-white/10 ring-1 ring-black/5 dark:ring-white/10 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3),_0_0_0_1px_rgba(255,255,255,0.4)] dark:shadow-[0_24px_70px_-15px_rgba(0,0,0,0.9),_0_0_0_1px_rgba(255,255,255,0.08)] flex flex-col select-none overflow-hidden animate-in slide-in-from-right duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] pointer-events-auto"
+              className="relative z-10 w-full sm:w-[460px] h-full max-h-[calc(100vh-20px)] sm:max-h-[calc(100vh-28px)] rounded-lg bg-card text-card-foreground border border-border shadow-2xl flex flex-col select-none overflow-hidden animate-in slide-in-from-right duration-200 ease-out pointer-events-auto"
             >
               {/* Header with glassmorphism & elevated drop shadow */}
-              <div className="shrink-0 px-5 py-4 border-b border-zinc-200/80 dark:border-white/10 bg-white/85 dark:bg-[#121316]/85 backdrop-blur-xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] dark:shadow-[0_4px_16px_rgba(0,0,0,0.4)] flex items-center justify-between z-10">
+              <div className="shrink-0 px-4 py-3 border-b border-border bg-card flex items-center justify-between z-10">
                 <div className="flex items-center gap-3">
                   <div className="size-8.5 rounded-xl bg-primary/10 text-primary border border-primary/20 flex items-center justify-center shrink-0 shadow-xs dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.15)]">
                     <Sparkles className="size-4" />
@@ -1034,7 +1084,7 @@ export default function NotificationBell() {
               </div>
 
               {/* Apple Segmented Control Filter & Elevated Search */}
-              <div className="shrink-0 px-4 pt-3.5 pb-3 border-b border-zinc-200/70 dark:border-white/[0.08] bg-white/50 dark:bg-[#121316]/50 backdrop-blur-md flex flex-col gap-2.5">
+              <div className="shrink-0 px-4 py-2.5 border-b border-border bg-card/60 flex flex-col gap-2">
                 <div className="flex p-1 rounded-xl bg-zinc-200/70 dark:bg-zinc-800/90 border border-zinc-300/50 dark:border-white/[0.06] shadow-inner gap-1">
                   <button
                     onClick={() => setFilterMode("all")}
@@ -1266,4 +1316,6 @@ export default function NotificationBell() {
     </div>
   );
 }
+
+export default NotificationBell;
 

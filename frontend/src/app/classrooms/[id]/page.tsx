@@ -58,20 +58,9 @@ import { GlassDropdown } from "@/components/ui/glass-dropdown";
 import NotificationBell from "@/components/notification-bell";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { cn } from "@/lib/utils";
-import { getClassroomTheme } from "@/lib/classroom-theme";
+import { getClassroomTheme, getClassroomCanvasStyle } from "@/lib/classroom-theme";
 import { AppLoadingScreen } from "@/components/ui/app-loading-screen";
-
-const publishAssignmentSchema = zod.object({
-  experimentNumber: zod.number().min(1, "Must be at least 1"),
-  title: zod.string().min(2, "Title is required"),
-  aim: zod.string().min(2, "Aim is required"),
-  instructions: zod.string().min(2, "Instructions are required"),
-  maxMarks: zod.number().min(1, "Marks must be positive").max(100, "Max 100 marks"),
-  deadline: zod.string().min(1, "Deadline is required"),
-  clusterName: zod.string().optional(),
-});
-
-type PublishAssignmentFields = zod.infer<typeof publishAssignmentSchema>;
+import { PublishExperimentModal } from "@/components/classroom/publish-experiment-modal";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -101,6 +90,7 @@ export default function ClassroomPage({ params }: PageProps) {
   const [selectedBatch, setSelectedBatch] = useState<string>("ALL");
   const [selectedAssignmentIds, setSelectedAssignmentIds] = useState<string[]>([]);
   const [showPublishModal, setShowPublishModal] = useState(false);
+  const [editingAssignment, setEditingAssignment] = useState<any | null>(null);
   const [showClusterModal, setShowClusterModal] = useState(false);
   const [newClusterName, setNewClusterName] = useState("");
   const [openCardMenuId, setOpenCardMenuId] = useState<string | null>(null);
@@ -184,24 +174,14 @@ export default function ClassroomPage({ params }: PageProps) {
     enabled: !!user && user.role === "student",
   });
 
-  // 5. Publish assignment mutation
-  const publishMutation = useMutation({
-    mutationFn: (data: any) =>
-      api.post(`/classrooms/${classroomId}/assignments`, {
-        ...data,
-        deadline: new Date(data.deadline).toISOString(),
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["assignments", classroomId] });
-      queryClient.invalidateQueries({ queryKey: ["gradebook", classroomId] });
-      queryClient.invalidateQueries({ queryKey: ["submissions", classroomId] });
-      setShowPublishModal(false);
-      publishForm.reset();
-    },
-    onError: (error: any) => {
-      setErrorMsg(error.message || "Failed to publish assignment");
-    },
-  });
+  // Check if an assignment has graded submissions (for evaluation-lock protection)
+  const isAssignmentGraded = (asgId: string) => {
+    return (
+      submissions?.some(
+        (s: any) => s.assignmentId === asgId && s.status === "approved"
+      ) || false
+    );
+  };
 
   // 6. Start/Open student journal editor mutation
   const startJournalMutation = useMutation({
@@ -306,14 +286,6 @@ export default function ClassroomPage({ params }: PageProps) {
     return Object.keys(clusterGroups.clusters);
   }, [clusterGroups.clusters]);
 
-  const publishForm = useForm<PublishAssignmentFields>({
-    resolver: zodResolver(publishAssignmentSchema),
-    defaultValues: {
-      experimentNumber: 1,
-      maxMarks: 20,
-    },
-  });
-
   const handleCopyCode = () => {
     if (classroom?.joinCode) {
       navigator.clipboard.writeText(classroom.joinCode);
@@ -376,19 +348,66 @@ export default function ClassroomPage({ params }: PageProps) {
     const map = new Map<string, any[]>();
     if (!assignments) return map;
 
-    assignments.forEach((asg: any) => {
-      if (!asg.deadline) return;
-      const d = new Date(asg.deadline);
+    const toDateKey = (dateStr: string) => {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return null;
       const y = d.getFullYear();
       const m = String(d.getMonth() + 1).padStart(2, "0");
       const day = String(d.getDate()).padStart(2, "0");
-      const key = `${y}-${m}-${day}`;
-      const list = map.get(key) || [];
-      list.push(asg);
-      map.set(key, list);
+      return `${y}-${m}-${day}`;
+    };
+
+    assignments.forEach((asg: any) => {
+      // 1. Lab Conducted Session Date (🔵 Upcoming Lab Session)
+      if (asg.conductedDate) {
+        const k = toDateKey(asg.conductedDate);
+        if (k) {
+          const list = map.get(k) || [];
+          list.push({
+            id: `${asg.id}-lab`,
+            assignment: asg,
+            eventType: "lab_session",
+            dateStr: asg.conductedDate,
+            title: `Lab Session: Exp #${asg.experimentNumber}`,
+          });
+          map.set(k, list);
+        }
+      }
+
+      // 2. Submission Deadline (Due / Soon / Closed / Graded)
+      if (asg.deadline) {
+        const k = toDateKey(asg.deadline);
+        if (k) {
+          const list = map.get(k) || [];
+          list.push({
+            id: `${asg.id}-deadline`,
+            assignment: asg,
+            eventType: "deadline",
+            dateStr: asg.deadline,
+            title: `Cut-off Deadline: Exp #${asg.experimentNumber}`,
+          });
+          map.set(k, list);
+        }
+      }
+
+      // 3. For Teachers: Scheduled Future Release
+      if (isTeacher && asg.publishDate && new Date(asg.publishDate) > new Date()) {
+        const k = toDateKey(asg.publishDate);
+        if (k) {
+          const list = map.get(k) || [];
+          list.push({
+            id: `${asg.id}-publish`,
+            assignment: asg,
+            eventType: "scheduled_publish",
+            dateStr: asg.publishDate,
+            title: `Scheduled Release: Exp #${asg.experimentNumber}`,
+          });
+          map.set(k, list);
+        }
+      }
     });
     return map;
-  }, [assignments]);
+  }, [assignments, isTeacher]);
 
   const calendarYear = calendarDate.getFullYear();
   const calendarMonth = calendarDate.getMonth();
@@ -442,29 +461,52 @@ export default function ClassroomPage({ params }: PageProps) {
     };
   }, []);
 
-  const getCalendarDayStatus = (asgs: any[]) => {
+  const getCalendarDayStatus = (events: any[]) => {
     const now = new Date();
     let hasOverdueOrToday = false;
     let hasDueSoon = false;
     let allGraded = true;
 
-    asgs.forEach((asg) => {
-      const d = new Date(asg.deadline);
+    events.forEach((item) => {
+      const asg = item.assignment;
+      const isLab = item.eventType === "lab_session";
+
+      if (isLab) {
+        allGraded = false;
+        return;
+      }
+
+      // Deadline check
+      const d = new Date(item.dateStr || asg.deadline);
       const diffMs = d.getTime() - now.getTime();
       const diffHours = diffMs / (1000 * 60 * 60);
       const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
 
-      if (diffMs < 0 || diffHours <= 24) {
-        hasOverdueOrToday = true;
-      } else if (diffDays <= 3) {
-        hasDueSoon = true;
-      }
-
+      // Graded check
+      let isGraded = false;
       if (isTeacher) {
         const asgSubs = submissions?.filter((s: any) => s.assignmentId === asg.id) || [];
         const pending = asgSubs.filter((s: any) => s.status === "submitted" || s.status === "late_submitted").length;
-        if (pending > 0 || asgSubs.length === 0) {
+        const approvedCount = asgSubs.filter((s: any) => s.status === "approved").length;
+        if (approvedCount > 0 && pending === 0) {
+          isGraded = true;
+        } else {
           allGraded = false;
+        }
+      } else {
+        const myJournal = journals?.find((j: any) => j.assignmentId === asg.id);
+        if (myJournal?.status === "approved") {
+          isGraded = true;
+        } else {
+          allGraded = false;
+        }
+      }
+
+      if (!isGraded) {
+        if (diffMs < 0 || diffHours <= 24) {
+          hasOverdueOrToday = true;
+        } else if (diffDays <= 3) {
+          hasDueSoon = true;
         }
       }
     });
@@ -491,7 +533,7 @@ export default function ClassroomPage({ params }: PageProps) {
         textClass: "text-amber-600 dark:text-amber-400",
       };
     }
-    if (isTeacher && allGraded && asgs.length > 0) {
+    if (allGraded && events.length > 0) {
       return {
         type: "graded",
         label: "Graded",
@@ -634,9 +676,9 @@ export default function ClassroomPage({ params }: PageProps) {
     return (
       <div
         key={asg.id}
-        className={`group p-4 sm:p-5 rounded-2xl glass-card hover:scale-[1.003] transition-all duration-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 ${
+        className={`group p-4 sm:p-5 rounded-xl border border-border/80 bg-card hover:border-border hover:shadow-md transition-all flex flex-col md:flex-row justify-between items-start md:items-center gap-4 ${
           isMenuOpen ? "relative z-30" : "relative z-0"
-        } ${isSelected ? "ring-2 ring-primary/40 bg-primary/[0.03]" : ""}`}
+        } ${isSelected ? "ring-2 ring-primary/40 bg-muted/40" : ""}`}
       >
         <div className="flex items-start gap-3 max-w-xl flex-1">
           {/* Checkbox for teacher bulk actions with gentle resting state (Hover Reveal) */}
@@ -667,33 +709,33 @@ export default function ClassroomPage({ params }: PageProps) {
 
           <div className="flex flex-col gap-1.5 flex-1 min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold font-mono uppercase bg-primary/10 text-primary border border-primary/20 shadow-2xs">
+              <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-muted text-foreground border border-border">
                 Exp #{asg.experimentNumber}
               </span>
               {/* Only show cluster pill if NOT already visually grouped inside the cluster accordion */}
               {!isInClusterView && isTeacher && asg.clusterName && (
-                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-indigo-500/10 text-indigo-500 border border-indigo-500/20 flex items-center gap-1">
+                <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-muted text-muted-foreground border border-border flex items-center gap-1">
                   <Folder className="size-2.5" />
                   {asg.clusterName}
                 </span>
               )}
-              <h4 className="font-extrabold text-base tracking-tight text-foreground group-hover:text-primary transition-colors">
+              <h4 className={cn("font-bold text-sm tracking-tight text-foreground transition-colors", theme.hoverTitle)}>
                 {asg.title}
               </h4>
             </div>
-            <p className="text-xs font-medium text-muted-foreground leading-relaxed line-clamp-2">
+            <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">
               {asg.aim}
             </p>
 
             {/* Instructor Remarks Callout Card */}
             {relatedJournal?.teacherRemarks && (
-              <div className="p-3 rounded-xl bg-amber-500/[0.08] dark:bg-amber-500/[0.12] border border-amber-500/25 flex items-start gap-2.5 text-xs text-foreground mt-1 shadow-2xs">
+              <div className="p-3 rounded-lg bg-amber-500/[0.08] dark:bg-amber-500/[0.12] border border-amber-500/25 flex items-start gap-2.5 text-xs text-foreground mt-1">
                 <MessageSquareQuote className="size-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
                 <div className="flex flex-col gap-0.5">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-300">
-                    Instructor Remarks
+                  <span className="text-[10px] font-semibold text-amber-800 dark:text-amber-300">
+                    Instructor remarks
                   </span>
-                  <p className="italic text-foreground/90 font-medium leading-relaxed">
+                  <p className="italic text-foreground/90 font-medium leading-relaxed font-serif">
                     "{relatedJournal.teacherRemarks}"
                   </p>
                 </div>
@@ -713,30 +755,30 @@ export default function ClassroomPage({ params }: PageProps) {
 
               return (
                 <div className="flex flex-wrap items-center gap-2 mt-1">
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-muted/70 text-foreground border border-border/60">
-                    <MessageSquare className="size-3 text-primary" />
-                    <span>{totalAnnotations} Review Notes</span>
+                  <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium bg-muted/80 text-foreground border border-border">
+                    <MessageSquare className="size-3 text-muted-foreground" />
+                    <span>{totalAnnotations} notes</span>
                   </span>
                   {warningCount > 0 && (
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30">
+                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-semibold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30">
                       <AlertTriangle className="size-3 text-amber-500" />
-                      <span>{warningCount} Action Required</span>
+                      <span>{warningCount} action needed</span>
                     </span>
                   )}
                   <div className="flex items-center gap-1 text-[11px] text-muted-foreground flex-wrap">
                     {commentCount > 0 && (
-                      <span className="px-1.5 py-0.5 rounded bg-muted/40 border border-border/40 font-medium">
-                        💬 {commentCount} comments
+                      <span className="px-1.5 py-0.5 rounded bg-muted/60 border border-border text-[10px]">
+                        {commentCount} comments
                       </span>
                     )}
                     {suggestionCount > 0 && (
-                      <span className="px-1.5 py-0.5 rounded bg-muted/40 border border-border/40 font-medium">
-                        ✨ {suggestionCount} suggestions
+                      <span className="px-1.5 py-0.5 rounded bg-muted/60 border border-border text-[10px]">
+                        {suggestionCount} suggestions
                       </span>
                     )}
                     {questionCount > 0 && (
-                      <span className="px-1.5 py-0.5 rounded bg-muted/40 border border-border/40 font-medium">
-                        ❓ {questionCount} questions
+                      <span className="px-1.5 py-0.5 rounded bg-muted/60 border border-border text-[10px]">
+                        {questionCount} questions
                       </span>
                     )}
                   </div>
@@ -746,29 +788,49 @@ export default function ClassroomPage({ params }: PageProps) {
 
             <div className="flex flex-wrap items-center gap-3 mt-0.5 text-[11px] font-medium text-muted-foreground">
               {hasMarks ? (
-                <span className="flex items-center gap-1 text-foreground font-bold bg-muted/40 border border-border/50 px-2 py-0.5 rounded-md">
-                  <Sparkles className="size-3 text-amber-500" /> Grade: {relatedJournal.marks} / {asg.maxMarks} ({Math.round((relatedJournal.marks / asg.maxMarks) * 100)}%)
+                <span className="flex items-center gap-1 text-foreground font-bold bg-muted/60 border border-border px-2 py-0.5 rounded tabular-nums">
+                  <Sparkles className="size-3 text-primary" /> Marks: {relatedJournal.marks} / {asg.maxMarks} ({Math.round((relatedJournal.marks / asg.maxMarks) * 100)}%)
                 </span>
               ) : (
-                <span className="flex items-center gap-1 text-foreground font-semibold">
-                  <Sparkles className="size-3 text-amber-500" /> Max Marks: {asg.maxMarks}
+                <span className="flex items-center gap-1 text-foreground font-medium tabular-nums">
+                  <Sparkles className="size-3 text-muted-foreground" /> Max marks: {asg.maxMarks}
                 </span>
               )}
 
               {deadlineInfo && (
-                <span className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md border text-[11px] ${deadlineInfo.badgeClass}`}>
+                <span className={`flex items-center gap-1.5 px-2 py-0.5 rounded border text-[11px] ${deadlineInfo.badgeClass}`}>
                   <Calendar className="size-3" />
                   <span>{deadlineInfo.text}</span>
+                </span>
+              )}
+
+              {asg.conductedDate && (
+                <span className="flex items-center gap-1.5 px-2 py-0.5 rounded border text-[11px] bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-500/30">
+                  <Calendar className="size-3 text-sky-500" />
+                  <span>Lab: {formatDateIST(asg.conductedDate)}</span>
+                </span>
+              )}
+
+              {asg.rubric && asg.rubric.length > 0 && (
+                <span className="flex items-center gap-1.5 px-2 py-0.5 rounded border text-[11px] bg-primary/10 text-primary border-primary/20">
+                  <span>{asg.rubric.length} Rubric Criteria</span>
+                </span>
+              )}
+
+              {isTeacher && asg.publishDate && new Date(asg.publishDate) > new Date() && (
+                <span className="flex items-center gap-1.5 px-2 py-0.5 rounded border text-[11px] bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border-indigo-500/30 font-semibold">
+                  <Clock className="size-3" />
+                  <span>Scheduled: {formatDateIST(asg.publishDate)}</span>
                 </span>
               )}
 
               {/* Submission Status Chip in Metadata Row (Truthful, Structured & Harmonized) */}
               {isTeacher && totalStudents > 0 && (
                 pendingCount > 0 ? (
-                  <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md border text-[11px] font-bold bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30 shadow-2xs">
+                  <span className="flex items-center gap-1.5 px-2 py-0.5 rounded border text-[11px] font-semibold bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30 tabular-nums">
                     <Clock className="size-3 text-amber-500 shrink-0" />
                     <span>
-                      {totalSubmitted}/{totalStudents} Submitted ({pendingCount} to review)
+                      {totalSubmitted}/{totalStudents} submitted ({pendingCount} pending)
                       {draftCount > 0 && (
                         <span className="font-normal text-muted-foreground ml-1">
                           • {draftCount} in draft
@@ -777,10 +839,10 @@ export default function ClassroomPage({ params }: PageProps) {
                     </span>
                   </span>
                 ) : totalSubmitted > 0 ? (
-                  <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md border text-[11px] font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30 shadow-2xs">
-                    <CheckCircle2 className="size-3 text-emerald-500 shrink-0" />
+                  <span className="flex items-center gap-1.5 px-2 py-0.5 rounded border text-[11px] font-medium bg-muted text-foreground border-border tabular-nums">
+                    <CheckCircle2 className="size-3 text-emerald-600 dark:text-emerald-400 shrink-0" />
                     <span>
-                      {totalSubmitted}/{totalStudents} Graded
+                      {totalSubmitted}/{totalStudents} graded
                       {draftCount > 0 && (
                         <span className="font-normal text-muted-foreground ml-1">
                           • {draftCount} in draft
@@ -789,11 +851,11 @@ export default function ClassroomPage({ params }: PageProps) {
                     </span>
                   </span>
                 ) : (
-                  <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md border text-[11px] text-muted-foreground/75 bg-muted/30 border-border/40">
+                  <span className="flex items-center gap-1.5 px-2 py-0.5 rounded border text-[11px] text-muted-foreground bg-muted/30 border-border tabular-nums">
                     <span>
-                      0/{totalStudents} Submitted
+                      0/{totalStudents} submitted
                       {draftCount > 0 && (
-                        <span className="text-amber-600 dark:text-amber-400 font-medium ml-1">
+                        <span className="text-amber-600 dark:text-amber-400 ml-1">
                           ({draftCount} in draft)
                         </span>
                       )}
@@ -805,19 +867,58 @@ export default function ClassroomPage({ params }: PageProps) {
           </div>
         </div>
 
-        {/* Card Actions - Unified Consistent Apple Button */}
+        {/* Card Actions - Purposeful Semantic Buttons */}
         <div className="flex items-center gap-2 md:self-center shrink-0">
           {isTeacher ? (
             <div className="flex items-center gap-2 relative">
+              {pendingCount > 0 ? (
+                <Button
+                  asChild
+                  variant="outline"
+                  size="sm"
+                  className="font-semibold rounded-md h-8 px-3 text-xs glass-btn-amber shadow-xs active:scale-[0.98] transition-all cursor-pointer gap-1.5"
+                >
+                  <Link href={`/classrooms/${classroomId}/grades?assignment=${asg.id}`}>
+                    <span>Grade submissions ({pendingCount})</span>
+                  </Link>
+                </Button>
+              ) : totalSubmitted > 0 ? (
+                <Button
+                  asChild
+                  variant="outline"
+                  size="sm"
+                  className="font-semibold rounded-md h-8 px-3 text-xs glass-btn-emerald-outline shadow-xs active:scale-[0.98] transition-all cursor-pointer gap-1.5"
+                >
+                  <Link href={`/classrooms/${classroomId}/grades?assignment=${asg.id}`}>
+                    <span>Submissions graded</span>
+                  </Link>
+                </Button>
+              ) : (
+                <Button
+                  asChild
+                  variant="outline"
+                  size="sm"
+                  className="font-medium rounded-md h-8 px-3 text-xs glass-btn-frosted active:scale-[0.98] transition-all cursor-pointer shadow-xs"
+                >
+                  <Link href={`/classrooms/${classroomId}/grades?assignment=${asg.id}`}>
+                    <span>Grade submissions</span>
+                  </Link>
+                </Button>
+              )}
+
               <Button
-                asChild
+                type="button"
                 variant="outline"
                 size="sm"
-                className="font-semibold rounded-xl h-8 px-3.5 text-xs bg-white/80 dark:bg-zinc-800/80 hover:bg-zinc-100 dark:hover:bg-zinc-700 text-foreground border-border/80 active:scale-95 transition-all cursor-pointer shadow-2xs"
+                onClick={() => {
+                  setEditingAssignment(asg);
+                  setShowPublishModal(true);
+                }}
+                className="font-medium rounded-md h-8 px-2.5 text-xs glass-btn-frosted shadow-xs active:scale-[0.98] transition-all cursor-pointer gap-1"
+                title="Edit practical details, timeline or rubrics"
               >
-                <Link href={`/classrooms/${classroomId}/grades?assignment=${asg.id}`}>
-                  <span>Grade Submissions</span>
-                </Link>
+                <Edit2 className="size-3 text-muted-foreground" />
+                <span>Edit</span>
               </Button>
 
               {/* In-place Cluster Move Menu */}
@@ -826,23 +927,38 @@ export default function ClassroomPage({ params }: PageProps) {
                   variant="ghost"
                   size="sm"
                   onClick={() => setOpenCardMenuId(openCardMenuId === asg.id ? null : asg.id)}
-                  className="size-8 p-0 rounded-xl cursor-pointer hover:bg-muted"
+                  className="size-8 p-0 rounded-md cursor-pointer hover:bg-muted border border-border"
                   title="Cluster Options"
                 >
                   <MoreVertical className="size-3.5 text-muted-foreground" />
                 </Button>
 
                 {openCardMenuId === asg.id && (
-                  <div className="absolute right-0 top-full mt-1.5 w-56 rounded-2xl bg-popover/98 dark:bg-zinc-900/98 backdrop-blur-2xl border border-border/80 shadow-2xl p-1.5 z-50 flex flex-col gap-0.5 animate-in fade-in zoom-in-95 duration-150 ring-1 ring-black/10 dark:ring-white/10">
+                  <div className="absolute right-0 top-full mt-1.5 w-56 rounded-md bg-popover border border-border shadow-md p-1.5 z-50 flex flex-col gap-0.5 animate-in fade-in zoom-in-95 duration-150">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setOpenCardMenuId(null);
+                        setEditingAssignment(asg);
+                        setShowPublishModal(true);
+                      }}
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs font-medium hover:bg-accent transition-colors text-left cursor-pointer"
+                    >
+                      <Edit2 className="size-3.5 text-muted-foreground" />
+                      <span>Edit practical & rubrics...</span>
+                    </button>
+
+                    <div className="my-1 border-t border-border" />
+
                     <span className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                      Assign to Cluster
+                      Assign to cluster
                     </span>
 
                     {/* Uncluster option */}
                     <button
                       type="button"
                       onClick={() => updateClusterMutation.mutate({ assignmentId: asg.id, clusterName: null })}
-                      className="flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium hover:bg-accent transition-colors text-left cursor-pointer"
+                      className="flex items-center justify-between px-2.5 py-1.5 rounded text-xs font-medium hover:bg-accent transition-colors text-left cursor-pointer"
                     >
                       <span>None (Unclustered)</span>
                       {!asg.clusterName && <Check className="size-3 text-primary" />}
@@ -852,16 +968,15 @@ export default function ClassroomPage({ params }: PageProps) {
                     {existingClusterNames.map((cName) => (
                       <button
                         key={cName}
-                        type="button"
                         onClick={() => updateClusterMutation.mutate({ assignmentId: asg.id, clusterName: cName })}
-                        className="flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium hover:bg-accent transition-colors text-left cursor-pointer"
+                        className="flex items-center justify-between px-2.5 py-1.5 rounded text-xs font-medium hover:bg-accent transition-colors text-left cursor-pointer"
                       >
                         <span className="truncate">{cName}</span>
                         {asg.clusterName === cName && <Check className="size-3 text-primary" />}
                       </button>
                     ))}
 
-                    <div className="my-1 border-t border-border/40" />
+                    <div className="my-1 border-t border-border" />
 
                     <button
                       type="button"
@@ -870,10 +985,10 @@ export default function ClassroomPage({ params }: PageProps) {
                         setSelectedAssignmentIds([asg.id]);
                         setShowClusterModal(true);
                       }}
-                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-primary hover:bg-primary/10 transition-colors text-left cursor-pointer"
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs font-medium text-primary hover:bg-primary/10 transition-colors text-left cursor-pointer"
                     >
                       <Plus className="size-3.5" />
-                      <span>Create New Cluster...</span>
+                      <span>Create new cluster...</span>
                     </button>
                   </div>
                 )}
@@ -884,7 +999,7 @@ export default function ClassroomPage({ params }: PageProps) {
               size="sm"
               onClick={() => startJournalMutation.mutate(asg.id)}
               disabled={startJournalMutation.isPending}
-              className="font-semibold rounded-xl h-8 px-3.5 text-xs active:scale-95 transition-all duration-150 cursor-pointer shadow-xs gap-1.5"
+              className="font-semibold rounded-md h-8 px-3.5 text-xs glass-btn-indigo-solid active:scale-[0.98] transition-all cursor-pointer shadow-xs gap-1.5"
             >
               {startJournalMutation.isPending && startJournalMutation.variables === asg.id ? (
                 <span className="flex items-center gap-1.5">
@@ -893,80 +1008,81 @@ export default function ClassroomPage({ params }: PageProps) {
                 </span>
               ) : (
                 <span className="flex items-center gap-1.5">
-                  <span>Start Journal</span>
+                  <span>Start journal</span>
                   <ArrowRight className="size-3.5" />
                 </span>
               )}
             </Button>
           ) : (
-            <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-2">
               <span
-                className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase border text-center ${
+                className={`px-2 py-0.5 rounded text-[10px] font-medium border text-center ${
                   isApproved
-                    ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
+                    ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 font-semibold"
                     : isLateSubmitted
-                    ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30"
+                    ? "bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/30 font-semibold"
                     : isSubmitted
-                    ? "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30"
+                    ? "bg-sky-500/10 text-sky-700 dark:text-sky-400 border-sky-500/30 font-semibold"
                     : isChangesRequested
-                    ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30"
-                    : "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/30"
+                    ? "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30 font-semibold"
+                    : "bg-muted text-foreground border-border"
                 }`}
               >
                 {isApproved
                   ? "Approved"
                   : isLateSubmitted
-                  ? "Late Submitted"
+                  ? "Late submitted"
                   : isSubmitted
-                  ? "Handed In"
+                  ? "Handed in"
                   : isChangesRequested
-                  ? "Changes Requested"
-                  : "In Progress"}
+                  ? "Changes requested"
+                  : "In progress"}
               </span>
 
               {isChangesRequested ? (
                 <Button
                   asChild
+                  variant="outline"
                   size="sm"
-                  className="font-bold rounded-xl h-8 px-3.5 text-xs bg-amber-600 hover:bg-amber-700 text-white shadow-xs active:scale-95 transition-all duration-150 cursor-pointer gap-1.5"
+                  className="font-semibold rounded-md h-8 px-3 text-xs glass-btn-amber shadow-xs active:scale-[0.98] transition-all cursor-pointer gap-1.5"
                 >
                   <Link href={`/editor/${relatedJournal.id}`}>
                     <FileEdit className="size-3.5" />
-                    <span>Revise Journal</span>
+                    <span>Revise journal</span>
                   </Link>
                 </Button>
               ) : isApproved ? (
                 <Button
                   asChild
-                  size="sm"
                   variant="outline"
-                  className="font-bold rounded-xl h-8 px-3.5 text-xs border border-border/80 hover:border-foreground/30 text-foreground hover:bg-muted/80 shadow-2xs active:scale-95 transition-all duration-150 cursor-pointer gap-1.5"
+                  size="sm"
+                  className="font-semibold rounded-md h-8 px-3 text-xs glass-btn-emerald-outline shadow-xs active:scale-[0.98] transition-all cursor-pointer gap-1.5"
                 >
                   <Link href={`/editor/${relatedJournal.id}`}>
-                    <span>View Grade & Journal</span>
-                    <ArrowUpRight className="size-3.5 text-muted-foreground" />
+                    <span>View evaluation</span>
+                    <ArrowUpRight className="size-3.5 text-emerald-600 dark:text-emerald-400" />
                   </Link>
                 </Button>
               ) : isLocked ? (
                 <Button
                   asChild
-                  size="sm"
                   variant="outline"
-                  className="font-semibold rounded-xl h-8 px-3.5 text-xs border border-border/80 text-foreground hover:bg-muted/80 shadow-2xs active:scale-95 transition-all duration-150 cursor-pointer gap-1.5"
+                  size="sm"
+                  className="font-medium rounded-md h-8 px-3 text-xs glass-btn-frosted shadow-xs active:scale-[0.98] transition-all cursor-pointer gap-1.5"
                 >
                   <Link href={`/editor/${relatedJournal.id}`}>
                     <Eye className="size-3.5 text-muted-foreground" />
-                    <span>Preview Journal</span>
+                    <span>Preview journal</span>
                   </Link>
                 </Button>
               ) : (
                 <Button
                   asChild
                   size="sm"
-                  className="font-semibold rounded-xl h-8 px-3.5 text-xs active:scale-95 transition-all duration-150 cursor-pointer shadow-xs gap-1.5"
+                  className="font-semibold rounded-md h-8 px-3.5 text-xs glass-btn-indigo-solid active:scale-[0.98] transition-all cursor-pointer shadow-xs gap-1.5"
                 >
                   <Link href={`/editor/${relatedJournal.id}`}>
-                    <span>Resume Journal</span>
+                    <span>Resume journal</span>
                     <ArrowRight className="size-3.5" />
                   </Link>
                 </Button>
@@ -999,27 +1115,23 @@ export default function ClassroomPage({ params }: PageProps) {
   }
 
   return (
-    <div className="min-h-screen bg-textured-workspace text-foreground flex flex-col">
-      {/* Unified Floating Island Header Bar (Symmetrical & Integrated) */}
-      <header className="fixed top-4 left-4 sm:left-8 md:left-12 right-4 sm:right-8 md:right-12 z-40 flex items-center justify-between px-3.5 sm:px-5 py-2.5 bg-gradient-to-b from-white/80 via-white/65 to-white/50 dark:from-zinc-900/85 dark:via-zinc-900/75 dark:to-zinc-950/70 backdrop-blur-2xl backdrop-saturate-180 border border-white/80 dark:border-white/15 ring-1 ring-black/5 dark:ring-white/10 shadow-[0_16px_40px_-8px_rgba(0,0,0,0.1),_inset_0_1px_1px_0_rgba(255,255,255,0.95),_inset_0_-1px_1px_0_rgba(0,0,0,0.05)] dark:shadow-[0_20px_50px_-12px_rgba(0,0,0,0.7),_inset_0_1px_1px_0_rgba(255,255,255,0.18),_inset_0_-1px_1px_0_rgba(0,0,0,0.5)] rounded-2xl select-none transition-all duration-300">
+    <div
+      className="min-h-screen bg-textured-workspace text-foreground flex flex-col"
+      style={getClassroomCanvasStyle(theme)}
+    >
+      {/* Grounded Institutional Archival Header */}
+      <header className="sticky top-0 z-40 w-full border-b border-border bg-card/95 backdrop-blur-xs px-4 sm:px-8 py-3 flex items-center justify-between transition-colors">
         <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
           <Link
             href="/dashboard"
-            title="Back to Dashboard"
-            className="flex items-center gap-2 group select-none px-2 py-1.5 -ml-1 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 active:scale-95 transition-all text-xs font-semibold shrink-0"
+            title="Back to dashboard"
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold text-foreground glass-btn-elevated cursor-pointer shrink-0"
           >
-            <ArrowLeft className="size-3.5 text-muted-foreground group-hover:text-foreground transition-colors" />
-            <img
-              src="/logo.png"
-              alt="eJournal Icon"
-              className="h-6.5 w-auto object-contain transition-transform group-hover:scale-105"
-            />
-            <span className="font-bold text-sm tracking-tight text-foreground">
-              eJournal
-            </span>
+            <ArrowLeft className="size-3.5" />
+            <span className="hidden sm:inline">Dashboard</span>
           </Link>
           <span className="text-muted-foreground/30 font-light select-none">/</span>
-          <span className="font-bold text-sm tracking-tight text-foreground truncate max-w-[180px] sm:max-w-[280px] md:max-w-none">
+          <span className="font-bold text-sm tracking-tight text-foreground truncate max-w-[180px] sm:max-w-[280px] md:max-w-none font-serif">
             {classroom.name}
           </span>
         </div>
@@ -1028,7 +1140,7 @@ export default function ClassroomPage({ params }: PageProps) {
           <ThemeToggle />
           <NotificationBell />
           <Link href="/profile" title="View & Edit Academic Profile">
-            <div className="size-7 rounded-full bg-primary/15 text-primary border border-primary/25 hover:border-primary/50 flex items-center justify-center font-bold text-xs cursor-pointer transition-all hover:scale-105 active:scale-95 shadow-2xs">
+            <div className="size-8 rounded-md glass-btn-elevated flex items-center justify-center font-bold text-xs cursor-pointer text-foreground">
               <User className="size-3.5" />
             </div>
           </Link>
@@ -1036,66 +1148,66 @@ export default function ClassroomPage({ params }: PageProps) {
       </header>
 
       {/* Subject Space Container with Left-Rail Desktop Two-Column Grid */}
-      <main className="max-w-7xl w-full mx-auto p-4 sm:p-6 md:p-8 pt-24 md:pt-24 relative z-10">
+      <main className="max-w-7xl w-full mx-auto p-4 sm:p-6 md:p-8 relative z-10">
         <div className="flex flex-col lg:flex-row gap-6 items-start">
           {/* Desktop Intelligence Sidebar (Left Rail on Desktop: 320px/352px width, sticky on desktop, order-2 on mobile) */}
           <aside className="w-full lg:w-80 xl:w-88 shrink-0 flex flex-col gap-5 order-2 lg:order-1 lg:sticky lg:top-24">
             {/* Sidebar Card 1: Classroom Cohort for Teachers vs Actionable Up Next Lab for Students */}
             {isTeacher ? (
-              <div className="p-5 rounded-2xl glass-card flex flex-col gap-3 shadow-xs">
+              <div className="p-5 rounded-xl border border-border/70 bg-card/85 backdrop-blur-md shadow-xs flex flex-col gap-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Users className="size-3.5 text-indigo-500" />
-                    <h4 className="font-extrabold text-xs uppercase tracking-wider text-foreground">
-                      Classroom Cohort
+                    <Users className="size-3.5 text-muted-foreground" />
+                    <h4 className="font-bold text-xs uppercase tracking-wider text-muted-foreground">
+                      Classroom cohort
                     </h4>
                   </div>
                   <button
                     type="button"
                     onClick={() => setActiveTab("roster")}
-                    className="text-[10px] font-bold text-primary hover:underline cursor-pointer"
+                    className={cn("text-[10px] font-semibold hover:underline cursor-pointer", theme.accentText)}
                   >
-                    View All ({totalStudents})
+                    View all ({totalStudents})
                   </button>
                 </div>
 
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  <strong className="text-foreground">{totalStudents}</strong> enrolled students in <strong className="text-foreground">Semester {classroom.semester}</strong> ({classroom.department} - Div {classroom.division}).
+                  <strong className="text-foreground font-semibold tabular-nums">{totalStudents}</strong> enrolled students in <strong className="text-foreground">Semester {classroom.semester}</strong> ({classroom.department} - Div {classroom.division}).
                 </p>
 
-                <div className="flex items-center justify-between p-2.5 rounded-xl bg-background/80 border border-border/60 shadow-2xs">
+                <div className="flex items-center justify-between p-2.5 rounded-lg bg-muted/40 border border-border">
                   <div className="flex flex-col">
-                    <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">Student Join Code</span>
-                    <code className="font-mono text-xs font-black text-foreground">{classroom.joinCode}</code>
+                    <span className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">Student join code</span>
+                    <code className="font-mono text-xs font-bold text-foreground">{classroom.joinCode}</code>
                   </div>
                   <button
                     type="button"
                     onClick={handleCopyCode}
-                    className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-primary/10 text-primary hover:bg-primary/20 transition-all cursor-pointer flex items-center gap-1 active:scale-95"
+                    className="px-2.5 py-1 rounded-md text-xs font-medium bg-muted hover:bg-muted/80 text-foreground border border-border transition-all cursor-pointer flex items-center gap-1 active:scale-[0.98]"
                   >
-                    {copiedCode ? <Check className="size-3 text-emerald-500" /> : <Copy className="size-3" />}
+                    {copiedCode ? <Check className="size-3 text-emerald-600 dark:text-emerald-400" /> : <Copy className="size-3" />}
                     <span>{copiedCode ? "Copied" : "Copy"}</span>
                   </button>
                 </div>
               </div>
             ) : upNextPractical ? (
-              <div className="p-5 rounded-2xl glass-card flex flex-col gap-3.5 shadow-xs border border-primary/25 relative overflow-hidden">
+              <div className="p-5 rounded-xl border border-border/70 bg-card/85 backdrop-blur-md shadow-xs flex flex-col gap-3.5 relative overflow-hidden">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <div className="size-6 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
-                      <Sparkles className="size-3.5" />
+                    <div className="size-6 rounded bg-muted text-foreground flex items-center justify-center border border-border">
+                      <BookOpen className={cn("size-3.5", theme.accentText)} />
                     </div>
-                    <h4 className="font-extrabold text-xs uppercase tracking-wider text-foreground">
-                      Up Next
+                    <h4 className="font-bold text-xs uppercase tracking-wider text-muted-foreground">
+                      Up next
                     </h4>
                   </div>
                   <span
-                    className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wide border ${
+                    className={`px-2 py-0.5 rounded text-[10px] font-medium border ${
                       upNextPractical.status === "changes_requested"
-                        ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30"
+                        ? "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30 font-semibold"
                         : upNextPractical.status === "in_progress"
-                        ? "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/30"
-                        : "bg-muted text-muted-foreground border-border/60"
+                        ? "bg-muted text-foreground border-border"
+                        : "bg-muted text-muted-foreground border-border"
                     }`}
                   >
                     {upNextPractical.status === "changes_requested"
@@ -1119,18 +1231,22 @@ export default function ClassroomPage({ params }: PageProps) {
                 </div>
 
                 <div className="pt-3 border-t border-border/50 flex items-center justify-between gap-2">
-                  <span className="text-[11px] text-muted-foreground font-medium">
+                  <span className="text-[11px] text-muted-foreground font-medium tabular-nums">
                     Max: {upNextPractical.asg.maxMarks} Marks
                   </span>
 
                   {upNextPractical.journal ? (
                     <Button
                       asChild
+                      variant={upNextPractical.status === "changes_requested" ? "outline" : "default"}
                       size="sm"
-                      className="font-semibold rounded-xl h-8 px-3 text-xs active:scale-95 transition-all cursor-pointer shadow-xs gap-1"
+                      className={cn(
+                        "font-semibold rounded-md h-8 px-3 text-xs active:scale-[0.98] transition-all cursor-pointer shadow-xs gap-1",
+                        upNextPractical.status === "changes_requested" ? "glass-btn-amber" : "glass-btn-indigo-solid"
+                      )}
                     >
                       <Link href={`/editor/${upNextPractical.journal.id}`}>
-                        <span>{upNextPractical.status === "changes_requested" ? "Revise Journal" : "Resume Draft"}</span>
+                        <span>{upNextPractical.status === "changes_requested" ? "Revise journal" : "Resume draft"}</span>
                         <ArrowRight className="size-3" />
                       </Link>
                     </Button>
@@ -1139,7 +1255,7 @@ export default function ClassroomPage({ params }: PageProps) {
                       size="sm"
                       onClick={() => startJournalMutation.mutate(upNextPractical.asg.id)}
                       disabled={startJournalMutation.isPending}
-                      className="font-semibold rounded-xl h-8 px-3 text-xs active:scale-95 transition-all cursor-pointer shadow-xs gap-1"
+                      className="font-semibold rounded-md h-8 px-3 text-xs glass-btn-indigo-solid active:scale-[0.98] transition-all cursor-pointer shadow-xs gap-1"
                     >
                       {startJournalMutation.isPending && startJournalMutation.variables === upNextPractical.asg.id ? (
                         <span className="flex items-center gap-1.5">
@@ -1148,7 +1264,7 @@ export default function ClassroomPage({ params }: PageProps) {
                         </span>
                       ) : (
                         <span className="flex items-center gap-1">
-                          <span>Start Journal</span>
+                          <span>Start journal</span>
                           <ArrowRight className="size-3" />
                         </span>
                       )}
@@ -1157,11 +1273,11 @@ export default function ClassroomPage({ params }: PageProps) {
                 </div>
               </div>
             ) : (
-              <div className="p-5 rounded-2xl glass-card flex flex-col items-center justify-center text-center gap-2 border border-emerald-500/20 shadow-xs">
-                <div className="size-10 rounded-full bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
-                  <CheckCircle2 className="size-5" />
+              <div className="p-5 rounded-xl border border-emerald-500/30 bg-emerald-500/[0.04] shadow-xs flex flex-col items-center justify-center text-center gap-2">
+                <div className="size-8 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 flex items-center justify-center shadow-xs">
+                  <CheckCircle2 className="size-4" />
                 </div>
-                <h4 className="font-bold text-sm text-foreground">Coursework Up To Date!</h4>
+                <h4 className="font-bold text-xs text-foreground uppercase tracking-wider">Coursework current</h4>
                 <p className="text-xs text-muted-foreground leading-relaxed max-w-[240px]">
                   All practical experiments in this classroom have been submitted or approved.
                 </p>
@@ -1171,75 +1287,75 @@ export default function ClassroomPage({ params }: PageProps) {
             {/* Sidebar Card 2: Live Action / Grading Queue for Teachers / Progress for Students */}
             {isTeacher ? (
               pendingReviewsCount > 0 ? (
-                <div className="p-5 rounded-2xl glass-card flex flex-col gap-3.5 border border-amber-500/25 shadow-xs">
+                <div className="p-5 rounded-xl border border-border/70 bg-card/85 backdrop-blur-md shadow-xs flex flex-col gap-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <span className="flex h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
-                      <h4 className="font-extrabold text-xs uppercase tracking-wider text-foreground">
-                        Needs Grading ({pendingReviewsCount})
+                      <h4 className="font-bold text-xs uppercase tracking-wider text-muted-foreground">
+                        Needs grading ({pendingReviewsCount})
                       </h4>
                     </div>
-                    <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400">Action Required</span>
+                    <span className="text-[10px] font-medium text-amber-700 dark:text-amber-400">Action required</span>
                   </div>
 
-                  <div className="flex flex-col gap-2">
+                  <div className="flex flex-col gap-1.5">
                     {pendingAssignments.map((item: any) => (
                       <Link
                         key={item.id}
                         href={`/classrooms/${classroomId}/grades?assignment=${item.id}`}
-                        className="flex items-center justify-between p-2.5 rounded-xl bg-background/70 hover:bg-background border border-border/50 hover:border-amber-500/30 transition-all group shadow-2xs"
+                        className="flex items-center justify-between p-2.5 rounded-lg bg-muted/40 hover:bg-muted border border-border transition-all group"
                       >
                         <div className="flex flex-col min-w-0 pr-2">
-                          <span className="text-xs font-bold text-foreground truncate group-hover:text-primary transition-colors">
+                          <span className={cn("text-xs font-bold text-foreground truncate transition-colors", theme.hoverTitle)}>
                             Exp #{item.expNum}: {item.title}
                           </span>
-                          <span className="text-[10px] text-muted-foreground">
+                          <span className="text-[10px] text-muted-foreground font-medium tabular-nums">
                             {item.totalSubmitted}/{totalStudents} submitted
-                            {item.draftCount > 0 && ` (${item.draftCount} in draft)`}
+                            {item.draftCount > 0 && ` (${item.draftCount} draft)`}
                           </span>
                         </div>
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 shrink-0">
-                          {item.pendingCount} to review
+                        <span className="px-2 py-0.5 rounded text-[10px] font-semibold tabular-nums bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/30 shrink-0">
+                          {item.pendingCount} pending
                         </span>
                       </Link>
                     ))}
                   </div>
                 </div>
               ) : (
-                <div className="p-5 rounded-2xl glass-card flex flex-col items-center justify-center text-center gap-2 border border-emerald-500/20 shadow-xs">
-                  <div className="size-9 rounded-full bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
-                    <CheckCircle2 className="size-5" />
+                <div className="p-5 rounded-xl border border-border/70 bg-card/85 backdrop-blur-md shadow-xs flex flex-col items-center justify-center text-center gap-2">
+                  <div className="size-8 rounded bg-muted text-emerald-600 dark:text-emerald-400 border border-border flex items-center justify-center">
+                    <CheckCircle2 className="size-4" />
                   </div>
-                  <h4 className="font-bold text-xs text-foreground">All Caught Up!</h4>
+                  <h4 className="font-bold text-xs text-foreground uppercase tracking-wider">All reviews cleared</h4>
                   <p className="text-[11px] text-muted-foreground leading-relaxed max-w-[240px]">
                     All student journals for this classroom have been reviewed and graded.
                   </p>
                 </div>
               )
             ) : (
-              <div className="p-5 rounded-2xl glass-card flex flex-col gap-3.5 shadow-xs">
+              <div className="p-5 rounded-xl border border-border/70 bg-card/85 backdrop-blur-md shadow-xs flex flex-col gap-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Sparkles className="size-3.5 text-emerald-500" />
-                    <h4 className="font-extrabold text-xs uppercase tracking-wider text-foreground">
-                      Practical Progress
+                    <Sparkles className={cn("size-3.5", theme.accentText)} />
+                    <h4 className="font-bold text-xs uppercase tracking-wider text-muted-foreground">
+                      Practical progress
                     </h4>
                   </div>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold font-mono bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
-                    {totalPracticals > 0 ? Math.round((studentCompletedCount / totalPracticals) * 100) : 0}% Done
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-muted text-foreground border border-border tabular-nums">
+                    {totalPracticals > 0 ? Math.round((studentCompletedCount / totalPracticals) * 100) : 0}% done
                   </span>
                 </div>
 
                 <div className="flex items-baseline justify-between text-xs">
-                  <span className="text-muted-foreground font-medium">Evaluation Completed</span>
-                  <span className="font-extrabold text-foreground font-mono">
+                  <span className="text-muted-foreground font-sans text-xs">Evaluation completed</span>
+                  <span className="font-bold text-foreground tabular-nums">
                     {studentCompletedCount} / {totalPracticals}
                   </span>
                 </div>
 
-                <div className="h-2.5 w-full bg-muted/70 rounded-full overflow-hidden p-0.5 border border-border/40 shadow-inner">
+                <div className="h-2 w-full bg-muted/80 rounded-full overflow-hidden border border-border/50">
                   <div
-                    className="h-full bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full transition-all duration-500 shadow-2xs"
+                    className="h-full bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full transition-all duration-500"
                     style={{
                       width: `${totalPracticals > 0 ? (studentCompletedCount / totalPracticals) * 100 : 0}%`,
                     }}
@@ -1247,10 +1363,10 @@ export default function ClassroomPage({ params }: PageProps) {
                 </div>
 
                 {studentPendingCount > 0 && (
-                  <div className="pt-2 border-t border-border/40 flex items-center justify-between text-[11px]">
-                    <span className="text-muted-foreground font-medium">Awaiting Evaluation</span>
-                    <span className="inline-flex items-center gap-1 font-semibold text-indigo-600 dark:text-indigo-400">
-                      <Clock className="size-3" />
+                  <div className="pt-2 border-t border-border/50 flex items-center justify-between text-[11px]">
+                    <span className="text-muted-foreground font-sans text-xs">Awaiting evaluation</span>
+                    <span className="inline-flex items-center gap-1 font-medium text-amber-700 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 tabular-nums">
+                      <Clock className="size-3 text-amber-500" />
                       {studentPendingCount} in review
                     </span>
                   </div>
@@ -1258,14 +1374,14 @@ export default function ClassroomPage({ params }: PageProps) {
               </div>
             )}
 
-            {/* Sidebar Card 3: Interactive Academic Calendar with Popovers (Google/Samsung Style) */}
-            <div className="p-5 rounded-2xl glass-card flex flex-col gap-3.5 shadow-xs relative">
+            {/* Sidebar Card 3: Interactive Academic Calendar with Popovers */}
+            <div className="p-5 rounded-xl border border-border/70 bg-card/85 backdrop-blur-md shadow-xs flex flex-col gap-3.5 relative">
               {/* Calendar Month & Navigation Header */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Calendar className="size-3.5 text-sky-500" />
-                  <h4 className="font-extrabold text-xs uppercase tracking-wider text-foreground">
-                    Academic Calendar
+                  <Calendar className="size-3.5 text-muted-foreground" />
+                  <h4 className="font-bold text-xs uppercase tracking-wider text-muted-foreground">
+                    Academic calendar
                   </h4>
                 </div>
 
@@ -1281,7 +1397,7 @@ export default function ClassroomPage({ params }: PageProps) {
                   <button
                     type="button"
                     onClick={handleJumpToToday}
-                    className="text-xs font-bold font-mono px-1.5 py-0.5 rounded-md hover:bg-black/5 dark:hover:bg-white/5 text-foreground transition-all cursor-pointer"
+                    className="text-xs font-bold px-1.5 py-0.5 rounded-md hover:bg-black/5 dark:hover:bg-white/5 text-foreground transition-all cursor-pointer tabular-nums"
                     title="Jump to Today"
                   >
                     {calendarMonthName}
@@ -1351,7 +1467,7 @@ export default function ClassroomPage({ params }: PageProps) {
                             setPinnedCalendarKey((prev) => (prev === dateKey ? null : dateKey));
                           }
                         }}
-                        className={`w-full h-8.5 rounded-xl flex flex-col items-center justify-center text-xs transition-all relative cursor-pointer ${
+                        className={`w-full h-8.5 rounded-lg flex flex-col items-center justify-center text-xs transition-all relative cursor-pointer ${
                           hasEvents && dayStatus
                             ? dayStatus.cellClass
                             : isToday
@@ -1371,7 +1487,7 @@ export default function ClassroomPage({ params }: PageProps) {
                       >
                         <span className={`leading-none text-[11px] ${isToday || hasEvents ? "font-bold" : "font-medium"}`}>{day}</span>
 
-                        {/* Proper Event Mark: Horizontal Pill Indicator Bar */}
+                        {/* Proper Event Mark: Glowing Horizontal Pill Indicator Bar */}
                         {hasEvents && dayStatus && (
                           <span
                             className={`w-3.5 h-[2.5px] rounded-full ${dayStatus.barClass} mt-1`}
@@ -1379,7 +1495,7 @@ export default function ClassroomPage({ params }: PageProps) {
                         )}
                       </button>
 
-                      {/* Minimal & Elegant Calendar Tooltip with Persistent Hover Bridge & Shallow Gradient */}
+                      {/* Minimal & Elegant Calendar Tooltip with Persistent Hover Bridge */}
                       {isPopoverOpen && dayStatus && (
                         <div
                           onMouseEnter={() => {
@@ -1390,37 +1506,55 @@ export default function ClassroomPage({ params }: PageProps) {
                           }}
                           onMouseLeave={handleDateMouseLeave}
                           onClick={(e) => e.stopPropagation()}
-                          className={`absolute z-50 w-68 p-3 rounded-2xl ${dayStatus.shallowGradient} backdrop-blur-2xl border border-border/70 dark:border-white/10 shadow-xl flex flex-col gap-2.5 animate-in fade-in zoom-in-95 duration-150 ring-1 ring-black/5 dark:ring-white/5 pointer-events-auto ${
+                          className={`absolute z-50 w-[264px] sm:w-[270px] p-3.5 rounded-xl border border-border/80 shadow-xl flex flex-col gap-2.5 animate-in fade-in zoom-in-95 duration-150 pointer-events-auto backdrop-blur-md ${dayStatus.shallowGradient} ${
                             rowIndex === 0
                               ? "top-full mt-2 origin-top before:absolute before:-top-3 before:left-0 before:right-0 before:h-3 before:content-['']"
                               : "bottom-full mb-2 origin-bottom before:absolute before:-bottom-3 before:left-0 before:right-0 before:h-3 before:content-['']"
-                          } ${colIndex >= 4 ? "right-0" : "left-0"}`}
+                          } ${
+                            colIndex === 0
+                              ? "left-0"
+                              : colIndex === 1
+                              ? "-left-9"
+                              : colIndex === 2
+                              ? "-left-18"
+                              : colIndex === 3
+                              ? "left-1/2 -translate-x-1/2"
+                              : colIndex === 4
+                              ? "-right-18"
+                              : colIndex === 5
+                              ? "-right-9"
+                              : "right-0"
+                          }`}
                         >
                           {/* Popover Header */}
-                          <div className="flex items-center justify-between pb-1.5 border-b border-border/50">
+                          <div className="flex items-center justify-between pb-1.5 border-b border-border/60">
                             <div className="flex items-center gap-1.5 text-[11px] font-bold text-foreground">
-                              <Calendar className="size-3 text-sky-500" />
+                              <Calendar className="size-3 text-primary" />
                               <span>{formatDateIST(dateKey)}</span>
                             </div>
-                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-muted text-muted-foreground">
-                              {dayAssignments.length} {dayAssignments.length === 1 ? "Practical" : "Practicals"}
+                            <span className="text-[10px] font-medium tabular-nums px-1.5 py-0.5 rounded bg-muted/80 text-muted-foreground border border-border">
+                              {dayAssignments.length} {dayAssignments.length === 1 ? "practical" : "practicals"}
                             </span>
                           </div>
 
                           {/* Practical Experiments List */}
-                          <div className="flex flex-col gap-2 max-h-52 overflow-y-auto pr-0.5">
-                            {dayAssignments.map((asg: any) => {
-                              const dInfo = getDeadlineInfo(asg.deadline);
+                          <div className="flex flex-col gap-1.5 max-h-52 overflow-y-auto pr-0.5">
+                            {dayAssignments.map((eventItem: any) => {
+                              const asg = eventItem.assignment || eventItem;
+                              const isLab = eventItem.eventType === "lab_session";
+                              const isPublish = eventItem.eventType === "scheduled_publish";
+                              const dInfo = !isLab && !isPublish ? getDeadlineInfo(asg.deadline) : null;
                               const asgSubs = submissions?.filter((s: any) => s.assignmentId === asg.id) || [];
                               const pending = asgSubs.filter((s: any) => s.status === "submitted" || s.status === "late_submitted").length;
                               const totalSub = asgSubs.filter((s: any) => s.status !== "draft").length;
                               const draft = asgSubs.filter((s: any) => s.status === "draft").length;
                               const relatedJournal = journals?.find((j: any) => j.assignmentId === asg.id);
+                              const isApproved = relatedJournal?.status === "approved";
 
                               return (
                                 <div
-                                  key={asg.id}
-                                  className="flex flex-col gap-1.5 p-2 rounded-xl bg-background/60 dark:bg-zinc-800/40 border border-border/40"
+                                  key={eventItem.id || asg.id}
+                                  className="flex flex-col gap-1.5 p-2.5 rounded-lg bg-card/85 backdrop-blur-xs border border-border/60 shadow-2xs"
                                 >
                                   <div className="flex items-center gap-1.5 min-w-0">
                                     <span className="text-xs font-bold text-foreground leading-tight truncate">
@@ -1429,36 +1563,52 @@ export default function ClassroomPage({ params }: PageProps) {
                                   </div>
 
                                   <div className="flex items-center gap-1.5 flex-wrap">
-                                    {dInfo && (
-                                      <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-semibold border ${dInfo.badgeClass}`}>
+                                    {isLab ? (
+                                      <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold border bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-500/30 flex items-center gap-1">
+                                        <span className="size-1.5 rounded-full bg-sky-500" />
+                                        <span>Lab Session</span>
+                                      </span>
+                                    ) : isPublish ? (
+                                      <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold border bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border-indigo-500/30">
+                                        Scheduled Release
+                                      </span>
+                                    ) : isApproved ? (
+                                      <span className="px-1.5 py-0.5 rounded text-[10px] font-bold border tabular-nums bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30">
+                                        Graded ({relatedJournal?.marks}/{asg.maxMarks}m)
+                                      </span>
+                                    ) : dInfo ? (
+                                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium border ${dInfo.badgeClass}`}>
                                         {dInfo.text}
                                       </span>
-                                    )}
-                                    <span className="text-[10px] text-muted-foreground font-mono">
+                                    ) : null}
+
+                                    <span className="text-[10px] text-muted-foreground font-medium tabular-nums">
                                       Max {asg.maxMarks}m
                                     </span>
                                   </div>
 
                                   {isTeacher ? (
-                                    <div className="flex items-center justify-between pt-1 border-t border-border/40 mt-0.5">
-                                      <span className="text-[10px] text-muted-foreground font-medium truncate max-w-[140px]">
-                                        {totalSub}/{totalStudents} submitted {pending > 0 ? `(${pending} to review)` : ""}{draft > 0 ? ` • ${draft} draft` : ""}
+                                    <div className="flex items-center justify-between pt-1 border-t border-border mt-0.5">
+                                      <span className="text-[10px] text-muted-foreground font-medium tabular-nums truncate max-w-[140px]">
+                                        {totalSub}/{totalStudents} submitted {pending > 0 ? `(${pending} pending)` : ""}{draft > 0 ? ` • ${draft} draft` : ""}
                                       </span>
                                       <Link
                                         href={`/classrooms/${classroomId}/grades?assignment=${asg.id}`}
-                                        className="text-[11px] font-bold text-primary hover:underline shrink-0"
+                                        className="text-[11px] font-semibold text-primary hover:underline shrink-0"
                                       >
                                         Grade →
                                       </Link>
                                     </div>
                                   ) : (
-                                    <div className="flex items-center justify-between pt-1 border-t border-border/40 mt-0.5">
-                                      <span className="text-[10px] text-muted-foreground">Due 11:59 PM</span>
+                                    <div className="flex items-center justify-between pt-1 border-t border-border mt-0.5">
+                                      <span className="text-[10px] text-muted-foreground font-medium">
+                                        {isLab ? "Conducted in Lab" : isApproved ? "Evaluation Complete" : "Due 11:59 PM"}
+                                      </span>
                                       <Link
                                         href={relatedJournal ? `/editor/${relatedJournal.id}` : `/editor/new?assignmentId=${asg.id}`}
-                                        className="text-[11px] font-bold text-primary hover:underline shrink-0"
+                                        className="text-[11px] font-semibold text-primary hover:underline shrink-0"
                                       >
-                                        Open →
+                                        {isApproved ? "Review →" : relatedJournal ? "Continue →" : "Start →"}
                                       </Link>
                                     </div>
                                   )}
@@ -1474,7 +1624,7 @@ export default function ClassroomPage({ params }: PageProps) {
               </div>
 
               {/* Status Color Legend */}
-              <div className="flex items-center justify-between pt-2 border-t border-border/40 text-[10px] font-medium text-muted-foreground">
+              <div className="flex items-center justify-between pt-2 border-t border-border text-[10px] font-medium text-muted-foreground">
                 <div className="flex items-center gap-1">
                   <span className="size-2 rounded-full bg-rose-500" />
                   <span>Due/Closed</span>
@@ -1487,12 +1637,10 @@ export default function ClassroomPage({ params }: PageProps) {
                   <span className="size-2 rounded-full bg-sky-500" />
                   <span>Upcoming</span>
                 </div>
-                {isTeacher && (
-                  <div className="flex items-center gap-1">
-                    <span className="size-2 rounded-full bg-emerald-500" />
-                    <span>Graded</span>
-                  </div>
-                )}
+                <div className="flex items-center gap-1">
+                  <span className="size-2 rounded-full bg-emerald-500" />
+                  <span>Graded</span>
+                </div>
               </div>
             </div>
           </aside>
@@ -1500,21 +1648,21 @@ export default function ClassroomPage({ params }: PageProps) {
           {/* Master Working Canvas (Right Canvas on Desktop: 68% width, order-1 on mobile) */}
           <div className="flex-1 min-w-0 w-full flex flex-col gap-6 order-1 lg:order-2">
             {/* Banner Section with Spatial Anchor Notch, Academic Metrics & Primary Actions */}
-            <div className="p-6 md:p-7 rounded-3xl glass-card relative overflow-hidden transition-all duration-300 flex flex-col gap-4 shadow-sm">
-              {/* Option C Spatial Anchor Notch */}
+            <div className="p-6 md:p-7 rounded-xl border border-border/70 bg-card/85 backdrop-blur-md relative overflow-hidden transition-all duration-200 flex flex-col gap-4 shadow-sm">
+              {/* Ambient Subject Atmospheric Glow */}
               <div
                 className={cn(
-                  "absolute left-0 top-6 bottom-6 w-1 rounded-r-full transition-all duration-300",
-                  theme.indicator,
-                  theme.notchGlow
+                  "absolute -right-16 -top-16 w-80 h-80 rounded-full blur-3xl pointer-events-none opacity-40 transition-all duration-700",
+                  theme.bannerGlow
                 )}
               />
 
-              {/* Atmospheric Cohort Ambient Glow */}
+              {/* Spatial Anchor Notch */}
               <div
                 className={cn(
-                  "absolute -top-12 -right-12 w-96 h-48 rounded-full blur-3xl pointer-events-none opacity-40 bg-gradient-to-b",
-                  theme.bannerGlow
+                  "absolute left-0 top-6 bottom-6 w-1 rounded-r-full transition-all duration-200",
+                  theme.indicator,
+                  theme.notchGlow
                 )}
               />
 
@@ -1523,92 +1671,92 @@ export default function ClassroomPage({ params }: PageProps) {
                   <div className="flex items-center gap-2 flex-wrap">
                     <span
                       className={cn(
-                        "px-2.5 py-0.5 rounded-md text-[11px] font-bold tracking-wide border flex items-center gap-1 shadow-2xs",
+                        "px-2 py-0.5 rounded text-[11px] border tracking-wide font-medium flex items-center gap-1.5",
                         theme.badge
                       )}
                     >
                       <BookOpen className="size-3" />
                       {classroom.subject}
                     </span>
-                    <span className="text-xs font-semibold text-muted-foreground">
+                    <span className="text-xs text-muted-foreground font-medium">
                       Semester {classroom.semester} • Div {classroom.division}
                     </span>
                   </div>
-                  <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-foreground">
+                  <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground font-serif">
                     {classroom.name}
                   </h1>
-                  <p className="text-xs font-medium text-muted-foreground">
+                  <p className="text-xs text-muted-foreground font-medium">
                     {classroom.department}
                   </p>
 
                   {/* Real-time Academic Metrics Strip */}
-                  <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-border/40 mt-1">
-                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-zinc-100/80 dark:bg-zinc-800/60 border border-zinc-200/60 dark:border-white/5 text-[11px] font-semibold text-foreground/80 shadow-2xs">
-                      <Users className="size-3.5 text-indigo-500" />
-                      <span>{totalStudents} {totalStudents === 1 ? "Student" : "Students"}</span>
+                  <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-border mt-1">
+                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-muted/60 border border-border text-[11px] font-medium text-foreground tabular-nums">
+                      <Users className="size-3.5 text-muted-foreground" />
+                      <span>{totalStudents} {totalStudents === 1 ? "student" : "students"}</span>
                     </div>
 
-                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-zinc-100/80 dark:bg-zinc-800/60 border border-zinc-200/60 dark:border-white/5 text-[11px] font-semibold text-foreground/80 shadow-2xs">
-                      <FileText className="size-3.5 text-sky-500" />
-                      <span>{totalPracticals} {totalPracticals === 1 ? "Practical" : "Practicals"}</span>
+                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-muted/60 border border-border text-[11px] font-medium text-foreground tabular-nums">
+                      <FileText className="size-3.5 text-muted-foreground" />
+                      <span>{totalPracticals} {totalPracticals === 1 ? "practical" : "practicals"}</span>
                     </div>
 
                     {isTeacher ? (
                       pendingReviewsCount > 0 ? (
-                        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/25 text-[11px] font-bold shadow-2xs">
+                        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/30 text-[11px] font-semibold tabular-nums">
                           <Clock className="size-3.5 text-amber-500" />
-                          <span>{pendingReviewsCount} Pending Review</span>
+                          <span>{pendingReviewsCount} pending review</span>
                         </div>
                       ) : (
-                        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/25 text-[11px] font-semibold shadow-2xs">
-                          <CheckCircle2 className="size-3.5 text-emerald-500" />
-                          <span>All Caught Up</span>
+                        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-muted/60 text-foreground border border-border text-[11px] font-medium">
+                          <CheckCircle2 className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+                          <span>All caught up</span>
                         </div>
                       )
                     ) : (
-                      <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/25 text-[11px] font-semibold shadow-2xs">
-                        <CheckCircle2 className="size-3.5 text-emerald-500" />
-                        <span>{studentCompletedCount}/{totalPracticals} Completed</span>
+                      <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 text-[11px] font-medium tabular-nums">
+                        <CheckCircle2 className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+                        <span>{studentCompletedCount}/{totalPracticals} completed</span>
                       </div>
                     )}
                   </div>
                 </div>
 
-                {/* Primary Classroom Actions (Prominent & Uncrowded) */}
-                <div className="flex items-center gap-2.5 flex-wrap self-start sm:self-center">
+                {/* Primary Classroom Actions */}
+                <div className="flex items-center gap-2 flex-wrap self-start sm:self-center">
                   {isTeacher ? (
                     <>
                       <Button
                         onClick={() => setShowClusterModal(true)}
-                        variant="outline"
                         size="sm"
-                        className="gap-1.5 text-xs font-semibold rounded-xl h-9 px-3.5 active:scale-95 transition-all cursor-pointer whitespace-nowrap bg-background/80 hover:bg-background border-border/80 shadow-2xs"
+                        className="gap-1.5 text-xs font-semibold rounded-lg h-8 px-3 active:scale-[0.98] transition-all cursor-pointer whitespace-nowrap glass-btn-frosted shadow-xs"
                         title="Manage experiment clusters and cycles"
                       >
-                        <Layers className="size-3.5 text-indigo-500" />
-                        <span>Manage Clusters</span>
+                        <Layers className="size-3.5 text-muted-foreground" />
+                        <span>Manage clusters</span>
                       </Button>
 
                       <Button
-                        onClick={() => setShowPublishModal(true)}
-                        variant="outline"
+                        onClick={() => {
+                          setEditingAssignment(null);
+                          setShowPublishModal(true);
+                        }}
                         size="sm"
-                        className="gap-1.5 text-xs font-semibold rounded-xl h-9 px-4 active:scale-95 transition-all duration-150 cursor-pointer whitespace-nowrap bg-indigo-50/70 hover:bg-indigo-100/70 dark:bg-indigo-950/40 dark:hover:bg-indigo-950/60 border-indigo-200/80 dark:border-indigo-500/30 text-indigo-600 dark:text-indigo-400 shadow-2xs"
+                        className="gap-1.5 text-xs font-semibold rounded-lg h-8 px-3.5 glass-btn-indigo-solid active:scale-[0.98] transition-all cursor-pointer whitespace-nowrap shadow-xs"
                       >
-                        <Plus className="size-3.5 text-indigo-500" />
-                        <span>Publish Experiment</span>
+                        <Plus className="size-3.5" />
+                        <span>Publish experiment</span>
                       </Button>
                     </>
                   ) : (
                     <Link href={`/classrooms/${classroomId}/compile-journal`}>
                       <Button
-                        variant="outline"
                         size="sm"
-                        className="gap-2 text-xs font-semibold rounded-xl h-9 px-4 active:scale-95 transition-all cursor-pointer whitespace-nowrap bg-indigo-50/70 hover:bg-indigo-100/70 dark:bg-indigo-950/40 dark:hover:bg-indigo-950/60 border-indigo-200/80 dark:border-indigo-500/30 text-indigo-600 dark:text-indigo-400 shadow-2xs"
+                        className="gap-2 text-xs font-semibold rounded-lg h-8 px-3.5 active:scale-[0.98] transition-all cursor-pointer whitespace-nowrap glass-btn-frosted shadow-xs"
                         title="Compile all practical experiments into an official master lab manual"
                       >
-                        <BookOpen className="size-3.5 text-indigo-500" />
-                        <span>Download Complete Journal</span>
+                        <BookOpen className={cn("size-3.5", theme.accentText)} />
+                        <span>Download complete journal</span>
                       </Button>
                     </Link>
                   )}
@@ -1617,14 +1765,14 @@ export default function ClassroomPage({ params }: PageProps) {
             </div>
 
         {/* Tab switcher & Action bar */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-b border-border/80 pb-3">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-b border-border pb-3">
           {/* Segmented Control Pill (Locked Height, Zero-Jitter, No Scrollbar) */}
-          <div className="flex items-center p-1 glass-pill rounded-2xl max-w-fit gap-1 shrink-0">
+          <div className="flex items-center p-0.5 border border-border bg-muted/40 rounded-md max-w-fit gap-1 shrink-0">
             <button
               onClick={() => setActiveTab("assignments")}
-              className={`flex items-center gap-1.5 h-8 px-3 text-xs font-semibold rounded-xl transition-all cursor-pointer whitespace-nowrap ${
+              className={`flex items-center gap-1.5 h-7.5 px-3 text-xs font-medium rounded transition-all cursor-pointer whitespace-nowrap ${
                 activeTab === "assignments"
-                  ? "bg-background text-foreground shadow-xs font-bold"
+                  ? "bg-card text-foreground shadow-xs font-bold"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
@@ -1637,10 +1785,10 @@ export default function ClassroomPage({ params }: PageProps) {
               <span>Practicals</span>
               <span
                 className={cn(
-                  "px-1.5 py-0.2 rounded-full font-mono text-[10px] font-bold border",
+                  "px-1.5 py-0.2 rounded text-[10px] font-semibold tabular-nums",
                   activeTab === "assignments"
-                    ? theme.activeBadge
-                    : "bg-muted text-muted-foreground border-transparent"
+                    ? "bg-muted text-foreground border border-border"
+                    : "text-muted-foreground"
                 )}
               >
                 {assignments?.length || 0}
@@ -1649,16 +1797,16 @@ export default function ClassroomPage({ params }: PageProps) {
 
             <button
               onClick={() => setActiveTab("announcements")}
-              className={`flex items-center gap-1.5 h-8 px-3 text-xs font-semibold rounded-xl transition-all cursor-pointer whitespace-nowrap ${
+              className={`flex items-center gap-1.5 h-7.5 px-3 text-xs font-medium rounded transition-all cursor-pointer whitespace-nowrap ${
                 activeTab === "announcements"
-                  ? "bg-background text-foreground shadow-xs font-bold"
+                  ? "bg-card text-foreground shadow-xs font-bold"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              <Sparkles className={`size-3.5 ${activeTab === "announcements" ? "text-amber-500" : "text-muted-foreground"}`} />
+              <Sparkles className={cn("size-3.5", activeTab === "announcements" ? theme.accentText : "text-muted-foreground")} />
               <span>Announcements</span>
-              <span className={`px-1.5 py-0.2 rounded-full font-mono text-[10px] font-bold ${
-                activeTab === "announcements" ? "bg-amber-500/10 text-amber-500" : "bg-muted text-muted-foreground"
+              <span className={`px-1.5 py-0.2 rounded text-[10px] font-semibold tabular-nums ${
+                activeTab === "announcements" ? "bg-muted text-foreground border border-border" : "text-muted-foreground"
               }`}>
                 {announcements?.length || 0}
               </span>
@@ -1667,16 +1815,16 @@ export default function ClassroomPage({ params }: PageProps) {
             {isTeacher && (
               <button
                 onClick={() => setActiveTab("submissions")}
-                className={`flex items-center gap-1.5 h-8 px-3 text-xs font-semibold rounded-xl transition-all cursor-pointer whitespace-nowrap ${
+                className={`flex items-center gap-1.5 h-7.5 px-3 text-xs font-medium rounded transition-all cursor-pointer whitespace-nowrap ${
                   activeTab === "submissions"
-                    ? "bg-background text-foreground shadow-xs font-bold"
+                    ? "bg-card text-foreground shadow-xs font-bold"
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
-                <GraduationCap className={`size-3.5 ${activeTab === "submissions" ? "text-indigo-500" : "text-muted-foreground"}`} />
+                <GraduationCap className={cn("size-3.5", activeTab === "submissions" ? theme.accentText : "text-muted-foreground")} />
                 <span>Gradebook</span>
                 {pendingReviewsCount > 0 && (
-                  <span className="px-1.5 py-0.2 rounded-full font-mono text-[10px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/25">
+                  <span className="px-1.5 py-0.2 rounded text-[10px] font-bold tabular-nums bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/30">
                     {pendingReviewsCount}
                   </span>
                 )}
@@ -1685,16 +1833,16 @@ export default function ClassroomPage({ params }: PageProps) {
 
             <button
               onClick={() => setActiveTab("roster")}
-              className={`flex items-center gap-1.5 h-8 px-3 text-xs font-semibold rounded-xl transition-all cursor-pointer whitespace-nowrap ${
+              className={`flex items-center gap-1.5 h-7.5 px-3 text-xs font-medium rounded transition-all cursor-pointer whitespace-nowrap ${
                 activeTab === "roster"
-                  ? "bg-background text-foreground shadow-xs font-bold"
+                  ? "bg-card text-foreground shadow-xs font-bold"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              <Users className={`size-3.5 ${activeTab === "roster" ? "text-primary" : "text-muted-foreground"}`} />
+              <Users className={cn("size-3.5", activeTab === "roster" ? theme.accentText : "text-muted-foreground")} />
               <span>Members</span>
-              <span className={`px-1.5 py-0.2 rounded-full font-mono text-[10px] font-bold ${
-                activeTab === "roster" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
+              <span className={`px-1.5 py-0.2 rounded text-[10px] font-semibold tabular-nums ${
+                activeTab === "roster" ? "bg-muted text-foreground border border-border" : "text-muted-foreground"
               }`}>
                 {totalStudents}
               </span>
@@ -1709,10 +1857,10 @@ export default function ClassroomPage({ params }: PageProps) {
               <Button
                 onClick={() => setShowAnnouncementModal(true)}
                 size="sm"
-                className="gap-1.5 text-xs font-semibold rounded-xl h-9 px-4 active:scale-95 transition-all duration-150 cursor-pointer glass-btn-amber whitespace-nowrap"
+                className="gap-1.5 text-xs font-medium rounded-md h-8 px-3 active:scale-[0.98] transition-all cursor-pointer whitespace-nowrap"
               >
                 <Plus className="size-3.5" />
-                <span>Post Announcement</span>
+                <span>Post announcement</span>
               </Button>
             )}
 
@@ -1720,11 +1868,12 @@ export default function ClassroomPage({ params }: PageProps) {
             {activeTab === "submissions" && isTeacher && (
               <Link href={`/classrooms/${classroomId}/grades`}>
                 <Button
+                  variant="outline"
                   size="sm"
-                  className="gap-1.5 text-xs font-semibold rounded-xl h-9 px-3.5 active:scale-95 transition-all cursor-pointer whitespace-nowrap"
+                  className="gap-1.5 text-xs font-semibold rounded-lg h-8 px-3.5 cursor-pointer whitespace-nowrap glass-btn-frosted shadow-xs"
                 >
-                  <LayoutGrid className="size-3.5" />
-                  <span>Full Gradebook Matrix</span>
+                  <LayoutGrid className={cn("size-3.5", theme.accentText)} />
+                  <span>Full gradebook matrix</span>
                 </Button>
               </Link>
             )}
@@ -1735,11 +1884,11 @@ export default function ClassroomPage({ params }: PageProps) {
                 onClick={handleCopyCode}
                 variant="outline"
                 size="sm"
-                className="gap-1.5 text-xs font-semibold rounded-xl h-9 px-3.5 active:scale-95 transition-all cursor-pointer whitespace-nowrap border-border/80"
+                className="gap-1.5 text-xs font-medium rounded-md h-8 px-3 active:scale-[0.98] transition-all cursor-pointer whitespace-nowrap border-border hover:bg-muted"
                 title="Copy student join code"
               >
-                {copiedCode ? <Check className="size-3.5 text-emerald-500" /> : <Copy className="size-3.5 text-muted-foreground" />}
-                <span>{copiedCode ? "Code Copied!" : `Copy Code: ${classroom?.joinCode || ""}`}</span>
+                {copiedCode ? <Check className="size-3.5 text-emerald-600 dark:text-emerald-400" /> : <Copy className="size-3.5 text-muted-foreground" />}
+                <span>{copiedCode ? "Copied" : <>Join code: <code className="font-mono font-semibold">{classroom?.joinCode || ""}</code></>}</span>
               </Button>
             )}
           </div>
@@ -1756,93 +1905,95 @@ export default function ClassroomPage({ params }: PageProps) {
         {activeTab === "announcements" ? (
           <div className="flex flex-col gap-4">
             {announcementsLoading ? (
-              <div className="flex items-center justify-center p-12 glass-card rounded-3xl">
-                <p className="text-sm text-muted-foreground animate-pulse">Loading classroom announcements...</p>
+              <div className="flex items-center justify-center p-12 rounded-lg border border-border bg-card">
+                <p className="text-xs text-muted-foreground animate-pulse">Loading announcements...</p>
               </div>
             ) : announcements && announcements.length > 0 ? (
-              <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-3">
                 {announcements.map((ann: any) => (
-                  <div key={ann.id} className="p-6 rounded-3xl glass-card flex flex-col gap-3 relative border border-amber-500/20">
+                  <div key={ann.id} className="p-5 rounded-lg border border-border bg-card shadow-xs flex flex-col gap-3 relative">
                     <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <div className="size-8 rounded-full bg-amber-500/10 text-amber-500 flex items-center justify-center font-bold text-xs">
+                      <div className="flex items-center gap-2.5">
+                        <div className="size-7 rounded bg-muted text-foreground border border-border flex items-center justify-center font-bold text-xs uppercase">
                           {ann.authorName?.[0] || "T"}
                         </div>
                         <div className="flex flex-col">
                           <span className="text-sm font-bold text-foreground">{ann.authorName}</span>
-                          <span className="text-[11px] text-muted-foreground">
+                          <span className="text-[11px] text-muted-foreground font-medium">
                             {formatDateTimeIST(ann.createdAt, false)}
                           </span>
                         </div>
                       </div>
                       {ann.targetBatch && (
-                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/10 text-indigo-500 border border-indigo-500/20">
-                          {ann.targetBatch} Only
+                        <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-muted text-foreground border border-border">
+                          {ann.targetBatch} only
                         </span>
                       )}
                     </div>
-                    <h3 className="text-base font-bold text-foreground">{ann.title}</h3>
-                    <p className="text-sm text-muted-foreground whitespace-pre-line leading-relaxed">{ann.content}</p>
+                    <h3 className="text-sm font-bold text-foreground">{ann.title}</h3>
+                    <p className="text-xs text-muted-foreground whitespace-pre-line leading-relaxed">{ann.content}</p>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="flex flex-col items-center justify-center p-12 text-center glass-card rounded-3xl gap-3">
-                <Sparkles className="size-10 text-amber-500/50 mb-1" />
-                <h3 className="text-base font-bold text-foreground">No Announcements Yet</h3>
+              <div className="flex flex-col items-center justify-center p-12 text-center rounded-lg border border-dashed border-border bg-card gap-2.5">
+                <Sparkles className="size-6 text-muted-foreground mb-1" />
+                <h3 className="text-sm font-bold text-foreground">No announcements yet</h3>
                 <p className="text-xs text-muted-foreground max-w-sm">
                   {isTeacher
                     ? "Post an announcement to notify students in your classroom or specific lab batches."
-                    : "Your teacher hasn't posted any announcements for this classroom."}
+                    : "Your teacher has not posted any announcements for this classroom."}
                 </p>
                 {isTeacher && (
                   <Button
                     onClick={() => setShowAnnouncementModal(true)}
                     size="sm"
-                    className="mt-2 text-xs font-semibold glass-btn-amber"
+                    className="mt-2 text-xs font-medium rounded-md h-8 px-3"
                   >
-                    Post First Announcement
+                    Post first announcement
                   </Button>
                 )}
               </div>
             )}
           </div>
         ) : activeTab === "assignments" ? (
-          <div className="flex flex-col gap-6">
+          <div className="flex flex-col gap-5">
             {assignments && assignments.length > 0 ? (
               isTeacher ? (
                 <>
-                  {/* 1. Render Grouped Clusters with Collapsible Accordions (De-cluttered) */}
+                  {/* 1. Render Grouped Clusters with Archival Section Accordions (Hallmark Rule 11 Compliant) */}
                   {existingClusterNames.map((cName) => {
                     const cAssignments = clusterGroups.clusters[cName];
                     const isCollapsed = collapsedClusters.includes(cName);
                     return (
                       <div key={cName} className="flex flex-col gap-3">
-                        {/* Cluster Accordion Header Strip */}
+                        {/* Archival Cluster Section Header Strip (Borderless Flow) */}
                         <div
                           onClick={() => toggleClusterCollapse(cName)}
-                          className="flex items-center justify-between gap-3 px-4 py-2.5 rounded-2xl bg-indigo-500/[0.04] dark:bg-indigo-500/[0.08] border border-indigo-500/15 cursor-pointer hover:bg-indigo-500/[0.07] dark:hover:bg-indigo-500/[0.12] transition-all select-none shadow-2xs"
+                          className="flex items-center justify-between gap-3 px-2 py-1.5 rounded-lg cursor-pointer hover:bg-muted/40 transition-all select-none group"
                         >
-                          <div className="flex items-center gap-2.5">
-                            <div className="size-7.5 rounded-xl bg-indigo-500/15 text-indigo-500 flex items-center justify-center font-bold">
-                              <Folder className="size-3.5" />
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="size-6 rounded-md bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 flex items-center justify-center font-bold shrink-0">
+                              <Folder className="size-3 text-indigo-600 dark:text-indigo-400" />
                             </div>
-                            <div className="flex items-center gap-2">
-                              <h3 className="font-extrabold text-sm tracking-tight text-foreground">{cName}</h3>
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border border-indigo-500/25">
-                                {cAssignments.length} {cAssignments.length === 1 ? "Practical" : "Practicals"}
+                            <div className="flex items-center gap-2 truncate">
+                              <h3 className="font-bold text-sm text-foreground tracking-tight">{cName}</h3>
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold tabular-nums bg-muted text-muted-foreground border border-border/80 shrink-0">
+                                {cAssignments.length} {cAssignments.length === 1 ? "practical" : "practicals"}
                               </span>
                             </div>
                           </div>
 
-                          <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex-1 h-px bg-border/60 mx-3 hidden sm:block" />
+
+                          <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
                             <Button
                               variant="ghost"
                               size="sm"
                               onClick={() => disbandClusterMutation.mutate(cName)}
                               disabled={disbandClusterMutation.isPending}
-                              className="text-xs text-muted-foreground hover:text-destructive h-7 px-2.5 rounded-lg cursor-pointer"
-                              title="Disband cluster (experiments become unclustered)"
+                              className="text-xs text-muted-foreground hover:text-destructive h-7 px-2.5 rounded cursor-pointer transition-colors"
+                              title="Disband cluster"
                             >
                               <FolderX className="size-3 mr-1" />
                               <span>Disband</span>
@@ -1851,7 +2002,7 @@ export default function ClassroomPage({ params }: PageProps) {
                             <button
                               type="button"
                               onClick={() => toggleClusterCollapse(cName)}
-                              className="p-1 rounded-lg text-muted-foreground hover:text-foreground cursor-pointer transition-transform"
+                              className="p-1 rounded text-muted-foreground hover:text-foreground cursor-pointer transition-transform"
                               title={isCollapsed ? "Expand cluster" : "Collapse cluster"}
                             >
                               <ChevronDown className={`size-4 transition-transform duration-200 ${isCollapsed ? "-rotate-90" : ""}`} />
@@ -1859,9 +2010,9 @@ export default function ClassroomPage({ params }: PageProps) {
                           </div>
                         </div>
 
-                        {/* Clustered Practicals with Clean Structural Left Guide */}
+                        {/* Clustered Practicals with Clean Structural Left Accent Guide */}
                         {!isCollapsed && (
-                          <div className="flex flex-col gap-3 pl-2 sm:pl-3 border-l-2 border-indigo-500/20 ml-3 animate-in fade-in-50 duration-200">
+                          <div className="flex flex-col gap-3 pl-3 sm:pl-4 border-l-2 border-indigo-500/30 dark:border-indigo-500/40 ml-2.5 sm:ml-3 animate-in fade-in-50 duration-200">
                             {cAssignments.map((asg) => renderAssignmentCard(asg, true))}
                           </div>
                         )}
@@ -1871,50 +2022,52 @@ export default function ClassroomPage({ params }: PageProps) {
 
                   {/* 2. Render Independent / General Curriculum Practicals */}
                   {clusterGroups.unclustered.length > 0 && (
-                    <div className="flex flex-col gap-3 mt-1">
+                    <div className="flex flex-col gap-2.5 mt-1">
                       {existingClusterNames.length > 0 && (
                         <div className="flex items-center gap-2 px-1 pt-2">
                           <FileText className="size-3.5 text-muted-foreground" />
                           <h4 className="font-bold text-xs uppercase tracking-wider text-muted-foreground">
-                            Independent Practicals ({clusterGroups.unclustered.length})
+                            Independent practicals ({clusterGroups.unclustered.length})
                           </h4>
-                          <div className="flex-1 h-px bg-border/60 ml-2" />
+                          <div className="flex-1 h-px bg-border ml-2" />
                         </div>
                       )}
-                      <div className="flex flex-col gap-3">
+                      <div className="flex flex-col gap-2.5">
                         {clusterGroups.unclustered.map((asg) => renderAssignmentCard(asg, false))}
                       </div>
                     </div>
                   )}
                 </>
               ) : (
-                /* Flat Sequential List for Students (Zero Cluster Clutter) */
-                <div className="flex flex-col gap-3">
+                /* Flat Sequential List for Students */
+                <div className="flex flex-col gap-2.5">
                   {[...assignments]
                     .sort((a, b) => a.experimentNumber - b.experimentNumber)
                     .map((asg) => renderAssignmentCard(asg, false))}
                 </div>
               )
             ) : (
-              <div className="py-16 flex flex-col items-center justify-center border-2 border-dashed border-border rounded-2xl glass-card">
-                <div className="size-14 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mb-4">
-                  <FileText className="size-7" />
+              <div className="py-16 flex flex-col items-center justify-center border-2 border-dashed border-border rounded-lg bg-card">
+                <div className="size-10 rounded bg-muted text-muted-foreground flex items-center justify-center mb-3 border border-border">
+                  <FileText className="size-5" />
                 </div>
-                <h4 className="font-extrabold text-xl tracking-tight">No experiments published</h4>
-                <p className="text-xs text-muted-foreground mt-1.5 text-center max-w-sm leading-relaxed">
+                <h4 className="font-bold text-base tracking-tight font-serif">No experiments published</h4>
+                <p className="text-xs text-muted-foreground mt-1 text-center max-w-sm leading-relaxed">
                   {isTeacher
-                    ? "Click 'Publish Experiment' above to create a new lab assignment for your students."
-                    : "Your teacher hasn't published any lab assignments in this workspace yet."}
+                    ? "Click 'Publish experiment' above to create a new lab assignment for your students."
+                    : "Your teacher has not published any lab assignments in this workspace yet."}
                 </p>
                 {isTeacher && (
                   <Button
-                    onClick={() => setShowPublishModal(true)}
-                    variant="outline"
+                    onClick={() => {
+                      setEditingAssignment(null);
+                      setShowPublishModal(true);
+                    }}
                     size="sm"
-                    className="mt-4 rounded-xl font-semibold active:scale-95 transition-all duration-150 bg-indigo-50/70 hover:bg-indigo-100/70 dark:bg-indigo-950/40 dark:hover:bg-indigo-950/60 border-indigo-200/80 dark:border-indigo-500/30 text-indigo-600 dark:text-indigo-400 shadow-2xs"
+                    className="mt-4 rounded-md font-medium text-xs h-8 px-3 shadow-xs"
                   >
-                    <Plus className="size-3.5 text-indigo-500 mr-1.5" />
-                    Publish Experiment Now
+                    <Plus className="size-3.5 mr-1.5" />
+                    Publish experiment now
                   </Button>
                 )}
               </div>
@@ -1923,32 +2076,32 @@ export default function ClassroomPage({ params }: PageProps) {
         ) : activeTab === "submissions" ? (
           <div className="flex flex-col gap-4">
             {/* Division & Batch Filter Strip */}
-            <div className="flex flex-col gap-2.5 pb-1">
+            <div className="flex flex-col gap-2 pb-1">
               {/* Division Filter */}
               {availableDivisions.length > 0 && (
-                <div className="flex items-center gap-2 overflow-x-auto pb-1">
-                  <span className="text-xs font-semibold text-muted-foreground mr-1">Division:</span>
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+                  <span className="text-xs font-medium text-muted-foreground mr-1">Division:</span>
                   <button
                     onClick={() => setSelectedDivision("ALL")}
-                    className={`px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    className={`px-2.5 py-1 rounded text-xs font-medium transition-all cursor-pointer ${
                       selectedDivision === "ALL"
-                        ? "bg-primary text-primary-foreground shadow-xs"
-                        : "glass-pill text-muted-foreground hover:text-foreground"
+                        ? "bg-foreground text-background font-bold shadow-xs"
+                        : "border border-border bg-card text-muted-foreground hover:text-foreground"
                     }`}
                   >
-                    All Divisions
+                    All divisions
                   </button>
                   {availableDivisions.map((d: string) => (
                     <button
                       key={d}
                       onClick={() => setSelectedDivision(d)}
-                      className={`px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      className={`px-2.5 py-1 rounded text-xs font-medium transition-all cursor-pointer ${
                         selectedDivision === d
-                          ? "bg-primary text-primary-foreground shadow-xs"
-                          : "glass-pill text-muted-foreground hover:text-foreground"
+                          ? "bg-foreground text-background font-bold shadow-xs"
+                          : "border border-border bg-card text-muted-foreground hover:text-foreground"
                       }`}
                     >
-                      Division {d}
+                      Div {d}
                     </button>
                   ))}
                 </div>
@@ -1956,26 +2109,26 @@ export default function ClassroomPage({ params }: PageProps) {
 
               {/* Batch Filter Pills */}
               {classroom?.batches && classroom.batches.length > 0 && (
-                <div className="flex items-center gap-2 overflow-x-auto pb-1">
-                  <span className="text-xs font-semibold text-muted-foreground mr-1">Batch:</span>
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+                  <span className="text-xs font-medium text-muted-foreground mr-1">Batch:</span>
                   <button
                     onClick={() => setSelectedBatch("ALL")}
-                    className={`px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    className={`px-2.5 py-1 rounded text-xs font-medium transition-all cursor-pointer ${
                       selectedBatch === "ALL"
-                        ? "bg-primary text-primary-foreground shadow-xs"
-                        : "glass-pill text-muted-foreground hover:text-foreground"
+                        ? "bg-foreground text-background font-bold shadow-xs"
+                        : "border border-border bg-card text-muted-foreground hover:text-foreground"
                     }`}
                   >
-                    All Batches
+                    All batches
                   </button>
                   {classroom.batches.map((b: string) => (
                     <button
                       key={b}
                       onClick={() => setSelectedBatch(b)}
-                      className={`px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      className={`px-2.5 py-1 rounded text-xs font-medium transition-all cursor-pointer ${
                         selectedBatch === b
-                          ? "bg-primary text-primary-foreground shadow-xs"
-                          : "glass-pill text-muted-foreground hover:text-foreground"
+                          ? "bg-foreground text-background font-bold shadow-xs"
+                          : "border border-border bg-card text-muted-foreground hover:text-foreground"
                       }`}
                     >
                       {b}
@@ -1986,16 +2139,16 @@ export default function ClassroomPage({ params }: PageProps) {
             </div>
 
             {submissionsLoading ? (
-              <p className="text-xs text-muted-foreground animate-pulse font-medium">
+              <p className="text-xs text-muted-foreground animate-pulse">
                 Loading student submissions...
               </p>
             ) : !submissions || submissions.length === 0 ? (
-              <div className="py-16 flex flex-col items-center justify-center border-2 border-dashed border-border rounded-2xl glass-card">
-                <div className="size-14 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mb-4">
-                  <GraduationCap className="size-7" />
+              <div className="py-16 flex flex-col items-center justify-center border-2 border-dashed border-border rounded-lg bg-card">
+                <div className="size-10 rounded bg-muted text-muted-foreground flex items-center justify-center mb-3 border border-border">
+                  <GraduationCap className="size-5" />
                 </div>
-                <h4 className="font-extrabold text-xl tracking-tight">No submissions yet</h4>
-                <p className="text-xs text-muted-foreground mt-1.5 text-center max-w-sm leading-relaxed">
+                <h4 className="font-bold text-base tracking-tight font-serif">No submissions yet</h4>
+                <p className="text-xs text-muted-foreground mt-1 text-center max-w-sm leading-relaxed">
                   Student hand-ins for your practical experiments will appear here for grading and evaluation.
                 </p>
               </div>
@@ -2009,47 +2162,47 @@ export default function ClassroomPage({ params }: PageProps) {
                 .map((sub) => (
                   <div
                     key={sub.id}
-                    className="p-5 rounded-2xl glass-card flex flex-col sm:flex-row justify-between sm:items-center gap-4 hover:scale-[1.01] transition-all duration-300"
+                    className="p-4 rounded-lg border border-border bg-card shadow-xs flex flex-col sm:flex-row justify-between sm:items-center gap-4 hover:border-foreground/40 transition-all"
                   >
                     <div className="flex flex-col gap-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-primary/10 text-primary border border-primary/20">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold tabular-nums bg-muted text-foreground border border-border">
                           Exp #{sub.experimentNumber}
                         </span>
                         <h4 className="font-bold text-sm text-foreground">
-                          {sub.studentName} ({sub.enrollmentNumber || "No Enr."})
+                          {sub.studentName} <span className="font-mono font-normal text-muted-foreground">({sub.enrollmentNumber || "No Enr."})</span>
                         </h4>
                         {sub.studentBatch && (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/10 text-indigo-500 border border-indigo-500/20">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-muted text-foreground border border-border">
                             {sub.studentBatch}
                           </span>
                         )}
                         {sub.isRevoked && (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-amber-500/10 text-amber-600 border border-amber-500/30 flex items-center gap-1">
-                            ⚠️ Revoked Submission
+                          <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/30">
+                            Revoked submission
                           </span>
                         )}
                         {(sub.isLate || sub.status === "late_submitted") && (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-rose-500/10 text-rose-600 border border-rose-500/30">
-                            Late Submission
+                          <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/30">
+                            Late submission
                           </span>
                         )}
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        {sub.assignmentTitle} • {sub.submittedAt ? `Handed in ${formatDateIST(sub.submittedAt)}` : "In Progress"}
+                        {sub.assignmentTitle} • {sub.submittedAt ? `Handed in ${formatDateIST(sub.submittedAt)}` : "In progress"}
                       </p>
                     </div>
 
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2.5">
                       <span
-                        className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase border ${
+                        className={`px-2 py-0.5 rounded text-[10px] font-medium border ${
                           sub.status === "approved"
-                            ? "bg-blue-500/10 text-blue-600 border-blue-500/20"
+                            ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30"
                             : sub.status === "submitted" || sub.status === "late_submitted"
-                            ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
+                            ? "bg-sky-500/10 text-sky-700 dark:text-sky-400 border-sky-500/30"
                             : sub.status === "changes_requested"
-                            ? "bg-amber-500/10 text-amber-600 border-amber-500/20"
-                            : "bg-muted text-muted-foreground border-border"
+                            ? "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30"
+                            : "bg-muted text-foreground border-border"
                         }`}
                       >
                         {sub.status === "approved"
@@ -2057,7 +2210,7 @@ export default function ClassroomPage({ params }: PageProps) {
                           : sub.status === "submitted" || sub.status === "late_submitted"
                           ? "Submitted"
                           : sub.status === "changes_requested"
-                          ? "Changes Requested"
+                          ? "Changes requested"
                           : "Draft"}
                       </span>
 
@@ -2066,18 +2219,56 @@ export default function ClassroomPage({ params }: PageProps) {
                           disabled
                           size="sm"
                           variant="outline"
-                          className="font-semibold rounded-xl h-8 px-3 text-xs opacity-60 cursor-not-allowed"
+                          className="font-medium rounded-md h-8 px-3 text-xs opacity-60 cursor-not-allowed"
                         >
-                          Revoked (Cannot Evaluate)
+                          Revoked
+                        </Button>
+                      ) : sub.status === "approved" ? (
+                        <Button
+                          asChild
+                          variant="outline"
+                          size="sm"
+                          className="font-semibold rounded-md h-8 px-3 text-xs glass-btn-emerald-outline shadow-xs active:scale-[0.98] transition-all cursor-pointer gap-1.5"
+                        >
+                          <Link href={`/editor/${sub.id}`}>
+                            <span>View evaluation</span>
+                            <ArrowUpRight className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+                          </Link>
+                        </Button>
+                      ) : sub.status === "submitted" || sub.status === "late_submitted" ? (
+                        <Button
+                          asChild
+                          variant="outline"
+                          size="sm"
+                          className="font-semibold rounded-md h-8 px-3 text-xs glass-btn-amber shadow-xs active:scale-[0.98] transition-all cursor-pointer gap-1.5"
+                        >
+                          <Link href={`/editor/${sub.id}`}>
+                            <span>Review journal</span>
+                            <ArrowRight className="size-3.5" />
+                          </Link>
+                        </Button>
+                      ) : sub.status === "changes_requested" ? (
+                        <Button
+                          asChild
+                          variant="outline"
+                          size="sm"
+                          className="font-semibold rounded-md h-8 px-3 text-xs glass-btn-amber shadow-xs active:scale-[0.98] transition-all cursor-pointer gap-1.5"
+                        >
+                          <Link href={`/editor/${sub.id}`}>
+                            <span>Review revision</span>
+                            <FileEdit className="size-3.5" />
+                          </Link>
                         </Button>
                       ) : (
                         <Button
                           asChild
+                          variant="outline"
                           size="sm"
-                          className="font-semibold rounded-xl h-8 px-3 text-xs active:scale-95 transition-all duration-150 cursor-pointer"
+                          className="font-medium rounded-md h-8 px-3 text-xs glass-btn-frosted shadow-xs active:scale-[0.98] transition-all cursor-pointer gap-1.5"
                         >
                           <Link href={`/editor/${sub.id}`}>
-                            <span>{sub.status === "approved" ? "View Evaluation" : "Review Journal"}</span>
+                            <Eye className="size-3.5 text-muted-foreground" />
+                            <span>Preview draft</span>
                           </Link>
                         </Button>
                       )}
@@ -2087,19 +2278,19 @@ export default function ClassroomPage({ params }: PageProps) {
             )}
           </div>
         ) : (
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-2.5">
             {membersLoading ? (
-              <p className="text-xs text-muted-foreground animate-pulse font-medium">
+              <p className="text-xs text-muted-foreground animate-pulse">
                 Loading roster members...
               </p>
             ) : members && members.length > 0 ? (
               members.map((member) => (
                 <div
                   key={member.studentId}
-                  className="p-4 rounded-2xl glass-card flex items-center justify-between gap-4"
+                  className="p-3.5 rounded-lg border border-border bg-card flex items-center justify-between gap-4 shadow-xs"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="size-10 rounded-xl bg-primary/10 text-primary font-bold text-xs flex items-center justify-center border border-primary/20 uppercase">
+                    <div className="size-8 rounded bg-muted text-foreground font-bold text-xs flex items-center justify-center border border-border uppercase">
                       {(member.name || member.email || "S").substring(0, 2)}
                     </div>
                     <div className="flex flex-col">
@@ -2107,19 +2298,19 @@ export default function ClassroomPage({ params }: PageProps) {
                         {member.name || member.email}
                       </h4>
                       <p className="text-xs text-muted-foreground">
-                        Enrollment: {member.enrollmentNumber} • Joined {formatDateIST(member.joinedAt)}
+                        Enrollment: <span className="font-mono">{member.enrollmentNumber}</span> • Joined {formatDateIST(member.joinedAt)}
                       </p>
                     </div>
                   </div>
                 </div>
               ))
             ) : (
-              <div className="py-16 flex flex-col items-center justify-center border-2 border-dashed border-border rounded-2xl glass-card">
-                <div className="size-14 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mb-4">
-                  <Users className="size-7" />
+              <div className="py-16 flex flex-col items-center justify-center border-2 border-dashed border-border rounded-lg bg-card">
+                <div className="size-10 rounded bg-muted text-muted-foreground flex items-center justify-center mb-3 border border-border">
+                  <Users className="size-5" />
                 </div>
-                <h4 className="font-extrabold text-xl tracking-tight">No roster members yet</h4>
-                <p className="text-xs text-muted-foreground mt-1.5 text-center max-w-sm leading-relaxed">
+                <h4 className="font-bold text-base tracking-tight font-serif">No roster members yet</h4>
+                <p className="text-xs text-muted-foreground mt-1 text-center max-w-sm leading-relaxed">
                   Students will appear here after they join your classroom using join code{" "}
                   <span className="font-mono font-bold text-foreground">{classroom.joinCode}</span>.
                 </p>
@@ -2131,159 +2322,55 @@ export default function ClassroomPage({ params }: PageProps) {
         </div>
       </main>
 
-      {/* Publish Assignment Modal (Teacher only) */}
-      {showPublishModal && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-6 animate-fade-in">
-          <div className="glass-card w-full max-w-[500px] p-6 rounded-3xl flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
-            <h3 className="font-bold text-xl tracking-tight">Publish Practical Assignment</h3>
-            <form
-              onSubmit={publishForm.handleSubmit((data) => publishMutation.mutate(data))}
-              className="flex flex-col gap-4"
-            >
-              <div className="grid grid-cols-2 gap-4">
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-semibold text-muted-foreground">Experiment #</label>
-                  <input
-                    type="number"
-                    className="h-10 rounded-xl border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    {...publishForm.register("experimentNumber", { valueAsNumber: true })}
-                  />
-                  {publishForm.formState.errors.experimentNumber && (
-                    <span className="text-xs text-destructive">
-                      {publishForm.formState.errors.experimentNumber.message}
-                    </span>
-                  )}
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-semibold text-muted-foreground">Max Marks</label>
-                  <input
-                    type="number"
-                    className="h-10 rounded-xl border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    {...publishForm.register("maxMarks", { valueAsNumber: true })}
-                  />
-                  {publishForm.formState.errors.maxMarks && (
-                    <span className="text-xs text-destructive">
-                      {publishForm.formState.errors.maxMarks.message}
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-muted-foreground">Title</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Verification of Ohm's Law"
-                  className="h-10 rounded-xl border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  {...publishForm.register("title")}
-                />
-                {publishForm.formState.errors.title && (
-                  <span className="text-xs text-destructive">{publishForm.formState.errors.title.message}</span>
-                )}
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-muted-foreground">Experiment Aim</label>
-                <textarea
-                  placeholder="To determine..."
-                  rows={2}
-                  className="rounded-xl border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  {...publishForm.register("aim")}
-                />
-                {publishForm.formState.errors.aim && (
-                  <span className="text-xs text-destructive">{publishForm.formState.errors.aim.message}</span>
-                )}
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-muted-foreground">Instructions & Procedure</label>
-                <textarea
-                  placeholder="Step 1..."
-                  rows={3}
-                  className="rounded-xl border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  {...publishForm.register("instructions")}
-                />
-                {publishForm.formState.errors.instructions && (
-                  <span className="text-xs text-destructive">{publishForm.formState.errors.instructions.message}</span>
-                )}
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-muted-foreground">Cut-off Deadline</label>
-                <input
-                  type="datetime-local"
-                  className="h-10 rounded-xl border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  {...publishForm.register("deadline")}
-                />
-                {publishForm.formState.errors.deadline && (
-                  <span className="text-xs text-destructive">{publishForm.formState.errors.deadline.message}</span>
-                )}
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-muted-foreground">Cluster / Lab Cycle (Optional)</label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    placeholder="e.g. Cluster 1: DC Circuits (leave blank for Unclustered)"
-                    list="cluster-suggestions"
-                    className="h-10 rounded-xl border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring flex-1"
-                    {...publishForm.register("clusterName")}
-                  />
-                  <datalist id="cluster-suggestions">
-                    {existingClusterNames.map((c) => (
-                      <option key={c} value={c} />
-                    ))}
-                  </datalist>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3 justify-end mt-2">
-                <Button type="button" variant="outline" onClick={() => setShowPublishModal(false)} className="rounded-xl">
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={publishMutation.isPending} className="rounded-xl">
-                  {publishMutation.isPending ? "Publishing..." : "Publish Assignment"}
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* Publish & Edit Assignment Modal (Teacher only) */}
+      <PublishExperimentModal
+        isOpen={showPublishModal}
+        onClose={() => {
+          setShowPublishModal(false);
+          setEditingAssignment(null);
+        }}
+        classroomId={classroomId}
+        classroomBatches={classroom?.batches || []}
+        existingClusterNames={existingClusterNames}
+        mode={editingAssignment ? "edit" : "create"}
+        initialData={editingAssignment}
+        hasGradedSubmissions={
+          editingAssignment ? isAssignmentGraded(editingAssignment.id) : false
+        }
+      />
 
       {/* Publish Announcement Modal */}
       {showAnnouncementModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-md">
-          <div className="w-full max-w-lg p-6 rounded-3xl glass-card flex flex-col gap-4 relative animate-in fade-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs">
+          <div className="w-full max-w-lg p-6 rounded-lg bg-card border border-border shadow-lg flex flex-col gap-4 relative animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Sparkles className="size-5 text-amber-500" />
-                <h3 className="text-lg font-bold text-foreground">Post Classroom Announcement</h3>
+                <Sparkles className="size-4 text-primary" />
+                <h3 className="font-serif font-bold text-base text-foreground">Post classroom announcement</h3>
               </div>
               <button
                 onClick={() => setShowAnnouncementModal(false)}
-                className="text-muted-foreground hover:text-foreground text-sm font-bold p-1 rounded-lg cursor-pointer"
+                className="text-muted-foreground hover:text-foreground text-sm p-1 rounded cursor-pointer"
               >
                 ✕
               </button>
             </div>
 
-            <div className="flex flex-col gap-4 mt-2">
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-muted-foreground">Announcement Title</label>
+            <div className="flex flex-col gap-3 mt-1">
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-muted-foreground">Announcement title</label>
                 <input
                   type="text"
                   placeholder="e.g. Schedule for Batch A1 Practicals"
                   value={announcementTitle}
                   onChange={(e) => setAnnouncementTitle(e.target.value)}
-                  className="h-10 rounded-xl border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="h-9 rounded-md border border-input bg-background px-3 py-1.5 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 />
               </div>
 
               {classroom?.batches && classroom.batches.length > 0 && (
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-semibold text-muted-foreground">Target Batch (Optional)</label>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-muted-foreground">Target batch (optional)</label>
                   <GlassDropdown
                     value={announcementBatch}
                     onChange={(val) => setAnnouncementBatch(val)}
@@ -2297,28 +2384,29 @@ export default function ClassroomPage({ params }: PageProps) {
                       })),
                     ]}
                     className="w-full"
-                    buttonClassName="h-10 px-3 rounded-xl bg-background"
+                    buttonClassName="h-9 px-3 rounded-md bg-background border-input text-xs"
                     renderMath={false}
                   />
                 </div>
               )}
 
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-muted-foreground">Content Message</label>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-muted-foreground">Content message</label>
                 <textarea
                   placeholder="Write your announcement details here..."
                   rows={4}
                   value={announcementContent}
                   onChange={(e) => setAnnouncementContent(e.target.value)}
-                  className="rounded-xl border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="rounded-md border border-input bg-background px-3 py-1.5 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 />
               </div>
 
-              <div className="flex items-center gap-3 justify-end mt-2">
-                <Button type="button" variant="outline" onClick={() => setShowAnnouncementModal(false)} className="rounded-xl">
+              <div className="flex items-center gap-2.5 justify-end mt-2 pt-2 border-t border-border">
+                <Button type="button" variant="outline" size="sm" onClick={() => setShowAnnouncementModal(false)} className="rounded-md h-8 px-3 text-xs">
                   Cancel
                 </Button>
                 <Button
+                  size="sm"
                   onClick={() => {
                     if (!announcementTitle.trim() || !announcementContent.trim()) {
                       setErrorMsg("Title and content are required");
@@ -2331,9 +2419,9 @@ export default function ClassroomPage({ params }: PageProps) {
                     });
                   }}
                   disabled={postAnnouncementMutation.isPending}
-                  className="rounded-xl glass-btn-amber"
+                  className="rounded-md h-8 px-3 text-xs"
                 >
-                  {postAnnouncementMutation.isPending ? "Posting..." : "Post Announcement"}
+                  {postAnnouncementMutation.isPending ? "Posting..." : "Post announcement"}
                 </Button>
               </div>
             </div>
@@ -2343,16 +2431,16 @@ export default function ClassroomPage({ params }: PageProps) {
 
       {/* Cluster Manager Modal */}
       {showClusterModal && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-6 animate-fade-in">
-          <div className="glass-card w-full max-w-lg p-6 rounded-3xl flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 sm:p-6 animate-fade-in">
+          <div className="bg-card border border-border shadow-lg w-full max-w-lg p-6 rounded-lg flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Layers className="size-5 text-indigo-500" />
-                <h3 className="font-bold text-lg tracking-tight">Manage Practical Clusters</h3>
+                <Layers className="size-4 text-primary" />
+                <h3 className="font-serif font-bold text-base tracking-tight text-foreground">Manage practical clusters</h3>
               </div>
               <button
                 onClick={() => setShowClusterModal(false)}
-                className="text-muted-foreground hover:text-foreground text-sm font-bold p-1 cursor-pointer"
+                className="text-muted-foreground hover:text-foreground text-sm p-1 cursor-pointer"
               >
                 ✕
               </button>
@@ -2364,9 +2452,9 @@ export default function ClassroomPage({ params }: PageProps) {
             </p>
 
             {/* Existing Clusters List */}
-            <div className="flex flex-col gap-2.5 mt-1">
+            <div className="flex flex-col gap-2 mt-1">
               {existingClusterNames.length === 0 ? (
-                <div className="p-6 text-center rounded-2xl border border-dashed border-border/60 text-xs text-muted-foreground">
+                <div className="p-6 text-center rounded-md border border-dashed border-border text-xs text-muted-foreground">
                   No clusters created yet. Use the card action menu or the form below to create your first cluster.
                 </div>
               ) : (
@@ -2375,14 +2463,14 @@ export default function ClassroomPage({ params }: PageProps) {
                   return (
                     <div
                       key={cName}
-                      className="p-3.5 rounded-2xl bg-muted/30 border border-border/60 flex items-center justify-between gap-3"
+                      className="p-3 rounded-md bg-muted/40 border border-border flex items-center justify-between gap-3"
                     >
                       <div className="flex items-center gap-2.5">
-                        <Folder className="size-4 text-indigo-500 shrink-0" />
+                        <Folder className="size-3.5 text-muted-foreground shrink-0" />
                         <div>
-                          <h4 className="text-sm font-bold text-foreground">{cName}</h4>
-                          <span className="text-[11px] text-muted-foreground">
-                            {count} {count === 1 ? "Experiment" : "Experiments"}
+                          <h4 className="text-xs font-bold text-foreground">{cName}</h4>
+                          <span className="text-[11px] font-medium text-muted-foreground tabular-nums">
+                            {count} {count === 1 ? "experiment" : "experiments"}
                           </span>
                         </div>
                       </div>
@@ -2392,9 +2480,9 @@ export default function ClassroomPage({ params }: PageProps) {
                         size="sm"
                         onClick={() => disbandClusterMutation.mutate(cName)}
                         disabled={disbandClusterMutation.isPending}
-                        className="text-xs text-destructive hover:bg-destructive/10 h-8 px-3 rounded-xl cursor-pointer"
+                        className="text-xs text-destructive hover:bg-destructive/10 h-7 px-2.5 rounded cursor-pointer"
                       >
-                        <FolderX className="size-3.5 mr-1" />
+                        <FolderX className="size-3 mr-1" />
                         Disband
                       </Button>
                     </div>
@@ -2404,15 +2492,15 @@ export default function ClassroomPage({ params }: PageProps) {
             </div>
 
             {/* Create New Cluster Row */}
-            <div className="flex flex-col gap-2 pt-3 border-t border-border/40">
-              <label className="text-xs font-semibold text-muted-foreground">Create New Cluster Name</label>
+            <div className="flex flex-col gap-1.5 pt-3 border-t border-border">
+              <label className="text-xs font-medium text-muted-foreground">Create new cluster name</label>
               <div className="flex items-center gap-2">
                 <input
                   type="text"
                   placeholder="e.g. Cycle 1: DC Circuits & Network Theorems"
                   value={newClusterName}
                   onChange={(e) => setNewClusterName(e.target.value)}
-                  className="flex-1 h-10 rounded-xl border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="flex-1 h-9 rounded-md border border-input bg-background px-3 py-1.5 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 />
                 <Button
                   size="sm"
@@ -2428,15 +2516,15 @@ export default function ClassroomPage({ params }: PageProps) {
                     setShowClusterModal(false);
                   }}
                   disabled={!newClusterName.trim()}
-                  className="h-10 px-4 rounded-xl text-xs font-semibold cursor-pointer"
+                  className="h-9 px-3 rounded-lg text-xs font-semibold cursor-pointer glass-btn-indigo-solid shadow-xs"
                 >
                   Create
                 </Button>
               </div>
             </div>
 
-            <div className="flex justify-end mt-2">
-              <Button variant="outline" size="sm" onClick={() => setShowClusterModal(false)} className="rounded-xl cursor-pointer">
+            <div className="flex justify-end mt-2 pt-2 border-t border-border">
+              <Button variant="outline" size="sm" onClick={() => setShowClusterModal(false)} className="rounded-lg h-8 px-3.5 text-xs font-medium cursor-pointer glass-btn-frosted shadow-xs">
                 Close
               </Button>
             </div>
@@ -2446,17 +2534,17 @@ export default function ClassroomPage({ params }: PageProps) {
 
       {/* Floating Multi-Select Bulk Action Bar for Teachers */}
       {isTeacher && selectedAssignmentIds.length > 0 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-zinc-900/95 dark:bg-zinc-800/95 text-white backdrop-blur-xl border border-white/20 shadow-2xl rounded-2xl px-5 py-3 flex items-center gap-4 animate-in fade-in slide-in-from-bottom-5 duration-200">
-          <span className="text-xs font-bold whitespace-nowrap">
-            {selectedAssignmentIds.length} {selectedAssignmentIds.length === 1 ? "Experiment" : "Experiments"} Selected
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-card text-foreground border border-border shadow-lg rounded-md px-4 py-2.5 flex items-center gap-3 animate-in fade-in slide-in-from-bottom-5 duration-150">
+          <span className="text-xs font-bold tabular-nums whitespace-nowrap">
+            {selectedAssignmentIds.length} {selectedAssignmentIds.length === 1 ? "experiment" : "experiments"} selected
           </span>
 
-          <div className="h-4 w-px bg-white/20" />
+          <div className="h-4 w-px bg-border" />
 
           <div className="flex items-center gap-2">
             <GlassDropdown
               value=""
-              placeholder="Move to Cluster..."
+              placeholder="Move to cluster..."
               options={[
                 { value: "UNCLUSTER", label: "None (Uncluster)" },
                 ...existingClusterNames.map((c) => ({
@@ -2472,7 +2560,7 @@ export default function ClassroomPage({ params }: PageProps) {
                 }
               }}
               size="sm"
-              buttonClassName="h-8 px-3 bg-white/10 hover:bg-white/20 text-white border-white/20 rounded-xl"
+              buttonClassName="h-7.5 px-2.5 bg-muted hover:bg-muted/80 text-foreground border-border rounded text-xs"
               menuClassName="w-52"
               renderMath={false}
             />
@@ -2481,7 +2569,7 @@ export default function ClassroomPage({ params }: PageProps) {
               variant="ghost"
               size="sm"
               onClick={() => setSelectedAssignmentIds([])}
-              className="text-xs text-white/70 hover:text-white h-8 px-2.5 rounded-lg cursor-pointer"
+              className="text-xs text-muted-foreground hover:text-foreground h-7 px-2 rounded cursor-pointer"
             >
               Cancel
             </Button>

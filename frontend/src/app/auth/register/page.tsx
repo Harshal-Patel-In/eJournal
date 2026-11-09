@@ -1,7 +1,8 @@
 /**
- * Register account view.
+ * Register account view — Almanac Archival Monograph.
  *
- * Enforces role selection and validation.
+ * Enforces role selection, institutional validation,
+ * and clean paper monograph typography.
  */
 
 "use client";
@@ -40,7 +41,7 @@ export default function RegisterPage() {
   const mutation = useMutation({
     mutationFn: (data: RegisterFields) =>
       api.post("/auth/register", { ...data, role: "student" }),
-    onSuccess: (data: any) => {
+    onSuccess: () => {
       // Redirect to verification screen with email preloaded
       router.push(`/auth/verify?email=${encodeURIComponent(watch("email"))}`);
     },
@@ -55,20 +56,17 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center p-6 bg-background relative overflow-hidden">
-      {/* Subtle ambient light glow underneath floating glass card */}
-      <div className="absolute size-[450px] rounded-full bg-blue-500/10 blur-[100px] pointer-events-none" />
-
-      <div className="w-full max-w-[400px] p-8 rounded-3xl bg-gradient-to-b from-white/80 via-white/65 to-white/50 dark:from-zinc-900/85 dark:via-zinc-900/75 dark:to-zinc-950/70 backdrop-blur-2xl backdrop-saturate-180 border border-white/80 dark:border-white/15 ring-1 ring-black/5 dark:ring-white/10 shadow-[0_20px_50px_-10px_rgba(0,0,0,0.1),_inset_0_1px_1px_0_rgba(255,255,255,0.95),_inset_0_-1px_1px_0_rgba(0,0,0,0.05)] dark:shadow-[0_24px_60px_-15px_rgba(0,0,0,0.7),_inset_0_1px_1px_0_rgba(255,255,255,0.18),_inset_0_-1px_1px_0_rgba(0,0,0,0.5)] flex flex-col gap-6 relative transition-all duration-300">
+    <div className="flex min-h-screen flex-col items-center justify-center p-4 sm:p-6 bg-background relative select-none">
+      <div className="w-full max-w-[400px] p-6 sm:p-8 rounded-2xl bg-card text-card-foreground border border-border/80 shadow-lg flex flex-col gap-5 relative">
         {/* Header */}
-        <div className="flex flex-col items-center gap-1 text-center">
+        <div className="flex flex-col items-center gap-1.5 text-center">
           <img
             src="/logo.png"
             alt="eJournal Logo"
-            className="h-16 w-auto object-contain mb-2"
+            className="h-12 w-auto object-contain mb-1"
           />
-          <h2 className="text-2xl font-bold tracking-tight">Student Registration</h2>
-          <p className="text-sm text-muted-foreground">
+          <h2 className="text-xl font-bold tracking-tight text-foreground font-serif">Student registration</h2>
+          <p className="text-xs text-muted-foreground">
             Create your student journal account
           </p>
         </div>
@@ -76,27 +74,27 @@ export default function RegisterPage() {
         {/* Form */}
         <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
           {errorMsg && (
-            <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm font-medium border border-destructive/20">
+            <div className="p-3 rounded-xl bg-destructive/10 text-destructive text-xs font-medium border border-destructive/20">
               {errorMsg}
             </div>
           )}
 
           {/* Institutional Student Notice */}
-          <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 text-xs text-blue-700 dark:text-blue-300 flex items-start gap-2">
-            <span className="font-bold shrink-0">Note:</span>
+          <div className="p-3 rounded-xl bg-muted/40 border border-border/80 text-xs text-muted-foreground flex items-start gap-2 leading-relaxed">
+            <span className="font-semibold text-foreground shrink-0">Note:</span>
             <span>
-              Self-registration is available for students. Faculty and instructor accounts are provisioned exclusively by Institutional Administrators.
+              Self-registration is designated for students. Faculty accounts are provisioned exclusively by Institutional Administrators.
             </span>
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold text-muted-foreground">
-              Institutional Email
+            <label className="text-xs font-medium text-muted-foreground">
+              Institutional email
             </label>
             <input
               type="email"
               placeholder="email@university.edu"
-              className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              className="h-10 rounded-xl border border-input bg-muted/40 focus:bg-background px-3.5 py-2 text-xs text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary transition-all disabled:cursor-not-allowed disabled:opacity-50"
               {...register("email")}
             />
             {errors.email && (
@@ -105,13 +103,13 @@ export default function RegisterPage() {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold text-muted-foreground">
+            <label className="text-xs font-medium text-muted-foreground">
               Password
             </label>
             <input
               type="password"
               placeholder="••••••••"
-              className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              className="h-10 rounded-xl border border-input bg-muted/40 focus:bg-background px-3.5 py-2 text-xs text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary transition-all disabled:cursor-not-allowed disabled:opacity-50"
               {...register("password")}
             />
             {errors.password && (
@@ -119,16 +117,21 @@ export default function RegisterPage() {
             )}
           </div>
 
-          <Button type="submit" size="lg" className="w-full mt-2" disabled={mutation.isPending}>
-            {mutation.isPending ? "Creating Account..." : "Register"}
+          <Button
+            type="submit"
+            size="default"
+            className="w-full mt-2 h-10 rounded-xl font-semibold text-xs glass-btn-indigo-solid active:scale-[0.98] transition-all cursor-pointer shadow-xs"
+            disabled={mutation.isPending}
+          >
+            {mutation.isPending ? "Creating account..." : "Create account"}
           </Button>
         </form>
 
         {/* Footer */}
-        <div className="text-center text-sm text-muted-foreground mt-2">
+        <div className="text-center text-xs text-muted-foreground pt-1 border-t border-border/60">
           Already registered?{" "}
           <Link href="/auth/login" className="font-semibold text-primary hover:underline">
-            Sign In
+            Sign in
           </Link>
         </div>
       </div>

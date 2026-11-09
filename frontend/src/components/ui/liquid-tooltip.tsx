@@ -196,22 +196,20 @@ export function LiquidTooltipProvider() {
         left: `${tooltip.x}px`,
         top: `${tooltip.y}px`,
       }}
-      className={`fixed z-[99999] pointer-events-none select-none flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium tracking-tight text-white bg-zinc-900/90 dark:bg-zinc-900/95 backdrop-blur-xl border border-white/15 dark:border-white/20 shadow-xl shadow-black/35 whitespace-nowrap ${
-        tooltip.side === "top" ? "animate-liquid-tooltip-top" : "animate-liquid-tooltip-bottom"
-      }`}
+      className="fixed z-[99999] pointer-events-none select-none flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium tracking-tight text-popover-foreground bg-popover border border-border shadow-md whitespace-nowrap animate-in fade-in-0 zoom-in-95 duration-100"
     >
-      <span className="font-semibold text-[11px] text-zinc-100 leading-none">
+      <span className="font-semibold text-[11px] text-foreground leading-none">
         {tooltip.content}
       </span>
 
       {tooltip.subtext && (
-        <span className="text-[10px] text-zinc-400 font-normal border-l border-white/15 pl-1.5 leading-none">
+        <span className="text-[10px] text-muted-foreground font-normal border-l border-border pl-1.5 leading-none">
           {tooltip.subtext}
         </span>
       )}
 
       {tooltip.shortcut && (
-        <kbd className="px-1.5 py-0.5 rounded bg-white/15 dark:bg-white/10 border border-white/10 text-[9.5px] font-mono font-medium text-zinc-300 ml-0.5 shrink-0 leading-none">
+        <kbd className="px-1.5 py-0.5 rounded bg-muted border border-border text-[9.5px] font-mono font-medium text-muted-foreground ml-0.5 shrink-0 leading-none">
           {tooltip.shortcut}
         </kbd>
       )}

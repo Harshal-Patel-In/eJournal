@@ -410,6 +410,35 @@ class AuthService:
         if not profile_dict:
             return user
 
+        current_profile = user.get("profile", {})
+
+        # Enforce institutional credential mutability rules once profile is complete (RULE-AUTH06)
+        if user.get("is_profile_complete", False):
+            if user["role"] == "student":
+                locked_student_fields = {"enrollmentNumber", "college", "university", "department", "name"}
+                for f in locked_student_fields:
+                    if f in profile_dict:
+                        existing_val = str(current_profile.get(f) or "").strip()
+                        new_val = str(profile_dict.get(f) or "").strip()
+                        if existing_val and new_val and existing_val.upper() != new_val.upper():
+                            raise AppException(
+                                code=ErrorCode.FORBIDDEN,
+                                message=f"Direct modification of locked credential '{f}' is prohibited. Please submit a Profile Correction Request.",
+                                status_code=status.HTTP_403_FORBIDDEN,
+                            )
+            elif user["role"] == "teacher":
+                locked_teacher_fields = {"facultyId", "college", "university", "department", "name"}
+                for f in locked_teacher_fields:
+                    if f in profile_dict:
+                        existing_val = str(current_profile.get(f) or "").strip()
+                        new_val = str(profile_dict.get(f) or "").strip()
+                        if existing_val and new_val and existing_val.upper() != new_val.upper():
+                            raise AppException(
+                                code=ErrorCode.FORBIDDEN,
+                                message=f"Direct modification of faculty appointment credential '{f}' is prohibited. Contact university administration.",
+                                status_code=status.HTTP_403_FORBIDDEN,
+                            )
+
         # Student specific formatting and validations
         if user["role"] == "student":
             if "enrollmentNumber" in profile_dict and profile_dict["enrollmentNumber"]:
@@ -451,6 +480,8 @@ class AuthService:
 
         # Construct merged profile dictionary to validate completeness
         current_profile = user.get("profile", {})
+
+
         merged_profile = {**current_profile, **profile_dict}
 
         # Check profile completeness based on user role (RULE-AUTH06)

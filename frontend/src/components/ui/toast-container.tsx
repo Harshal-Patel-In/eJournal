@@ -25,39 +25,39 @@ export function ToastContainer() {
     return unsubscribe;
   }, [removeToast]);
 
-  if (toasts.length === 0) return null; 
+  if (toasts.length === 0) return null;
 
   return (
-    <div className="fixed top-5 right-5 z-[9999] flex flex-col gap-2.5 max-w-sm w-full pointer-events-none select-none">
+    <div className="fixed bottom-4 right-4 z-[9999] flex flex-col-reverse gap-2 max-w-sm w-full pointer-events-none select-none">
       {toasts.map((item) => {
-        const typeStyles = {
-          success: "border-emerald-500/30 bg-emerald-500/10 text-foreground dark:bg-emerald-950/40 border-emerald-500/30",
-          error: "border-rose-500/30 bg-rose-500/10 text-foreground dark:bg-rose-950/40 border-rose-500/30",
-          warning: "border-amber-500/30 bg-amber-500/10 text-foreground dark:bg-amber-950/40 border-amber-500/30",
-          info: "border-indigo-500/30 bg-indigo-500/10 text-foreground dark:bg-indigo-950/40 border-indigo-500/30",
+        const typeBorder = {
+          success: "border-l-4 border-l-emerald-600",
+          error: "border-l-4 border-l-destructive",
+          warning: "border-l-4 border-l-amber-600",
+          info: "border-l-4 border-l-primary",
         };
 
         const typeIcons = {
-          success: <CheckCircle2 className="size-4 text-emerald-500 shrink-0 mt-0.5" />,
-          error: <AlertCircle className="size-4 text-rose-500 shrink-0 mt-0.5" />,
-          warning: <AlertTriangle className="size-4 text-amber-500 shrink-0 mt-0.5" />,
-          info: <Info className="size-4 text-indigo-500 shrink-0 mt-0.5" />,
+          success: <CheckCircle2 className="size-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />,
+          error: <AlertCircle className="size-4 text-destructive shrink-0 mt-0.5" />,
+          warning: <AlertTriangle className="size-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />,
+          info: <Info className="size-4 text-primary shrink-0 mt-0.5" />,
         };
 
         return (
           <div
             key={item.id}
-            className={`pointer-events-auto p-4 rounded-2xl border backdrop-blur-xl shadow-xl flex items-start justify-between gap-3 animate-in slide-in-from-top-3 fade-in duration-200 transition-all ${typeStyles[item.type]}`}
+            className={`pointer-events-auto p-3.5 rounded-xl border border-border bg-card text-card-foreground shadow-xl flex items-start justify-between gap-3 animate-in slide-in-from-bottom-2 fade-in duration-150 ${typeBorder[item.type]}`}
           >
-            <div className="flex items-start gap-3">
+            <div className="flex items-start gap-2.5 min-w-0 flex-1">
               {typeIcons[item.type]}
-              <div className="flex flex-col gap-0.5">
+              <div className="flex flex-col gap-0.5 min-w-0">
                 {item.title && (
                   <span className="text-xs font-bold tracking-tight text-foreground">
                     {item.title}
                   </span>
                 )}
-                <span className="text-xs font-medium leading-snug text-foreground/90">
+                <span className="text-xs font-normal leading-snug text-muted-foreground break-words">
                   {item.message}
                 </span>
                 {item.actionLabel && item.onAction && (
@@ -66,7 +66,7 @@ export function ToastContainer() {
                       item.onAction?.();
                       removeToast(item.id);
                     }}
-                    className="mt-2 text-[11px] font-bold text-primary hover:underline self-start cursor-pointer"
+                    className="mt-1.5 text-xs font-semibold text-primary hover:underline self-start cursor-pointer"
                   >
                     {item.actionLabel}
                   </button>
@@ -75,7 +75,8 @@ export function ToastContainer() {
             </div>
             <button
               onClick={() => removeToast(item.id)}
-              className="text-muted-foreground/60 hover:text-foreground p-0.5 rounded-lg transition-colors cursor-pointer"
+              className="text-muted-foreground hover:text-foreground p-0.5 rounded transition-colors cursor-pointer shrink-0"
+              aria-label="Dismiss toast"
             >
               <X className="size-3.5" />
             </button>

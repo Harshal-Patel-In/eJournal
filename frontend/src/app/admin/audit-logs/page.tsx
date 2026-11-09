@@ -52,14 +52,14 @@ export default function AdminAuditLogsPage() {
     // 1. Session & Auth
     if (act.includes("LOGGED_IN") || act.includes("LOGIN")) {
       return (
-        <span className="px-2.5 py-0.5 rounded-md bg-emerald-500/12 text-emerald-700 dark:text-emerald-400 font-mono text-[10px] font-extrabold border border-emerald-500/30">
+        <span className="px-2.5 py-0.5 rounded-md bg-emerald-500/12 text-emerald-700 dark:text-emerald-400 text-[10px] font-bold tracking-wide uppercase border border-emerald-500/30">
           {action}
         </span>
       );
     }
     if (act.includes("LOGGED_OUT") || act.includes("LOGOUT")) {
       return (
-        <span className="px-2.5 py-0.5 rounded-md bg-slate-500/12 text-slate-700 dark:text-slate-400 font-mono text-[10px] font-bold border border-slate-500/25">
+        <span className="px-2.5 py-0.5 rounded-md bg-slate-500/12 text-slate-700 dark:text-slate-400 text-[10px] font-bold tracking-wide uppercase border border-slate-500/25">
           {action}
         </span>
       );
@@ -68,7 +68,7 @@ export default function AdminAuditLogsPage() {
     // 2. Security & Credentials
     if (act.includes("PASSWORD") || act.includes("RESET")) {
       return (
-        <span className="px-2.5 py-0.5 rounded-md bg-sky-500/12 text-sky-700 dark:text-sky-400 font-mono text-[10px] font-extrabold border border-sky-500/30">
+        <span className="px-2.5 py-0.5 rounded-md bg-sky-500/12 text-sky-700 dark:text-sky-400 text-[10px] font-bold tracking-wide uppercase border border-sky-500/30">
           {action}
         </span>
       );
@@ -77,7 +77,7 @@ export default function AdminAuditLogsPage() {
     // 3. Faculty Onboarding / Provisioning
     if (act.includes("FACULTY")) {
       return (
-        <span className="px-2.5 py-0.5 rounded-md bg-purple-500/12 text-purple-700 dark:text-purple-400 font-mono text-[10px] font-extrabold border border-purple-500/30">
+        <span className="px-2.5 py-0.5 rounded-md bg-purple-500/12 text-purple-700 dark:text-purple-400 text-[10px] font-bold tracking-wide uppercase border border-purple-500/30">
           {action}
         </span>
       );
@@ -86,7 +86,7 @@ export default function AdminAuditLogsPage() {
     // 4. Classroom Operations & Management
     if (act.includes("CLASSROOM") || act.includes("REASSIGNED")) {
       return (
-        <span className="px-2.5 py-0.5 rounded-md bg-amber-500/12 text-amber-700 dark:text-amber-400 font-mono text-[10px] font-extrabold border border-amber-500/30">
+        <span className="px-2.5 py-0.5 rounded-md bg-amber-500/12 text-amber-700 dark:text-amber-400 text-[10px] font-bold tracking-wide uppercase border border-amber-500/30">
           {action}
         </span>
       );
@@ -95,7 +95,7 @@ export default function AdminAuditLogsPage() {
     // 5. Account Lifecycle / Suspension
     if (act.includes("STATUS") || act.includes("SUSPEND") || act.includes("DELETE") || act.includes("ARCHIVE")) {
       return (
-        <span className="px-2.5 py-0.5 rounded-md bg-rose-500/12 text-rose-700 dark:text-rose-400 font-mono text-[10px] font-extrabold border border-rose-500/30">
+        <span className="px-2.5 py-0.5 rounded-md bg-rose-500/12 text-rose-700 dark:text-rose-400 text-[10px] font-bold tracking-wide uppercase border border-rose-500/30">
           {action}
         </span>
       );
@@ -104,7 +104,7 @@ export default function AdminAuditLogsPage() {
     // 6. Journal & Academic Workflows
     if (act.includes("JOURNAL") || act.includes("SUBMITTED") || act.includes("APPROVED")) {
       return (
-        <span className="px-2.5 py-0.5 rounded-md bg-blue-500/12 text-blue-700 dark:text-blue-400 font-mono text-[10px] font-extrabold border border-blue-500/30">
+        <span className="px-2.5 py-0.5 rounded-md bg-blue-500/12 text-blue-700 dark:text-blue-400 text-[10px] font-bold tracking-wide uppercase border border-blue-500/30">
           {action}
         </span>
       );
@@ -113,14 +113,14 @@ export default function AdminAuditLogsPage() {
     // 7. General Registration
     if (act.includes("REGISTER")) {
       return (
-        <span className="px-2.5 py-0.5 rounded-md bg-indigo-500/12 text-indigo-700 dark:text-indigo-400 font-mono text-[10px] font-extrabold border border-indigo-500/30">
+        <span className="px-2.5 py-0.5 rounded-md bg-indigo-500/12 text-indigo-700 dark:text-indigo-400 text-[10px] font-bold tracking-wide uppercase border border-indigo-500/30">
           {action}
         </span>
       );
     }
 
     return (
-      <span className="px-2.5 py-0.5 rounded-md bg-muted text-foreground font-mono text-[10px] font-semibold border border-border">
+      <span className="px-2.5 py-0.5 rounded-md bg-muted text-foreground text-[10px] font-semibold tracking-wide uppercase border border-border">
         {action}
       </span>
     );
@@ -219,18 +219,18 @@ export default function AdminAuditLogsPage() {
                       </div>
                     </td>
                     <td className="py-3 px-4">
-                      <span className="text-muted-foreground font-mono text-[11px]">
+                      <span className="text-muted-foreground text-[11px] font-medium">
                         {log.entity}
                         {log.entityId ? `:${log.entityId.slice(-6)}` : ""}
                       </span>
                     </td>
                     <td className="py-3 px-4">
-                      <span className="font-mono text-[11px] text-muted-foreground flex items-center gap-1">
+                      <span className="text-[11px] text-muted-foreground font-medium flex items-center gap-1">
                         <Laptop className="size-3" />
                         {log.ipAddress}
                       </span>
                     </td>
-                    <td className="py-3 px-5 text-right font-mono text-[11px] text-muted-foreground whitespace-nowrap">
+                    <td className="py-3 px-5 text-right text-[11px] text-muted-foreground font-medium whitespace-nowrap">
                       {formatDateTimeIST(log.timestamp)}
                     </td>
                   </tr>

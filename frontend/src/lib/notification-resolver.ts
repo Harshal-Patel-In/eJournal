@@ -17,6 +17,7 @@ export type NotificationCategory =
   | "late_submission"
   | "assignment"
   | "announcement"
+  | "admin_request"
   | "system";
 
 export interface NotificationEntityRef {
@@ -53,10 +54,15 @@ export function resolveNotificationCategory(notif: NotificationEntityRef): Notif
   if (rawCat === "submission") return "submission";
   if (rawCat === "assignment") return "assignment";
   if (rawCat === "announcement") return "announcement";
+  if (rawCat === "admin_request" || rawCat === "profile_correction") return "admin_request";
 
   const type = (notif.type || "").toLowerCase().trim();
   const title = (notif.title || "").toLowerCase();
   const msg = (notif.message || "").toLowerCase();
+
+  if (type === "admin_request" || title.includes("profile correction") || (notif.entityType === "profile_change_request")) {
+    return "admin_request";
+  }
 
   if (type === "announcement" || title.includes("announcement")) return "announcement";
   if (type === "assignment" || title.includes("assignment")) return "assignment";
@@ -165,6 +171,14 @@ export function resolveNotificationTarget(
     if (classroomId) {
       return `/classrooms/${classroomId}?tab=announcements`;
     }
+  }
+
+  // 4. Primary Entity Resolution: Profile Correction Requests
+  if (category === "admin_request" || notif.entityType === "profile_change_request") {
+    const reqId = notif.entityId || (typeof notif.metadata?.requestId === "string" ? notif.metadata.requestId : null);
+    return reqId
+      ? `/admin/students?filter=pending_correction&requestId=${encodeURIComponent(reqId)}`
+      : `/admin/students?filter=pending_correction`;
   }
 
   // 4. Fallback to existing link or actionUrl
@@ -327,6 +341,18 @@ export function getCategoryDisplayMeta(
         badgeClass: "bg-cyan-50 dark:bg-cyan-500/15 text-cyan-800 dark:text-cyan-300 border-cyan-200 dark:border-cyan-500/30",
         cardHoverBtn: "group-hover:bg-cyan-500/10 group-hover:text-cyan-600 dark:group-hover:text-cyan-400 group-hover:border-cyan-500/30",
         directHoverBtn: "hover:!bg-cyan-600 hover:!text-white hover:!border-cyan-600 hover:shadow-[0_2px_8px_rgba(6,182,212,0.4)]",
+      };
+
+    case "admin_request":
+      return {
+        category: "Profile Correction",
+        badgeText: "Profile Correction",
+        actionLabel: "Review & Edit Profile",
+        iconType: "file-edit",
+        avatarBg: "bg-amber-500/10 dark:bg-amber-500/20 border-amber-500/25 dark:border-amber-500/35",
+        badgeClass: "bg-amber-50 dark:bg-amber-500/15 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-500/30 font-semibold",
+        cardHoverBtn: "group-hover:bg-amber-500/10 group-hover:text-amber-600 dark:group-hover:text-amber-400 group-hover:border-amber-500/30",
+        directHoverBtn: "hover:!bg-amber-500 hover:!text-white hover:!border-amber-500 hover:shadow-[0_2px_8px_rgba(245,158,11,0.4)]",
       };
 
     default:

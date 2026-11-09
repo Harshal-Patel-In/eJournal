@@ -10,8 +10,13 @@ from app.core.config import settings
 from app.dependencies.auth import get_active_user
 from app.schemas.auth import UserMeResponse
 from app.schemas.profile import ProfileUpdateRequest
+from app.schemas.profile_change_request import (
+    ProfileChangeRequestCreate,
+    ProfileChangeRequestResponse,
+)
 from app.schemas.response import ApiResponse, success_response
 from app.services.auth_service import AuthService
+from app.services.profile_change_request_service import ProfileChangeRequestService
 from app.utils.security import create_jwt_token
 
 router = APIRouter(prefix="/profile")
@@ -94,3 +99,46 @@ async def update_profile(
     user_dict["isAdmin"] = is_admin
     user_dict["access_token"] = access_token
     return success_response(user_dict)
+
+
+@router.post("/change-request", response_model=ApiResponse[dict])
+async def submit_change_request(
+    payload: ProfileChangeRequestCreate,
+    user: dict = Depends(get_active_user),
+    service: ProfileChangeRequestService = Depends(),
+):
+    """Submit a record correction request to administration (1-request concurrency cap)."""
+    result = await service.submit_change_request(user, payload)
+    return success_response(result)
+
+
+@router.get("/change-request/active", response_model=ApiResponse[dict | None])
+async def get_active_change_request(
+    user: dict = Depends(get_active_user),
+    service: ProfileChangeRequestService = Depends(),
+):
+    """Retrieve the student's currently active pending correction request if any."""
+    result = await service.get_active_request(user)
+    return success_response(result)
+
+
+@router.post("/change-request/{request_id}/bump", response_model=ApiResponse[dict])
+async def bump_change_request(
+    request_id: str,
+    user: dict = Depends(get_active_user),
+    service: ProfileChangeRequestService = Depends(),
+):
+    """Send reminder / bump existing request to the top of the admin stack (24h cooldown)."""
+    result = await service.bump_request(user, request_id)
+    return success_response(result)
+
+
+@router.delete("/change-request/{request_id}", response_model=ApiResponse[dict])
+async def discard_change_request(
+    request_id: str,
+    user: dict = Depends(get_active_user),
+    service: ProfileChangeRequestService = Depends(),
+):
+    """Discard and withdraw an active correction request."""
+    result = await service.discard_request(user, request_id)
+    return success_response(result)

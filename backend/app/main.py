@@ -1,5 +1,8 @@
 """eJournal Backend - FastAPI Application Entry Point."""
 
+import asyncio
+import gc
+import time
 from contextlib import asynccontextmanager
 
 # Configure robust DNS nameservers fallback for MongoDB Atlas SRV resolution
@@ -21,10 +24,51 @@ from app.core.database import connect_to_mongodb, close_mongodb_connection
 from app.core.redis import connect_to_redis, close_redis_connection
 from app.core.logging import setup_logging
 from app.middleware.error_handler import register_exception_handlers
-import time
 
 logger = structlog.get_logger(__name__)
 APP_START_TIME = time.time()
+
+# Proactively guard Uvicorn against reload/shutdown deadlocks on Windows (WatchFiles reload hang)
+# When --timeout-graceful-shutdown is None (the default in uvicorn CLI), long-lived WebSockets
+# or SSE streams cause uvicorn to hang indefinitely waiting for connections to close.
+try:
+    import uvicorn.server
+    import uvicorn.config
+
+    # Set default graceful shutdown timeout to 1s on any existing config instance
+    for _obj in gc.get_objects():
+        if isinstance(_obj, uvicorn.Config) and _obj.timeout_graceful_shutdown is None:
+            _obj.timeout_graceful_shutdown = 1
+
+    _orig_uvicorn_shutdown = uvicorn.server.Server.shutdown
+
+    async def _safe_uvicorn_shutdown(self, sockets=None):
+        if getattr(self.config, "timeout_graceful_shutdown", None) is None:
+            self.config.timeout_graceful_shutdown = 1
+
+        # Proactively close all WebSockets before uvicorn enters task wait loop
+        try:
+            from app.core.websocket_manager import websocket_manager
+            await websocket_manager.close_all()
+        except Exception:
+            pass
+
+        # Discard or close lingering connections so reload continues without freezing
+        try:
+            if hasattr(self, "server_state") and hasattr(self.server_state, "connections"):
+                for conn in list(self.server_state.connections):
+                    try:
+                        conn.shutdown()
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
+        return await _orig_uvicorn_shutdown(self, sockets)
+
+    uvicorn.server.Server.shutdown = _safe_uvicorn_shutdown
+except Exception:
+    pass
 
 
 
@@ -38,13 +82,19 @@ async def lifespan(app: FastAPI):
     await connect_to_mongodb()
     logger.info("mongodb_connected", database=settings.MONGODB_DATABASE)
 
-    # Initialize collections and indexes (RULE-DB03)
-    try:
-        from scripts.create_indexes import create_indexes
-        create_indexes()
-        logger.info("mongodb_indexes_verified")
-    except Exception as e:
-        logger.error("mongodb_indexes_verification_failed", error=str(e))
+    # Initialize collections and indexes asynchronously in background (RULE-DB03)
+    # Reuses existing database pool and does not block critical server boot path
+    async def _verify_indexes_background():
+        try:
+            from app.core.database import get_database
+            from scripts.create_indexes import create_indexes
+            db = get_database()
+            await asyncio.to_thread(create_indexes, db=db)
+            logger.info("mongodb_indexes_verified")
+        except Exception as e:
+            logger.error("mongodb_indexes_verification_failed", error=str(e))
+
+    asyncio.create_task(_verify_indexes_background())
 
     # Ensure default Super Administrator exists (documents/admin.md)
     try:
@@ -85,9 +135,24 @@ async def lifespan(app: FastAPI):
     await connect_to_redis()
     logger.info("redis_connected")
 
+    # Initialize app shutdown event for responsive SSE & WebSocket teardown
+    app.state.shutdown_event = asyncio.Event()
+
     yield
 
-    # Shutdown
+    # Shutdown: 1. Signal shutdown immediately to all active SSE streams & background workers
+    if hasattr(app.state, "shutdown_event"):
+        app.state.shutdown_event.set()
+        logger.info("shutdown_signal_dispatched")
+
+    # 2. Close all active WebSockets
+    try:
+        from app.core.websocket_manager import websocket_manager
+        await websocket_manager.close_all()
+    except Exception as e:
+        logger.warning("websocket_shutdown_error", error=str(e))
+
+    # 3. Disconnect services
     await close_redis_connection()
     logger.info("redis_disconnected")
 

@@ -76,6 +76,42 @@ class UserRepository(BaseRepository):
                 update_fields[f"profile.{key}"] = val
 
         update_fields["is_profile_complete"] = is_complete
+        if is_complete:
+            update_fields["status"] = "active"
         update_fields["updatedAt"] = datetime.now(timezone.utc)
 
         return await self.update_by_id(user_id, {"$set": update_fields})
+
+    async def find_existing_by_emails_or_enrollments(
+        self, emails: list[str], enrollments: list[str]
+    ) -> tuple[set[str], set[str]]:
+        """Pre-flight check for duplicate emails or enrollment numbers across the user directory."""
+        query_conditions = []
+        if emails:
+            query_conditions.append({"email": {"$in": [e.lower().strip() for e in emails]}})
+        if enrollments:
+            query_conditions.append({"profile.enrollmentNumber": {"$in": [en.upper().strip() for en in enrollments]}})
+
+        if not query_conditions:
+            return set(), set()
+
+        cursor = self.collection.find(
+            {"$or": query_conditions},
+            {"email": 1, "profile.enrollmentNumber": 1},
+        )
+        existing_docs = await cursor.to_list(length=None)
+
+        existing_emails = {doc.get("email", "").lower().strip() for doc in existing_docs if doc.get("email")}
+        existing_enrollments = {
+            doc.get("profile", {}).get("enrollmentNumber", "").upper().strip()
+            for doc in existing_docs
+            if doc.get("profile", {}).get("enrollmentNumber")
+        }
+        return existing_emails, existing_enrollments
+
+    async def bulk_insert_users(self, user_docs: list[dict]) -> int:
+        """Atomic batch insertion of user documents."""
+        if not user_docs:
+            return 0
+        result = await self.collection.insert_many(user_docs, ordered=False)
+        return len(result.inserted_ids)

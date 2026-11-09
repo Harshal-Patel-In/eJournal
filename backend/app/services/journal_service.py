@@ -69,6 +69,23 @@ class JournalService:
                 message="Cannot edit journal after submission or approval",
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
+
+        # Enforce Term Freeze lock (HTTP 423 Locked)
+        classroom_id = journal.get("classroomId")
+        if not classroom_id and journal.get("assignmentId"):
+            asg = await self.assignment_repo.find_by_id(journal.get("assignmentId"))
+            if asg:
+                classroom_id = asg.get("classroomId")
+
+        if classroom_id:
+            classroom = await self.classroom_repo.find_by_id(str(classroom_id))
+            if classroom and (classroom.get("is_frozen") or classroom.get("isArchived")):
+                raise AppException(
+                    code=ErrorCode.FORBIDDEN,
+                    message="Academic term is officially sealed by university administration. Journal editing is locked.",
+                    status_code=status.HTTP_423_LOCKED,
+                )
+
         return journal
 
     async def create_journal(

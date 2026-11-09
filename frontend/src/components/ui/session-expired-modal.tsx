@@ -39,14 +39,14 @@ export function SessionExpiredModal() {
   if (!isOpen || isAuthPage) return null;
 
   return (
-    <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="w-full max-w-md bg-background dark:bg-zinc-900 rounded-3xl border border-amber-500/30 p-6 shadow-2xl flex flex-col gap-5 select-none">
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/60 animate-in fade-in duration-150 select-none">
+      <div className="w-full max-w-md bg-card text-card-foreground rounded-lg border border-border p-6 shadow-xl flex flex-col gap-4">
         <div className="flex items-center gap-3">
-          <div className="size-10 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-500 flex items-center justify-center font-bold">
-            <Lock className="size-5" />
+          <div className="size-9 rounded-md bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center font-bold shrink-0">
+            <Lock className="size-4" />
           </div>
           <div className="flex flex-col">
-            <h3 className="text-base font-bold text-foreground">Session Expired</h3>
+            <h3 className="text-sm font-semibold text-foreground">Session expired</h3>
             <span className="text-xs text-muted-foreground">Authentication required</span>
           </div>
         </div>
@@ -59,10 +59,10 @@ export function SessionExpiredModal() {
           <Button
             size="sm"
             onClick={handleLoginRedirect}
-            className="gap-2 font-semibold glass-btn-amber h-9 px-5 rounded-xl cursor-pointer"
+            className="gap-2 font-semibold h-8 px-4 cursor-pointer"
           >
-            <LogIn className="size-4" />
-            <span>Log In Again</span>
+            <LogIn className="size-3.5" />
+            <span>Log in again</span>
           </Button>
         </div>
       </div>

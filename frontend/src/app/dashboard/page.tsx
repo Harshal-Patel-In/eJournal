@@ -201,22 +201,26 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-textured-workspace text-foreground flex flex-col">
-      {/* Dynamic Header Functional Layer (Apple Liquid Glass Floating Capsule Bar) */}
-      <header className="fixed top-4 left-4 sm:left-8 md:left-16 right-4 sm:right-8 md:right-16 z-40 flex items-center justify-between px-5 py-2.5 bg-gradient-to-b from-white/80 via-white/65 to-white/50 dark:from-zinc-900/85 dark:via-zinc-900/75 dark:to-zinc-950/70 backdrop-blur-2xl backdrop-saturate-180 border border-white/80 dark:border-white/15 ring-1 ring-black/5 dark:ring-white/10 shadow-[0_16px_40px_-8px_rgba(0,0,0,0.1),_inset_0_1px_1px_0_rgba(255,255,255,0.95),_inset_0_-1px_1px_0_rgba(0,0,0,0.05)] dark:shadow-[0_20px_50px_-12px_rgba(0,0,0,0.7),_inset_0_1px_1px_0_rgba(255,255,255,0.18),_inset_0_-1px_1px_0_rgba(0,0,0,0.5)] rounded-2xl select-none transition-all duration-300">
+      {/* Grounded Institutional Archival Header */}
+      <header className="sticky top-0 z-40 w-full border-b border-border bg-card/95 backdrop-blur-xs px-4 sm:px-8 py-3 flex items-center justify-between transition-colors">
         <div className="flex items-center gap-3">
           <Link href="/dashboard" className="flex items-center gap-2.5 group select-none">
             <img
               src="/logo.png"
               alt="eJournal Icon"
-              className="h-8 w-auto object-contain transition-transform group-hover:scale-105"
+              className="h-7 w-auto object-contain transition-transform group-hover:scale-105"
             />
-            <span className="font-bold text-lg tracking-tight text-foreground">
+            <span className="font-bold text-base tracking-tight text-foreground font-serif">
               eJournal
             </span>
           </Link>
+          <span className="text-muted-foreground/30 font-light select-none">/</span>
+          <span className="text-xs font-medium text-muted-foreground hidden sm:inline">
+            {isStudent ? "Student workspace" : "Faculty review console"}
+          </span>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           <ThemeToggle />
           <NotificationBell />
 
@@ -225,99 +229,98 @@ export default function DashboardPage() {
               <Button
                 variant="outline"
                 size="sm"
-                className="gap-1.5 text-xs font-bold rounded-xl h-8 px-2.5 bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30 hover:bg-amber-500/20 cursor-pointer transition-all hover:scale-105 active:scale-95"
+                className="gap-1.5 text-xs font-semibold rounded-md h-8 px-2.5 glass-btn-accent-outline cursor-pointer"
               >
-                <ShieldAlert className="size-3.5 text-amber-500" />
-                <span className="hidden sm:inline font-bold">Admin Console</span>
+                <ShieldAlert className="size-3.5 text-indigo-600 dark:text-indigo-400" />
+                <span className="hidden sm:inline">Admin console</span>
               </Button>
             </Link>
           )}
 
           <Link href="/profile" title="View & Edit Academic Profile">
             <Button
-              variant="ghost"
+              variant="outline"
               size="sm"
-              className="gap-2 text-xs font-semibold rounded-xl h-8 px-2.5 hover:bg-muted/80 text-foreground cursor-pointer transition-all hover:scale-105 active:scale-95 border border-border/50"
+              className="gap-2 text-xs font-semibold rounded-md h-8 px-2.5 glass-btn-elevated cursor-pointer"
             >
-              <div className="size-5 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold text-[10px]">
+              <div className="size-5 rounded bg-muted text-foreground flex items-center justify-center font-bold text-[10px]">
                 <User className="size-3" />
               </div>
-              <span className="hidden sm:inline font-semibold">{userDisplayName}</span>
+              <span className="hidden sm:inline">{userDisplayName}</span>
             </Button>
           </Link>
 
           <Button
-            variant="ghost"
-            color="neutral"
+            variant="outline"
             size="sm"
             onClick={() => logoutMutation.mutate()}
             disabled={logoutMutation.isPending}
-            className="gap-1.5 text-xs font-medium rounded-xl h-8 px-2.5 bg-transparent border border-rose-500/20 text-rose-700/75 dark:text-rose-300/75 hover:bg-rose-500/8 hover:border-rose-500/40 hover:text-rose-700 dark:hover:text-rose-200 active:scale-95 transition-all duration-150 cursor-pointer"
+            className="gap-1.5 text-xs font-semibold rounded-md h-8 px-2.5 glass-btn-rose-outline cursor-pointer"
             title="Sign out of eJournal"
           >
-            <LogOut className="size-3.5 text-rose-600/70 dark:text-rose-400/70" />
-            <span>Sign Out</span>
+            <LogOut className="size-3.5" />
+            <span className="hidden sm:inline">Sign out</span>
           </Button>
         </div>
       </header>
 
       {/* Main Workspace */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-6 md:p-8 pt-24 md:pt-24 flex flex-col gap-8 relative z-10">
+      <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 md:p-8 flex flex-col gap-6 relative z-10">
         {/* Teacher vs Student Workspace Hero & Operational Telemetry */}
         {isStudent ? (
           <>
-            {/* Student Welcome Deck (Seamless Surface, Zero Card Syndrome) */}
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pt-1">
-              <div className="flex flex-col gap-1.5">
+            {/* Student Welcome Deck */}
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pt-1">
+              <div className="flex flex-col gap-1">
                 <div className="flex items-center gap-2">
-                  <span className="inline-flex items-center gap-1.5 text-xs font-bold text-primary tracking-wide">
-                    <Sparkles className="size-3.5" />
-                    Student Academic Workspace
+                  <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary">
+                    <GraduationCap className="size-3.5" />
+                    Student workspace
                   </span>
                   <span className="text-muted-foreground/40">•</span>
-                  <span className="text-xs font-semibold text-muted-foreground">
+                  <span className="text-xs font-medium text-muted-foreground">
                     {user?.profile?.department || "Computer Engineering"}
                   </span>
                 </div>
-                <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-foreground">
+                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground font-serif">
                   Welcome back, {userDisplayName}
                 </h1>
-                <p className="text-sm text-muted-foreground max-w-xl">
-                  Access your active laboratory practicals, write mathematical journals, and track teacher reviews.
+                <p className="text-xs sm:text-sm text-muted-foreground max-w-xl">
+                  Active laboratory practicals, mathematical journals, and teacher review records.
                 </p>
               </div>
 
               <div className="shrink-0 flex items-center gap-3">
                 <Button
                   onClick={() => setShowJoinModal(true)}
-                  size="default"
-                  className="gap-2 font-semibold rounded-xl h-10 px-5 shadow-xs active:scale-95 transition-all cursor-pointer"
+                  size="sm"
+                  className="gap-2 font-medium rounded-md h-9 px-4 shadow-xs glass-btn-indigo-solid active:scale-[0.98] transition-all cursor-pointer"
                 >
-                  <UserPlus className="size-4" />
-                  <span>Join Classroom</span>
+                  <UserPlus className="size-3.5" />
+                  <span>Join classroom</span>
                 </Button>
               </div>
             </div>
 
-            {/* Unified Student Telemetry Cockpit (Single Cohesive Glass Bar, Zero Card Syndrome) */}
-            <div className="rounded-2xl glass-card border border-border/80 shadow-xs divide-y md:divide-y-0 md:divide-x divide-border/60 grid grid-cols-1 md:grid-cols-3 overflow-hidden">
+            {/* Unified Student Telemetry Cockpit */}
+            <div className="rounded-lg border border-border/80 bg-card shadow-xs divide-y md:divide-y-0 md:divide-x divide-border/80 grid grid-cols-1 md:grid-cols-3 overflow-hidden">
               {/* Sector 1: Coursework Progress */}
               <div className="p-5 flex items-center justify-between gap-4">
                 <div className="flex flex-col gap-0.5">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                      Coursework Completed
+                    <span className="text-xs font-semibold text-muted-foreground">
+                      Coursework completed
                     </span>
                     {(analytics?.completedApproved ?? 0) === (analytics?.totalAssigned ?? 0) && (analytics?.totalAssigned ?? 0) > 0 && (
-                      <span className="px-1.5 py-0.5 rounded-md text-[10px] font-extrabold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
-                        100% Done
+                      <span className="px-1.5 py-0.2 rounded text-[10px] font-bold tabular-nums bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/25">
+                        100% done
                       </span>
                     )}
                   </div>
                   <div className="flex items-baseline gap-2 mt-1">
-                    <span className="text-3xl font-extrabold tracking-tight text-foreground">
+                    <span className="text-3xl font-bold tracking-tight font-sans tabular-nums text-foreground">
                       {analytics?.completedApproved ?? 0}
-                      <span className="text-lg font-bold text-muted-foreground/60"> / {analytics?.totalAssigned ?? 0}</span>
+                      <span className="text-lg font-normal text-muted-foreground"> / {analytics?.totalAssigned ?? 0}</span>
                     </span>
                     <span className="text-xs text-muted-foreground font-medium">
                       {(analytics?.totalAssigned ?? 0) - (analytics?.completedApproved ?? 0) === 0 && (analytics?.totalAssigned ?? 0) > 0
@@ -326,8 +329,8 @@ export default function DashboardPage() {
                     </span>
                   </div>
                 </div>
-                <div className="size-11 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-500/25 shrink-0">
-                  <CheckCircle2 className="size-5.5" />
+                <div className="size-10 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-500/20 shrink-0">
+                  <CheckCircle2 className="size-5" />
                 </div>
               </div>
 
@@ -335,21 +338,21 @@ export default function DashboardPage() {
               <div className="p-5 flex items-center justify-between gap-4">
                 <div className="flex flex-col gap-0.5">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                      Teacher Reviews
+                    <span className="text-xs font-semibold text-muted-foreground">
+                      Teacher reviews
                     </span>
                     {(analytics?.changesRequested ?? 0) > 0 ? (
-                      <span className="px-1.5 py-0.5 rounded-md text-[10px] font-extrabold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
-                        Changes Requested
+                      <span className="px-1.5 py-0.2 rounded text-[10px] font-medium bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/30">
+                        Changes requested
                       </span>
                     ) : (analytics?.submittedPending ?? 0) > 0 ? (
-                      <span className="px-1.5 py-0.5 rounded-md text-[10px] font-extrabold bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border border-indigo-500/30">
-                        Under Review
+                      <span className="px-1.5 py-0.2 rounded text-[10px] font-medium bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 border border-indigo-500/25">
+                        Under review
                       </span>
                     ) : null}
                   </div>
                   <div className="flex items-baseline gap-2 mt-1">
-                    <span className="text-3xl font-extrabold tracking-tight text-foreground">
+                    <span className="text-3xl font-bold tracking-tight font-sans tabular-nums text-foreground">
                       {analytics?.submittedPending ?? 0}
                     </span>
                     <span className="text-xs text-muted-foreground font-medium">
@@ -357,84 +360,84 @@ export default function DashboardPage() {
                     </span>
                   </div>
                 </div>
-                <div className="size-11 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center border border-indigo-500/25 shrink-0">
-                  <Clock className="size-5.5" />
+                <div className="size-10 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center border border-amber-500/20 shrink-0">
+                  <Clock className="size-5" />
                 </div>
               </div>
 
               {/* Sector 3: Active Classroom Workspaces */}
               <div className="p-5 flex items-center justify-between gap-4">
                 <div className="flex flex-col gap-0.5">
-                  <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                    Enrolled Subjects
+                  <span className="text-xs font-semibold text-muted-foreground">
+                    Enrolled subjects
                   </span>
                   <div className="flex items-baseline gap-2 mt-1">
-                    <span className="text-3xl font-extrabold tracking-tight text-foreground">
+                    <span className="text-3xl font-bold tracking-tight font-sans tabular-nums text-foreground">
                       {classrooms?.length || 0}
                     </span>
                     <span className="text-xs text-muted-foreground font-medium">
-                      {user?.profile?.semester ? `Semester ${user.profile.semester}` : "Active Cohort"}
+                      {user?.profile?.semester ? `Semester ${user.profile.semester}` : "Active cohort"}
                     </span>
                   </div>
                 </div>
-                <div className="size-11 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-500/25 shrink-0">
-                  <BookOpen className="size-5.5" />
+                <div className="size-10 rounded-md bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center border border-indigo-500/20 shrink-0">
+                  <BookOpen className="size-5" />
                 </div>
               </div>
             </div>
           </>
         ) : (
           <>
-            {/* Faculty Welcome Deck (Seamless Surface, No Awkward Card Bubble) */}
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pt-1">
-              <div className="flex flex-col gap-1.5">
+            {/* Faculty Welcome Deck */}
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pt-1">
+              <div className="flex flex-col gap-1">
                 <div className="flex items-center gap-2">
-                  <span className="inline-flex items-center gap-1.5 text-xs font-bold text-primary tracking-wide">
-                    <Sparkles className="size-3.5" />
-                    Faculty Review Console
+                  <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary">
+                    <Building2 className="size-3.5" />
+                    Faculty review console
                   </span>
                   <span className="text-muted-foreground/40">•</span>
-                  <span className="text-xs font-semibold text-muted-foreground">
+                  <span className="text-xs font-medium text-muted-foreground">
                     {user?.profile?.department || "Computer Engineering"}
                   </span>
                 </div>
-                <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-foreground">
+                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground font-serif">
                   Welcome back, {userDisplayName}
                 </h1>
-                <p className="text-sm text-muted-foreground max-w-xl">
-                  Track student practical submissions, conduct in-line reviews, and manage lab evaluation batches.
+                <p className="text-xs sm:text-sm text-muted-foreground max-w-xl">
+                  Student practical submissions, in-line reviews, and laboratory evaluation cohorts.
                 </p>
               </div>
 
               <div className="shrink-0 flex items-center gap-3">
                 <Button
                   onClick={() => setShowCreateModal(true)}
-                  size="default"
-                  className="gap-2 font-semibold rounded-xl h-10 px-5 shadow-xs active:scale-95 transition-all cursor-pointer"
+                  size="sm"
+                  className="gap-2 font-medium rounded-md h-9 px-4 shadow-xs glass-btn-indigo-solid active:scale-[0.98] transition-all cursor-pointer"
                 >
-                  <Plus className="size-4" />
-                  <span>Create Classroom</span>
+                  <Plus className="size-3.5" />
+                  <span>Create classroom</span>
                 </Button>
               </div>
             </div>
 
-            {/* Unified Executive Telemetry Cockpit (Single Cohesive Glass Bar, Zero Card Syndrome) */}
-            <div className="rounded-2xl glass-card border border-border/80 shadow-xs divide-y md:divide-y-0 md:divide-x divide-border/60 grid grid-cols-1 md:grid-cols-3 overflow-hidden">
+            {/* Unified Executive Telemetry Cockpit */}
+            <div className="rounded-lg border border-border/80 bg-card shadow-xs divide-y md:divide-y-0 md:divide-x divide-border/80 grid grid-cols-1 md:grid-cols-3 overflow-hidden">
               {/* Sector 1: Review Queue */}
               <div className="p-5 flex items-center justify-between gap-4">
                 <div className="flex flex-col gap-0.5">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                      Awaiting Review
+                    <span className="text-xs font-semibold text-muted-foreground">
+                      Awaiting review
                     </span>
                     {(teacherAnalytics?.pendingSubmissions ?? 0) > 0 && (
-                      <span className="px-1.5 py-0.5 rounded-md text-[10px] font-extrabold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
-                        Action Needed
+                      <span className="px-1.5 py-0.2 rounded text-[10px] font-medium bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/30">
+                        Action needed
                       </span>
                     )}
                   </div>
                   <div className="flex items-baseline gap-2 mt-1">
-                    <span className="text-3xl font-extrabold tracking-tight text-foreground">
+                    <span className="text-3xl font-bold tracking-tight font-sans tabular-nums text-foreground">
                       {teacherAnalytics?.pendingSubmissions ?? 0}
                     </span>
                     <span className="text-xs text-muted-foreground font-medium">
@@ -444,25 +447,19 @@ export default function DashboardPage() {
                     </span>
                   </div>
                 </div>
-                <div
-                  className={`size-11 rounded-xl flex items-center justify-center border shrink-0 ${
-                    (teacherAnalytics?.pendingSubmissions ?? 0) > 0
-                      ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/25"
-                      : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/25"
-                  }`}
-                >
-                  <Clock className="size-5.5" />
+                <div className="size-10 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center border border-amber-500/20 shrink-0">
+                  <Clock className="size-5" />
                 </div>
               </div>
 
               {/* Sector 2: Student Enrollment */}
               <div className="p-5 flex items-center justify-between gap-4">
                 <div className="flex flex-col gap-0.5">
-                  <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                    Enrolled Students
+                  <span className="text-xs font-semibold text-muted-foreground">
+                    Enrolled students
                   </span>
                   <div className="flex items-baseline gap-2 mt-1">
-                    <span className="text-3xl font-extrabold tracking-tight text-foreground">
+                    <span className="text-3xl font-bold tracking-tight font-sans tabular-nums text-foreground">
                       {teacherAnalytics?.totalStudents ?? 0}
                     </span>
                     <span className="text-xs text-muted-foreground font-medium">
@@ -470,19 +467,19 @@ export default function DashboardPage() {
                     </span>
                   </div>
                 </div>
-                <div className="size-11 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-500/25 shrink-0">
-                  <Users className="size-5.5" />
+                <div className="size-10 rounded-md bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center border border-indigo-500/20 shrink-0">
+                  <Users className="size-5" />
                 </div>
               </div>
 
               {/* Sector 3: Curriculum Practicals */}
               <div className="p-5 flex items-center justify-between gap-4">
                 <div className="flex flex-col gap-0.5">
-                  <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                    Active Practicals
+                  <span className="text-xs font-semibold text-muted-foreground">
+                    Active practicals
                   </span>
                   <div className="flex items-baseline gap-2 mt-1">
-                    <span className="text-3xl font-extrabold tracking-tight text-foreground">
+                    <span className="text-3xl font-bold tracking-tight font-sans tabular-nums text-foreground">
                       {teacherAnalytics?.totalAssignments ?? 0}
                     </span>
                     <span className="text-xs text-muted-foreground font-medium">
@@ -490,8 +487,8 @@ export default function DashboardPage() {
                     </span>
                   </div>
                 </div>
-                <div className="size-11 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center border border-purple-500/25 shrink-0">
-                  <FlaskConical className="size-5.5" />
+                <div className="size-10 rounded-md bg-sky-500/10 text-sky-600 dark:text-sky-400 flex items-center justify-center border border-sky-500/20 shrink-0">
+                  <FlaskConical className="size-5" />
                 </div>
               </div>
             </div>
@@ -510,17 +507,17 @@ export default function DashboardPage() {
         {/* Section Title */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <h2 className="text-xl font-extrabold tracking-tight text-foreground">
-              My Classroom Workspaces
+            <h2 className="text-lg sm:text-xl font-bold tracking-tight text-foreground font-serif">
+              My classroom workspaces
             </h2>
-            <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-muted text-muted-foreground">
+            <span className="px-2 py-0.5 rounded text-xs font-semibold tabular-nums bg-muted text-muted-foreground border border-border">
               {classrooms?.length || 0}
             </span>
           </div>
         </div>
 
-        {/* Classrooms Grid (Elevated Apple-Style Cards with Visual Batch Identity) */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {/* Classrooms Grid (Archival Monograph Cards) */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {classrooms && classrooms.length > 0 ? (
             classrooms.map((room, idx) => {
               const stats = teacherAnalytics?.classroomsStats?.[room.id];
@@ -541,7 +538,7 @@ export default function DashboardPage() {
                   key={room.id}
                   onClick={() => router.push(`/classrooms/${room.id}`)}
                   className={cn(
-                    "group relative p-6 rounded-2xl glass-card hover:shadow-xl hover:-translate-y-1 transition-all duration-200 flex flex-col justify-between min-h-[220px] cursor-pointer overflow-hidden border border-border/70",
+                    "group relative p-5 rounded-xl border border-border/80 bg-card hover:border-border hover:shadow-md transition-all duration-200 flex flex-col justify-between min-h-[208px] cursor-pointer overflow-hidden",
                     theme.hoverBorder
                   )}
                   role="button"
@@ -553,11 +550,12 @@ export default function DashboardPage() {
                     }
                   }}
                 >
-                  {/* Option C: Vertical Batch Anchor Notch */}
+                  {/* Vertical Batch Anchor Notch with subject glow */}
                   <div
                     className={cn(
-                      "absolute left-0 top-6 bottom-6 w-[3.5px] rounded-r-full transition-opacity duration-200 opacity-80 group-hover:opacity-100",
-                      theme.indicator
+                      "absolute left-0 top-4 bottom-4 w-1 rounded-r-full transition-all duration-200",
+                      theme.indicator,
+                      theme.notchGlow
                     )}
                   />
 
@@ -567,13 +565,13 @@ export default function DashboardPage() {
                       <div className="flex items-center gap-1.5">
                         <span
                           className={cn(
-                            "px-2.5 py-0.5 rounded-md text-[11px] border tracking-wide",
+                            "px-2 py-0.5 rounded text-[11px] border tracking-wide font-medium",
                             theme.badge
                           )}
                         >
                           {room.subject}
                         </span>
-                        <span className="text-xs font-semibold text-muted-foreground">
+                        <span className="text-xs text-muted-foreground font-medium">
                           Div {room.division}
                         </span>
                       </div>
@@ -586,11 +584,11 @@ export default function DashboardPage() {
                             handleCopyCode(room.joinCode);
                           }}
                           title="Click to copy join code"
-                          className="inline-flex items-center gap-1.5 text-[11px] font-mono font-semibold bg-primary/10 hover:bg-primary/20 text-primary px-2.5 py-1 rounded-lg border border-primary/20 transition-all active:scale-95 cursor-pointer"
+                          className="inline-flex items-center gap-1.5 text-[11px] font-mono font-medium bg-muted hover:bg-muted/80 text-foreground px-2 py-0.5 rounded border border-border transition-all active:scale-[0.98] cursor-pointer"
                         >
                           <span>{room.joinCode}</span>
                           {copiedCode === room.joinCode ? (
-                            <Check className="size-3 text-emerald-500 animate-in zoom-in" />
+                            <Check className="size-3 text-emerald-600 dark:text-emerald-400" />
                           ) : (
                             <Copy className="size-3 opacity-60 group-hover:opacity-100" />
                           )}
@@ -599,17 +597,17 @@ export default function DashboardPage() {
                     </div>
 
                     {/* Title & Department */}
-                    <div className="mt-4">
+                    <div className="mt-3.5">
                       <h3
                         className={cn(
-                          "font-extrabold text-xl tracking-tight text-foreground line-clamp-1 transition-colors",
+                          "font-bold text-base tracking-tight text-foreground line-clamp-1 transition-colors font-serif",
                           theme.hoverTitle
                         )}
                       >
                         {room.name}
                       </h3>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {room.department} • {room.semester}
+                      <p className="text-xs text-muted-foreground font-medium mt-1">
+                        {room.department} • Semester {room.semester}
                       </p>
                     </div>
 
@@ -617,19 +615,19 @@ export default function DashboardPage() {
                     {isStudent ? (
                       <div className="flex flex-col gap-2 mt-4 pt-3 border-t border-border/40">
                         <div className="flex items-center justify-between text-xs">
-                          <span className="font-semibold text-muted-foreground flex items-center gap-1.5">
-                            <FlaskConical className="size-3.5 text-primary/80" />
-                            {studentCompleted} / {studentTotal} Practicals Done
+                          <span className="font-medium text-muted-foreground flex items-center gap-1.5">
+                            <FlaskConical className={cn("size-3", theme.accentText)} />
+                            {studentCompleted} / {studentTotal} practicals done
                           </span>
                           {studentTotal > 0 && (
-                            <span className="font-bold text-xs text-foreground font-mono">
+                            <span className="font-bold text-xs text-foreground tabular-nums">
                               {pct}%
                             </span>
                           )}
                         </div>
-                        <div className="w-full bg-muted/70 h-2 rounded-full overflow-hidden border border-border/40 p-0.5 shadow-inner">
+                        <div className="w-full bg-muted/80 h-1.5 rounded-full overflow-hidden border border-border/50">
                           <div
-                            className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 transition-all duration-500 shadow-2xs"
+                            className={cn("h-full rounded-full transition-all duration-500", theme.indicator)}
                             style={{ width: `${pct}%` }}
                           />
                         </div>
@@ -637,90 +635,111 @@ export default function DashboardPage() {
                     ) : (
                       <div className="flex items-center gap-4 mt-4 pt-3 border-t border-border/40 text-xs text-muted-foreground font-medium">
                         <div
-                          className="flex items-center gap-1.5"
-                          title={`${studentCount} enrolled students`}
+                          className="flex items-center gap-1.5 tabular-nums"
+                          title={`${studentCount} enrolled ${studentCount === 1 ? "student" : "students"}`}
                         >
-                          <Users className="size-3.5 text-primary/70" />
-                          <span>{studentCount} Students</span>
+                          <Users className="size-3 text-muted-foreground" />
+                          <span>{studentCount} {studentCount === 1 ? "student" : "students"}</span>
                         </div>
                         <span className="text-border/60">•</span>
                         <div
-                          className="flex items-center gap-1.5"
-                          title={`${assignmentCount} practical experiments`}
+                          className="flex items-center gap-1.5 tabular-nums"
+                          title={`${assignmentCount} practical ${assignmentCount === 1 ? "experiment" : "experiments"}`}
                         >
-                          <FlaskConical className="size-3.5 text-indigo-500/70" />
-                          <span>{assignmentCount} Practicals</span>
+                          <FlaskConical className="size-3 text-muted-foreground" />
+                          <span>{assignmentCount} {assignmentCount === 1 ? "practical" : "practicals"}</span>
                         </div>
                       </div>
                     )}
                   </div>
 
                   {/* Footer Action & Evaluation Status */}
-                  <div className="flex items-center justify-between border-t border-border/60 pt-4 mt-3">
+                  <div className="flex items-center justify-between border-t border-border/40 pt-3 mt-3">
                     <div>
                       {isStudent ? (
                         studentPending > 0 ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/30">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/30">
                             <Clock className="size-3" />
                             {studentPending} in review
                           </span>
                         ) : studentCompleted === studentTotal && studentTotal > 0 ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                            <CheckCircle2 className="size-3" />
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30">
+                            <CheckCircle2 className="size-3 text-emerald-600 dark:text-emerald-400" />
                             All completed
                           </span>
                         ) : studentTotal > studentCompleted ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/30">
                             <AlertCircle className="size-3" />
                             {studentTotal - studentCompleted} remaining
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium text-muted-foreground bg-muted/40 border border-border/40">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium text-muted-foreground bg-muted border border-border">
                             No practicals
                           </span>
                         )
                       ) : (
                         pendingReview > 0 ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/30">
                             <Clock className="size-3" />
                             {pendingReview} to review
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                            <CheckCircle2 className="size-3" />
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30">
+                            <CheckCircle2 className="size-3 text-emerald-600 dark:text-emerald-400" />
                             All caught up
                           </span>
                         )
                       )}
                     </div>
 
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-primary group-hover:translate-x-1 transition-transform duration-150">
-                      <span>{isStudent ? "View Workspace" : "Open Workspace"}</span>
+                    <div className={cn(
+                      "flex items-center gap-1 text-xs font-semibold group-hover:translate-x-0.5 transition-transform duration-150",
+                      theme.accentText
+                    )}>
+                      <span>{isStudent ? "View workspace" : "Open workspace"}</span>
                       <ArrowRight className="size-3.5" />
                     </div>
                   </div>
                 </div>
               );
             })
+            .concat(
+              !isStudent && classrooms.length > 0 && classrooms.length % 3 !== 0 ? [
+                <button
+                  key="create-new-cohort-placeholder"
+                  type="button"
+                  onClick={() => setShowCreateModal(true)}
+                  className="p-5 rounded-xl border-2 border-dashed border-border/70 hover:border-primary/50 bg-card hover:bg-muted/40 transition-all flex flex-col items-center justify-center gap-2.5 text-center min-h-[208px] cursor-pointer group select-none shadow-2xs"
+                >
+                  <div className="size-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <Plus className="size-5" />
+                  </div>
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-xs font-bold text-foreground">Create new cohort</span>
+                    <span className="text-[11px] text-muted-foreground">Add another division or subject space</span>
+                  </div>
+                </button>
+              ] : []
+            )
           ) : (
-            <div className="col-span-full py-16 flex flex-col items-center justify-center border-2 border-dashed border-border rounded-2xl glass-card">
-              <div className="size-14 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mb-4">
-                <BookOpen className="size-7" />
+            <div className="col-span-full py-14 flex flex-col items-center justify-center border border-dashed border-border rounded-lg bg-card/50">
+              <div className="size-12 rounded-md bg-muted text-foreground flex items-center justify-center mb-3 border border-border">
+                <BookOpen className="size-6" />
               </div>
-              <h3 className="font-extrabold text-xl tracking-tight">No workspaces found</h3>
-              <p className="text-xs text-muted-foreground mt-1.5 text-center max-w-sm leading-relaxed">
+              <h3 className="font-bold text-lg tracking-tight font-serif">No workspaces found</h3>
+              <p className="text-xs text-muted-foreground mt-1 text-center max-w-sm leading-relaxed">
                 {isStudent
-                  ? "You haven't joined any classrooms yet. Click 'Join Classroom' and enter the join code provided by your teacher."
-                  : "You haven't created any classrooms yet. Click 'Create Classroom' to start publishing practical assignments."}
+                  ? "You haven't joined any classrooms yet. Click 'Join classroom' and enter the join code provided by your instructor."
+                  : "You haven't created any classrooms yet. Click 'Create classroom' to start publishing practical assignments."}
               </p>
-              <div className="mt-5">
+              <div className="mt-4">
                 {isStudent ? (
-                  <Button onClick={() => setShowJoinModal(true)} size="sm" className="rounded-xl">
-                    Join Classroom Now
+                  <Button onClick={() => setShowJoinModal(true)} variant="outline" size="sm" className="rounded-lg h-8 px-3 text-xs font-semibold glass-btn-frosted shadow-xs">
+                    Join classroom
                   </Button>
                 ) : (
-                  <Button onClick={() => setShowCreateModal(true)} size="sm" className="rounded-xl">
-                    Create Classroom Now
+                  <Button onClick={() => setShowCreateModal(true)} size="sm" className="rounded-lg h-8 px-3.5 text-xs font-semibold glass-btn-indigo-solid shadow-xs">
+                    Create classroom
                   </Button>
                 )}
               </div>
@@ -731,16 +750,16 @@ export default function DashboardPage() {
 
       {/* Join Classroom Modal (Student only) */}
       {showJoinModal && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-6 animate-fade-in">
-          <div className="glass-card w-full max-w-[400px] p-6 rounded-3xl flex flex-col gap-4">
-            <h3 className="font-bold text-xl tracking-tight">Join Classroom</h3>
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-120">
+          <div className="bg-popover border border-border shadow-lg rounded-lg w-full max-w-sm p-6 flex flex-col gap-4">
+            <h3 className="font-bold text-lg tracking-tight font-serif">Join classroom</h3>
             <form onSubmit={joinForm.handleSubmit((data) => joinMutation.mutate(data))} className="flex flex-col gap-4">
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-muted-foreground">Join Code</label>
+                <label className="text-xs font-medium text-muted-foreground">Classroom join code</label>
                 <input
                   type="text"
                   placeholder="e.g. CS401-7F2A"
-                  className="h-10 rounded-xl border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm font-mono uppercase tracking-widest text-center focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                   {...joinForm.register("joinCode")}
                 />
                 {joinForm.formState.errors.joinCode && (
@@ -748,11 +767,11 @@ export default function DashboardPage() {
                 )}
               </div>
 
-              <div className="flex items-center gap-3 justify-end mt-2">
-                <Button type="button" variant="outline" onClick={() => setShowJoinModal(false)} className="rounded-xl">
+              <div className="flex items-center gap-2 justify-end mt-2">
+                <Button type="button" variant="outline" size="sm" onClick={() => setShowJoinModal(false)} className="rounded-lg h-8 px-3 text-xs font-medium glass-btn-frosted">
                   Cancel
                 </Button>
-                <Button type="submit" disabled={joinMutation.isPending} className="rounded-xl">
+                <Button type="submit" size="sm" disabled={joinMutation.isPending} className="rounded-lg h-8 px-4 text-xs font-semibold glass-btn-indigo-solid shadow-xs">
                   {joinMutation.isPending ? "Joining..." : "Join"}
                 </Button>
               </div>
@@ -763,16 +782,16 @@ export default function DashboardPage() {
 
       {/* Create Classroom Modal (Teacher only) */}
       {showCreateModal && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-6 animate-fade-in">
-          <div className="glass-card w-full max-w-[450px] p-6 rounded-3xl flex flex-col gap-4">
-            <h3 className="font-bold text-xl tracking-tight">Create Classroom</h3>
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-120">
+          <div className="bg-popover border border-border shadow-lg rounded-lg w-full max-w-md p-6 flex flex-col gap-4">
+            <h3 className="font-bold text-lg tracking-tight font-serif">Create classroom</h3>
             <form onSubmit={createForm.handleSubmit((data) => createMutation.mutate(data))} className="flex flex-col gap-4">
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-muted-foreground">Classroom Name</label>
+                <label className="text-xs font-medium text-muted-foreground">Classroom name</label>
                 <input
                   type="text"
-                  placeholder="e.g. OS Practicals Batch A"
-                  className="h-10 rounded-xl border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  placeholder="e.g. Operating Systems Lab Batch A"
+                  className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                   {...createForm.register("name")}
                 />
                 {createForm.formState.errors.name && (
@@ -781,11 +800,11 @@ export default function DashboardPage() {
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-muted-foreground">Subject Code / Title</label>
+                <label className="text-xs font-medium text-muted-foreground">Subject code / title</label>
                 <input
                   type="text"
                   placeholder="e.g. CS401"
-                  className="h-10 rounded-xl border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm font-mono focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                   {...createForm.register("subject")}
                 />
                 {createForm.formState.errors.subject && (
@@ -793,33 +812,33 @@ export default function DashboardPage() {
                 )}
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-3">
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-semibold text-muted-foreground">Semester</label>
+                  <label className="text-xs font-medium text-muted-foreground">Semester</label>
                   <input
                     type="text"
                     placeholder="e.g. Semester V"
-                    className="h-10 rounded-xl border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                     {...createForm.register("semester")}
                   />
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-semibold text-muted-foreground">Division</label>
+                  <label className="text-xs font-medium text-muted-foreground">Division</label>
                   <input
                     type="text"
                     placeholder="e.g. Division A"
-                    className="h-10 rounded-xl border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                     {...createForm.register("division")}
                   />
                 </div>
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-muted-foreground">Department</label>
+                <label className="text-xs font-medium text-muted-foreground">Department</label>
                 <input
                   type="text"
                   placeholder="e.g. Computer Engineering"
-                  className="h-10 rounded-xl border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                   {...createForm.register("department")}
                 />
                 {createForm.formState.errors.department && (
@@ -827,11 +846,11 @@ export default function DashboardPage() {
                 )}
               </div>
 
-              <div className="flex items-center gap-3 justify-end mt-2">
-                <Button type="button" variant="outline" onClick={() => setShowCreateModal(false)} className="rounded-xl">
+              <div className="flex items-center gap-2 justify-end mt-2">
+                <Button type="button" variant="outline" size="sm" onClick={() => setShowCreateModal(false)} className="rounded-lg h-8 px-3 text-xs font-medium glass-btn-frosted">
                   Cancel
                 </Button>
-                <Button type="submit" disabled={createMutation.isPending} className="rounded-xl">
+                <Button type="submit" size="sm" disabled={createMutation.isPending} className="rounded-lg h-8 px-4 text-xs font-semibold glass-btn-indigo-solid shadow-xs">
                   {createMutation.isPending ? "Creating..." : "Create"}
                 </Button>
               </div>

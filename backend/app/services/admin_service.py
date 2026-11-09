@@ -29,6 +29,7 @@ from app.utils.security import hash_password, verify_password
 import os
 import platform
 import re
+import hashlib
 import structlog
 import time
 import urllib.parse
@@ -552,6 +553,7 @@ class AdminService:
             student_count = db.classroom_memberships.count_documents({"classroomId": cid})
             assignment_count = db.assignments.count_documents({"classroomId": cid})
             teacher_info = teacher_map.get(c.get("teacherId"), {"name": "Unassigned", "email": None})
+            is_frozen = bool(c.get("is_frozen") or c.get("isFrozen", False))
 
             enriched.append(
                 {
@@ -567,6 +569,9 @@ class AdminService:
                     "studentCount": student_count,
                     "assignmentCount": assignment_count,
                     "isArchived": c.get("isArchived", False),
+                    "is_frozen": is_frozen,
+                    "isFrozen": is_frozen,
+                    "frozenAt": c.get("frozenAt"),
                     "createdAt": c.get("createdAt"),
                 }
             )
@@ -949,3 +954,1010 @@ class AdminService:
             "message": f"Administrative authority {'granted to' if is_admin else 'revoked from'} faculty member.",
         }
 
+
+
+    async def bulk_import_students(
+        self,
+        admin_user: dict,
+        students: list[Any],
+        target_classroom_id: str | None = None,
+        send_email_invite: bool = True,
+        ip_address: str | None = None,
+    ) -> dict:
+        """High-performance bulk student onboarding with Two-Tier pending_setup state machine."""
+        if not students:
+            raise AppException(
+                code=ErrorCode.VALIDATION_ERROR,
+                message="Student roster list cannot be empty.",
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        seen_enrollments = set()
+        cleaned_rows = []
+        candidate_emails = []
+        candidate_enrollments = []
+        skipped_errors = []
+
+        for idx, row in enumerate(students):
+            raw_enr = getattr(row, "enrollmentNumber", None) if hasattr(row, "enrollmentNumber") else (row.get("enrollmentNumber") if isinstance(row, dict) else None)
+            raw_name = getattr(row, "name", None) if hasattr(row, "name") else (row.get("name") if isinstance(row, dict) else None)
+            raw_sem = getattr(row, "semester", None) if hasattr(row, "semester") else (row.get("semester", 1) if isinstance(row, dict) else 1)
+            raw_dept = getattr(row, "department", None) if hasattr(row, "department") else (row.get("department") if isinstance(row, dict) else None)
+            raw_div = getattr(row, "division", None) if hasattr(row, "division") else (row.get("division") if isinstance(row, dict) else None)
+            raw_batch = getattr(row, "batch", None) if hasattr(row, "batch") else (row.get("batch") if isinstance(row, dict) else None)
+            raw_college = getattr(row, "college", None) if hasattr(row, "college") else (row.get("college") if isinstance(row, dict) else None)
+            raw_uni = getattr(row, "university", None) if hasattr(row, "university") else (row.get("university") if isinstance(row, dict) else "Charotar University of Science and Technology (CHARUSAT)")
+
+            enr_clean = str(raw_enr or "").upper().strip()
+            name_clean = str(raw_name or "").strip()
+
+            if not enr_clean or not name_clean:
+                skipped_errors.append({
+                    "row": idx + 1,
+                    "reason": "Missing mandatory student name or enrollment number",
+                })
+                continue
+
+            if enr_clean in seen_enrollments:
+                skipped_errors.append({
+                    "row": idx + 1,
+                    "enrollmentNumber": enr_clean,
+                    "reason": f"Duplicate enrollment number '{enr_clean}' within uploaded batch",
+                })
+                continue
+
+            seen_enrollments.add(enr_clean)
+            email_clean = f"{enr_clean.lower()}@charusat.edu.in"
+            candidate_emails.append(email_clean)
+            candidate_enrollments.append(enr_clean)
+
+            cleaned_rows.append({
+                "name": name_clean,
+                "enrollmentNumber": enr_clean,
+                "email": email_clean,
+                "semester": int(raw_sem or 1),
+                "department": raw_dept.strip() if raw_dept and str(raw_dept).strip() else None,
+                "division": str(raw_div).strip() if raw_div and str(raw_div).strip() else None,
+                "batch": str(raw_batch).strip() if raw_batch and str(raw_batch).strip() else None,
+                "college": str(raw_college).strip() if raw_college and str(raw_college).strip() else None,
+                "university": str(raw_uni).strip() if raw_uni else "Charotar University of Science and Technology (CHARUSAT)",
+            })
+
+        existing_emails, existing_enrollments = await self.user_repo.find_existing_by_emails_or_enrollments(
+            candidate_emails, candidate_enrollments
+        )
+
+        user_docs = []
+        credentials_manifest = []
+        active_count = 0
+        pending_setup_count = 0
+        email_dispatch_payload = []
+        now = datetime.now(timezone.utc)
+
+        for row in cleaned_rows:
+            enr = row["enrollmentNumber"]
+            em = row["email"]
+
+            if em in existing_emails or enr in existing_enrollments:
+                skipped_errors.append({
+                    "enrollmentNumber": enr,
+                    "email": em,
+                    "reason": "Account with this enrollment number or institutional email already exists in system",
+                })
+                continue
+
+            is_complete = bool(
+                row["department"] and row["division"] and row["batch"] and row["college"]
+            )
+            # All bulk-imported students start as pending_setup until their first login and password change
+            account_status = "pending_setup"
+            pending_setup_count += 1
+
+            temp_password = secrets.token_urlsafe(8)
+            password_hash = hash_password(temp_password)
+
+            user_id = ObjectId()
+            doc = {
+                "_id": user_id,
+                "email": em,
+                "password_hash": password_hash,
+                "role": "student",
+                "is_verified": True,
+                "is_profile_complete": False,  # Becomes True when student completes first login setup
+                "status": "pending_setup",
+                "must_change_password": True,
+                "profile": {
+                    "name": row["name"],
+                    "enrollmentNumber": enr,
+                    "semester": str(row["semester"]),
+                    "department": row["department"],
+                    "division": row["division"],
+                    "batch": row["batch"],
+                    "college": row["college"],
+                    "university": row["university"],
+                },
+                "createdAt": now,
+                "updatedAt": now,
+            }
+            user_docs.append(doc)
+
+            credentials_manifest.append({
+                "name": row["name"],
+                "enrollmentNumber": enr,
+                "email": em,
+                "temporaryPassword": temp_password,
+                "status": "pending_setup",
+                "isProfileComplete": False,
+            })
+
+            if send_email_invite:
+                email_dispatch_payload.append({
+                    "name": row["name"],
+                    "email": em,
+                    "enrollment": enr,
+                    "temp_password": temp_password,
+                    "status": account_status,
+                })
+
+        total_created = 0
+        if user_docs:
+            total_created = await self.user_repo.bulk_insert_users(user_docs)
+
+            if target_classroom_id:
+                try:
+                    cls_obj_id = ObjectId(target_classroom_id)
+                    membership_docs = [
+                        {
+                            "userId": doc["_id"],
+                            "classroomId": cls_obj_id,
+                            "role": "student",
+                            "joinedAt": now,
+                        }
+                        for doc in user_docs
+                    ]
+                    db = get_database()
+                    db.classroom_memberships.insert_many(membership_docs, ordered=False)
+                except Exception as e:
+                    logger.warning("bulk_classroom_enrollment_partial_error", error=str(e))
+
+            if email_dispatch_payload:
+                import asyncio
+
+                async def _dispatch_worker(items: list[dict]):
+                    for item in items:
+                        try:
+                            html_msg = f"""
+                            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
+                                <h2 style="color: #2563eb; margin-top: 0;">Welcome to eJournal Platform</h2>
+                                <p>Dear <strong>{item['name']}</strong>,</p>
+                                <p>Your institutional student account for eJournal has been created.</p>
+                                <div style="background-color: #f8fafc; padding: 15px; border-radius: 6px; margin: 20px 0;">
+                                    <p style="margin: 5px 0;"><strong>Enrollment Number:</strong> {item['enrollment']}</p>
+                                    <p style="margin: 5px 0;"><strong>Official Email:</strong> {item['email']}</p>
+                                    <p style="margin: 5px 0;"><strong>Temporary Password:</strong> <code style="background: #e2e8f0; padding: 2px 6px; border-radius: 4px;">{item['temp_password']}</code></p>
+                                </div>
+                                <p>Please sign in at the eJournal portal and change your password immediately.</p>
+                                {'<p style="color: #d97706;"><em>Note: Please complete your missing batch/college details upon initial login.</em></p>' if item['status'] == 'pending_setup' else ''}
+                            </div>
+                            """
+                            await send_notification_email(
+                                to_email=item["email"],
+                                subject="eJournal Student Portal Access Credentials",
+                                html_content=html_msg,
+                            )
+                        except Exception:
+                            pass
+                        await asyncio.sleep(1.0 / 15.0)
+
+                asyncio.create_task(_dispatch_worker(email_dispatch_payload))
+
+        await self.audit_repo.log_event(
+            user_id=admin_user.get("id"),
+            action="STUDENTS_BULK_IMPORTED",
+            entity="users",
+            entity_id=None,
+            ip_address=ip_address,
+        )
+
+        return {
+            "totalProcessed": len(students),
+            "totalCreated": total_created,
+            "totalSkipped": len(skipped_errors),
+            "activeCount": active_count,
+            "pendingSetupCount": pending_setup_count,
+            "credentials": credentials_manifest,
+            "skippedErrors": skipped_errors,
+        }
+
+
+    async def freeze_classroom(
+        self,
+        admin_user: dict,
+        classroom_id: str,
+        is_frozen: bool,
+        ip_address: str | None = None,
+    ) -> dict:
+        """Seal or unseal an academic term for a classroom, locking all student journal writes."""
+        db = get_database()
+        cls_obj = await self.classroom_repo.find_by_id(classroom_id)
+        if not cls_obj:
+            raise AppException(
+                code=ErrorCode.NOT_FOUND,
+                message="Classroom not found",
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+
+        now = datetime.now(timezone.utc)
+        await self.classroom_repo.update_by_id(
+            classroom_id,
+            {"$set": {"is_frozen": is_frozen, "frozenAt": now if is_frozen else None}},
+        )
+
+        action = "ACADEMIC_TERM_SEALED" if is_frozen else "ACADEMIC_TERM_UNSEALED"
+        await self.audit_repo.log_event(
+            user_id=admin_user.get("id"),
+            action=action,
+            entity="classrooms",
+            entity_id=classroom_id,
+            ip_address=ip_address,
+        )
+
+        return {
+            "id": classroom_id,
+            "name": cls_obj.get("name"),
+            "isFrozen": is_frozen,
+            "is_frozen": is_frozen,
+            "message": f"Academic term officially {'sealed' if is_frozen else 'unsealed'} for this classroom.",
+        }
+
+    async def purge_classroom_deep(
+        self,
+        admin_user: dict,
+        classroom_id: str,
+        password: str,
+        confirm_title: str,
+        ip_address: str | None = None,
+    ) -> dict:
+        """Deep Storage Purge: batch-deletes Cloudinary images and cascades MongoDB collections."""
+        # 1. Admin Password verification
+        db = get_database()
+        admin_doc = db.users.find_one({"_id": ObjectId(admin_user.get("id"))})
+        if not admin_doc or not verify_password(password, admin_doc.get("password_hash", "")):
+            raise AppException(
+                code=ErrorCode.INVALID_CREDENTIALS,
+                message="Administrative password verification failed",
+                status_code=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        # 2. Classroom Title Confirmation
+        classroom = await self.classroom_repo.find_by_id(classroom_id)
+        if not classroom:
+            raise AppException(
+                code=ErrorCode.NOT_FOUND,
+                message="Classroom not found",
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+
+        if classroom.get("name", "").strip().lower() != confirm_title.strip().lower():
+            raise AppException(
+                code=ErrorCode.VALIDATION_ERROR,
+                message="Classroom title confirmation does not match exact record",
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # 3. Collect all assignments and journals in this classroom
+        asg_cursor = db.assignments.find({"classroomId": ObjectId(classroom_id)}, {"_id": 1})
+        asg_ids = [doc["_id"] for doc in asg_cursor]
+
+        journal_cursor = db.journals.find(
+            {"$or": [{"assignmentId": {"$in": asg_ids}}, {"assignmentId": {"$in": [str(a) for a in asg_ids]}}]},
+            {"_id": 1, "blocks": 1},
+        )
+        journals = list(journal_cursor)
+        journal_ids = [j["_id"] for j in journals]
+        journal_str_ids = [str(j) for j in journal_ids]
+
+        # 4. Scan image blocks for Cloudinary assets
+        cloudinary_public_ids = []
+        for j in journals:
+            for block in j.get("blocks", []):
+                if block.get("type") == "image":
+                    c_data = block.get("content") or {}
+                    pid = c_data.get("publicId") or c_data.get("public_id")
+                    if pid:
+                        cloudinary_public_ids.append(pid)
+
+        # 5. Batch-delete Cloudinary assets via Admin API
+        if cloudinary_public_ids:
+            try:
+                import cloudinary.api
+                for i in range(0, len(cloudinary_public_ids), 100):
+                    chunk = cloudinary_public_ids[i:i + 100]
+                    cloudinary.api.delete_resources(chunk, resource_type="image")
+            except Exception as e:
+                logger.warning("cloudinary_asset_deletion_failed", error=str(e))
+
+        # 6. Cascading MongoDB Deletes
+        db.journals.delete_many({"_id": {"$in": journal_ids}})
+        db.block_versions.delete_many({"journalId": {"$in": journal_str_ids}})
+        db.comments.delete_many({"journalId": {"$in": journal_str_ids}})
+        db.classroom_memberships.delete_many({"classroomId": ObjectId(classroom_id)})
+        db.assignments.delete_many({"_id": {"$in": asg_ids}})
+        db.classrooms.delete_one({"_id": ObjectId(classroom_id)})
+
+        reclaimed_bytes = len(cloudinary_public_ids) * 800 * 1024 + len(journal_ids) * 50 * 1024
+
+        await self.audit_repo.log_event(
+            user_id=admin_user.get("id"),
+            action="CLASSROOM_DEEP_PURGED",
+            entity="classrooms",
+            entity_id=classroom_id,
+            ip_address=ip_address,
+        )
+
+        return {
+            "success": True,
+            "classroomId": classroom_id,
+            "reclaimedBytes": reclaimed_bytes,
+            "imagesPurged": len(cloudinary_public_ids),
+            "journalsPurged": len(journal_ids),
+            "assignmentsPurged": len(asg_ids),
+            "message": f"Classroom deep purge complete. Reclaimed ~{round(reclaimed_bytes / (1024 * 1024), 1)} MB storage.",
+        }
+
+    async def get_defaulters_radar(
+        self,
+        classroom_id: str | None = None,
+        threshold: float = 75.0,
+    ) -> dict:
+        """High-performance indexed aggregation pipeline calculating defaulter student indices (< 75%)."""
+        db = get_database()
+
+        classroom_filter = {}
+        if classroom_id:
+            classroom_filter["_id"] = ObjectId(classroom_id)
+
+        target_classrooms = list(db.classrooms.find(classroom_filter, {"_id": 1, "name": 1, "subjectCode": 1}))
+        if not target_classrooms:
+            return {
+                "classroomId": classroom_id,
+                "classroomName": None,
+                "threshold": threshold,
+                "totalStudents": 0,
+                "defaultersCount": 0,
+                "defaulters": [],
+            }
+
+        # Map of unique student_id (str) -> {"total": int, "approved": int}
+        student_workload: dict[str, dict[str, int]] = {}
+
+        for cls in target_classrooms:
+            cls_id = cls["_id"]
+            cls_keys = [cls_id, str(cls_id)]
+            # Total published assignments for this classroom
+            asg_cursor = db.assignments.find({"classroomId": {"$in": cls_keys}}, {"_id": 1})
+            asg_ids = [doc["_id"] for doc in asg_cursor]
+            total_practicals = len(asg_ids)
+            if total_practicals == 0:
+                continue
+
+            asg_keys = asg_ids + [str(a) for a in asg_ids]
+
+            # Enrolled students (support both studentId and userId, string and ObjectId)
+            memberships = list(db.classroom_memberships.find({"classroomId": {"$in": cls_keys}}))
+            raw_sids = [m.get("studentId") or m.get("userId") for m in memberships if (m.get("studentId") or m.get("userId"))]
+            cls_student_ids = list({str(s) for s in raw_sids})
+            if not cls_student_ids:
+                continue
+
+            # Query approved journals in one batch for this classroom's assignments
+            approved_cursor = db.journals.aggregate([
+                {
+                    "$match": {
+                        "assignmentId": {"$in": asg_keys},
+                        "status": "approved",
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": "$studentId",
+                        "approvedCount": {"$sum": 1},
+                    }
+                }
+            ])
+            approved_map = {str(doc["_id"]): doc["approvedCount"] for doc in approved_cursor}
+
+            for sid in cls_student_ids:
+                if sid not in student_workload:
+                    student_workload[sid] = {"total": 0, "approved": 0}
+                student_workload[sid]["total"] += total_practicals
+                student_workload[sid]["approved"] += approved_map.get(sid, 0)
+
+        if not student_workload:
+            primary_name = target_classrooms[0]["name"] if len(target_classrooms) == 1 else "All Department Labs"
+            return {
+                "classroomId": classroom_id,
+                "classroomName": primary_name,
+                "threshold": threshold,
+                "totalStudents": 0,
+                "defaultersCount": 0,
+                "defaulters": [],
+            }
+
+        # Query student profiles for all unique evaluated students in one batch
+        student_object_ids = []
+        for sid in student_workload.keys():
+            student_object_ids.append(sid)
+            if ObjectId.is_valid(sid):
+                student_object_ids.append(ObjectId(sid))
+
+        student_users = list(db.users.find({"_id": {"$in": student_object_ids}}, {"_id": 1, "email": 1, "profile": 1}))
+        user_map = {str(u["_id"]): u for u in student_users}
+
+        all_defaulters = []
+        for sid, metrics in student_workload.items():
+            total = metrics["total"]
+            approved = metrics["approved"]
+            rate = round((approved / total) * 100, 1) if total > 0 else 0.0
+
+            if rate < threshold:
+                s_user = user_map.get(sid, {})
+                s_profile = s_user.get("profile") or {}
+                all_defaulters.append({
+                    "studentId": sid,
+                    "name": s_profile.get("name", "Student"),
+                    "enrollmentNumber": s_profile.get("enrollmentNumber", "—"),
+                    "email": s_user.get("email", ""),
+                    "batch": s_profile.get("batch"),
+                    "department": s_profile.get("department"),
+                    "division": s_profile.get("division"),
+                    "approvedPracticals": approved,
+                    "totalPracticals": total,
+                    "completionRate": rate,
+                })
+
+        # Sort defaulters by lowest completion rate first
+        all_defaulters.sort(key=lambda d: d["completionRate"])
+
+        primary_name = target_classrooms[0]["name"] if len(target_classrooms) == 1 else "All Department Labs"
+
+        return {
+            "classroomId": classroom_id,
+            "classroomName": primary_name,
+            "threshold": threshold,
+            "totalStudents": len(student_workload),
+            "defaultersCount": len(all_defaulters),
+            "defaulters": all_defaulters,
+        }
+
+    # =========================================================================
+    # Phase 3: Integrity Screener & Accreditation Portfolio Subsystems
+    # =========================================================================
+
+    @staticmethod
+    def _normalize_text(text: str) -> str:
+        """Normalize text by lowercasing and stripping punctuation and excess whitespace."""
+        if not text:
+            return ""
+        text = re.sub(r"[^\w\s]", " ", text.lower())
+        return " ".join(text.split())
+
+    @staticmethod
+    def _normalize_code(code: str) -> str:
+        """Strip single and multi-line comments and collapse whitespace in code."""
+        if not code:
+            return ""
+        code = re.sub(r"/\*[\s\S]*?\*/", "", code)
+        code = re.sub(r'"""[\s\S]*?"""', "", code)
+        code = re.sub(r"'''[\s\S]*?'''", "", code)
+        code = re.sub(r"//.*$", "", code, flags=re.MULTILINE)
+        code = re.sub(r"#.*$", "", code, flags=re.MULTILINE)
+        return " ".join(code.lower().split())
+
+    @staticmethod
+    def _normalize_table(content: dict) -> str:
+        """Extract and normalize all cell values from table block content."""
+        if not content:
+            return ""
+        rows = content.get("rows") or []
+        cells = []
+        for r in rows:
+            if isinstance(r, list):
+                for cell in r:
+                    cells.append(str(cell).strip().lower())
+            elif isinstance(r, dict):
+                for v in r.values():
+                    cells.append(str(v).strip().lower())
+        return " ".join(cells)
+
+    @staticmethod
+    def _normalize_math(content: dict) -> str:
+        """Normalize mathematical LaTeX expressions."""
+        if not content:
+            return ""
+        eq = content.get("latex") or content.get("formula") or content.get("text") or ""
+        # Strip layout and spacing commands while preserving math operators
+        eq = re.sub(r"\\(left|right|text|mathrm|mathbf|displaystyle|quad|qquad|,|;|!)\b", "", eq)
+        eq = re.sub(r"[\s\\]", "", eq.lower())
+        return eq
+
+    @classmethod
+    def _winnowing_fingerprints(cls, text: str, k: int = 15, w: int = 15) -> set[int]:
+        """
+        Winnowing local fingerprinting algorithm (Schleimer et al.).
+        Generates deterministic hash fingerprints resistant to whitespace variation.
+        """
+        if len(text) < k:
+            if not text:
+                return set()
+            return {int(hashlib.md5(text.encode("utf-8")).hexdigest()[:12], 16)}
+
+        hashes = []
+        for i in range(len(text) - k + 1):
+            kgram = text[i : i + k]
+            h = int(hashlib.md5(kgram.encode("utf-8")).hexdigest()[:12], 16)
+            hashes.append(h)
+
+        if len(hashes) <= w:
+            return {min(hashes)} if hashes else set()
+
+        fingerprints = set()
+        min_idx = -1
+
+        for i in range(len(hashes) - w + 1):
+            window = hashes[i : i + w]
+            w_min_val = min(window)
+            w_min_idx = i + [j for j, v in enumerate(window) if v == w_min_val][-1]
+
+            if w_min_idx != min_idx:
+                fingerprints.add(w_min_val)
+                min_idx = w_min_idx
+
+        return fingerprints
+
+    async def scan_similarity(
+        self,
+        admin_user: dict,
+        assignment_id: str | None = None,
+        classroom_id: str | None = None,
+        threshold: float = 0.50,
+        ip_address: str | None = None,
+    ) -> dict:
+        """Cross-journal multi-block similarity screener across code, math, tables, and paragraphs."""
+        db = get_database()
+
+        # 1. Resolve Target Assignments
+        asg_filter: dict[str, Any] = {}
+        asg_title = None
+        cls_name = None
+
+        if assignment_id:
+            asg_lookup_keys = [assignment_id]
+            if ObjectId.is_valid(assignment_id):
+                asg_lookup_keys.append(ObjectId(assignment_id))
+            asg_doc = db.assignments.find_one({"_id": {"$in": asg_lookup_keys}})
+            if not asg_doc:
+                raise AppException(code=ErrorCode.NOT_FOUND, message="Target assignment not found", status_code=status.HTTP_404_NOT_FOUND)
+            asg_filter["_id"] = asg_doc["_id"]
+            asg_title = asg_doc.get("title")
+            classroom_id = str(asg_doc.get("classroomId"))
+        elif classroom_id:
+            cls_lookup_keys = [classroom_id]
+            if ObjectId.is_valid(classroom_id):
+                cls_lookup_keys.append(ObjectId(classroom_id))
+            asg_filter["classroomId"] = {"$in": cls_lookup_keys}
+
+        if classroom_id:
+            cls_lookup_keys = [classroom_id]
+            if ObjectId.is_valid(classroom_id):
+                cls_lookup_keys.append(ObjectId(classroom_id))
+            cls_doc = db.classrooms.find_one({"_id": {"$in": cls_lookup_keys}})
+            if cls_doc:
+                cls_name = cls_doc.get("name")
+
+        target_assignments = list(db.assignments.find(asg_filter, {"_id": 1, "title": 1, "description": 1, "classroomId": 1}))
+        if not target_assignments:
+            report_id = str(ObjectId())
+            empty_report = {
+                "id": report_id,
+                "assignmentId": assignment_id,
+                "assignmentTitle": asg_title or "No Published Lab Practicals Found",
+                "classroomId": classroom_id,
+                "classroomName": cls_name or "Course",
+                "generatedAt": datetime.now(timezone.utc).isoformat(),
+                "totalSubmissions": 0,
+                "flaggedPairsCount": 0,
+                "threshold": threshold,
+                "matches": [],
+            }
+            db.integrity_reports.insert_one({"_id": ObjectId(report_id), **empty_report})
+            return empty_report
+
+        asg_obj_ids = [a["_id"] for a in target_assignments]
+        asg_keys = asg_obj_ids + [str(a) for a in asg_obj_ids]
+
+        # 2. Fetch Submitted/Approved Student Journals
+        journals_cursor = db.journals.find(
+            {
+                "assignmentId": {"$in": asg_keys},
+                "status": {"$in": ["submitted", "late_submitted", "approved"]},
+            },
+            {"_id": 1, "studentId": 1, "assignmentId": 1, "title": 1, "blocks": 1, "studentName": 1, "enrollmentNumber": 1}
+        )
+        journals = list(journals_cursor)
+
+        if len(journals) < 2:
+            report_id = str(ObjectId())
+            empty_report = {
+                "id": report_id,
+                "assignmentId": assignment_id,
+                "assignmentTitle": asg_title or (target_assignments[0]["title"] if len(target_assignments) == 1 else "Batch Lab Practicals"),
+                "classroomId": classroom_id,
+                "classroomName": cls_name,
+                "generatedAt": datetime.now(timezone.utc).isoformat(),
+                "totalSubmissions": len(journals),
+                "flaggedPairsCount": 0,
+                "threshold": threshold,
+                "matches": [],
+            }
+            db.integrity_reports.insert_one({"_id": ObjectId(report_id), **empty_report})
+            return empty_report
+
+        # 3. Fetch User Profiles to enrich student data
+        student_ids = [j.get("studentId") for j in journals if j.get("studentId")]
+        users_cursor = db.users.find(
+            {"_id": {"$in": [ObjectId(s) for s in student_ids if ObjectId.is_valid(s)]}},
+            {"_id": 1, "email": 1, "profile": 1}
+        )
+        user_map = {str(u["_id"]): u for u in users_cursor}
+
+        # 4. Extract Block-Level and Category-Level Fingerprints per Student Journal
+        processed_journals = []
+        for j in journals:
+            s_id = str(j.get("studentId"))
+            u_doc = user_map.get(s_id, {})
+            u_prof = u_doc.get("profile") or {}
+            student_meta = {
+                "id": s_id,
+                "name": u_prof.get("name") or j.get("studentName") or "Student",
+                "enrollment": u_prof.get("enrollmentNumber") or j.get("enrollmentNumber") or "—",
+                "email": u_doc.get("email", ""),
+            }
+
+            blocks = j.get("blocks") or []
+            cat_texts: dict[str, list[str]] = {"code": [], "table": [], "paragraph": [], "math": []}
+            block_fingerprints = []
+
+            for b in blocks:
+                b_type = b.get("type")
+                b_id = b.get("id") or str(ObjectId())
+                b_content = b.get("content") or {}
+
+                norm_str = ""
+                snippet = ""
+
+                if b_type == "code":
+                    raw_code = b_content.get("code") or ""
+                    snippet = raw_code[:120]
+                    norm_str = self._normalize_code(raw_code)
+                    cat_texts["code"].append(norm_str)
+                elif b_type == "table":
+                    snippet = f"Table ({len(b_content.get('rows') or [])} rows)"
+                    norm_str = self._normalize_table(b_content)
+                    cat_texts["table"].append(norm_str)
+                elif b_type in ["paragraph", "heading"]:
+                    raw_p = b_content.get("text") or ""
+                    snippet = raw_p[:120]
+                    norm_str = self._normalize_text(raw_p)
+                    cat_texts["paragraph"].append(norm_str)
+                elif b_type == "math":
+                    raw_m = b_content.get("latex") or b_content.get("formula") or ""
+                    snippet = raw_m[:120]
+                    norm_str = self._normalize_math(b_content)
+                    cat_texts["math"].append(norm_str)
+
+                if norm_str:
+                    fps = self._winnowing_fingerprints(norm_str)
+                    if fps:
+                        block_fingerprints.append({
+                            "blockType": "paragraph" if b_type == "heading" else b_type,
+                            "blockId": b_id,
+                            "fps": fps,
+                            "snippet": snippet,
+                        })
+
+            cat_fps = {
+                cat: self._winnowing_fingerprints(" ".join(texts))
+                for cat, texts in cat_texts.items()
+                if texts
+            }
+
+            processed_journals.append({
+                "journalId": str(j["_id"]),
+                "student": student_meta,
+                "catFps": cat_fps,
+                "blockFps": block_fingerprints,
+            })
+
+        # 5. Pairwise Combinations (3,160 pairs for 80 students)
+        matches = []
+        n_docs = len(processed_journals)
+
+        for i in range(n_docs):
+            for j in range(i + 1, n_docs):
+                j_a = processed_journals[i]
+                j_b = processed_journals[j]
+
+                # Prevent self-comparison
+                if j_a["student"]["id"] == j_b["student"]["id"]:
+                    continue
+
+                cat_sims: dict[str, float] = {}
+                weights = {"code": 0.35, "table": 0.25, "paragraph": 0.25, "math": 0.15}
+                weighted_sum = 0.0
+                total_weight = 0.0
+
+                for cat in ["code", "table", "paragraph", "math"]:
+                    fps_a = j_a["catFps"].get(cat, set())
+                    fps_b = j_b["catFps"].get(cat, set())
+
+                    if fps_a or fps_b:
+                        intersection = len(fps_a & fps_b)
+                        union = len(fps_a | fps_b)
+                        sim = round(intersection / union, 2) if union > 0 else 0.0
+                        cat_sims[cat] = sim
+                        w = weights[cat]
+                        weighted_sum += sim * w
+                        total_weight += w
+                    else:
+                        cat_sims[cat] = 0.0
+
+                overall_sim = round(weighted_sum / total_weight, 2) if total_weight > 0 else 0.0
+
+                # Flag pair if overall similarity >= threshold OR any core technical block >= 0.70
+                if overall_sim >= threshold or cat_sims.get("code", 0) >= 0.70 or cat_sims.get("table", 0) >= 0.70:
+                    matched_block_pairs = []
+
+                    # Find specific matching blocks
+                    for blk_a in j_a["blockFps"]:
+                        for blk_b in j_b["blockFps"]:
+                            if blk_a["blockType"] == blk_b["blockType"]:
+                                b_inter = len(blk_a["fps"] & blk_b["fps"])
+                                b_union = len(blk_a["fps"] | blk_b["fps"])
+                                b_sim = round(b_inter / b_union, 2) if b_union > 0 else 0.0
+                                if b_sim >= 0.55:
+                                    matched_block_pairs.append({
+                                        "blockType": blk_a["blockType"],
+                                        "blockIdA": blk_a["blockId"],
+                                        "blockIdB": blk_b["blockId"],
+                                        "similarity": b_sim,
+                                        "snippetA": blk_a["snippet"],
+                                        "snippetB": blk_b["snippet"],
+                                    })
+
+                    matches.append({
+                        "studentA": j_a["student"],
+                        "studentB": j_b["student"],
+                        "journalIdA": j_a["journalId"],
+                        "journalIdB": j_b["journalId"],
+                        "overallSimilarity": overall_sim,
+                        "categoryMatches": cat_sims,
+                        "matchedBlockPairs": matched_block_pairs,
+                    })
+
+        matches.sort(key=lambda m: m["overallSimilarity"], reverse=True)
+
+        report_id = str(ObjectId())
+        report_data = {
+            "id": report_id,
+            "assignmentId": assignment_id,
+            "assignmentTitle": asg_title or (target_assignments[0]["title"] if len(target_assignments) == 1 else "Batch Lab Practicals"),
+            "classroomId": classroom_id,
+            "classroomName": cls_name or "Department Course",
+            "generatedAt": datetime.now(timezone.utc).isoformat(),
+            "totalSubmissions": len(journals),
+            "flaggedPairsCount": len(matches),
+            "threshold": threshold,
+            "matches": matches,
+        }
+
+        db.integrity_reports.insert_one({"_id": ObjectId(report_id), **report_data})
+
+        await self.audit_repo.log_event(
+            user_id=admin_user.get("id"),
+            action="SIMILARITY_SCAN_EXECUTED",
+            entity="integrity_reports",
+            entity_id=report_id,
+            ip_address=ip_address,
+        )
+
+        return report_data
+
+    async def list_similarity_reports(
+        self,
+        classroom_id: str | None = None,
+        assignment_id: str | None = None,
+        skip: int = 0,
+        limit: int = 20,
+    ) -> dict:
+        """List historical academic integrity reports."""
+        db = get_database()
+        query: dict[str, Any] = {}
+        if classroom_id:
+            query["classroomId"] = classroom_id
+        if assignment_id:
+            query["assignmentId"] = assignment_id
+
+        total = db.integrity_reports.count_documents(query)
+        cursor = db.integrity_reports.find(query).sort("generatedAt", -1).skip(skip).limit(limit)
+        reports = []
+        for r in cursor:
+            r["id"] = str(r.get("_id", r.get("id")))
+            r.pop("_id", None)
+            reports.append(r)
+
+        return {"total": total, "reports": reports}
+
+    async def get_similarity_report_by_id(self, report_id: str) -> dict:
+        """Fetch a specific integrity report by ID."""
+        db = get_database()
+        report = db.integrity_reports.find_one({"_id": ObjectId(report_id)})
+        if not report:
+            report = db.integrity_reports.find_one({"id": report_id})
+        if not report:
+            raise AppException(code=ErrorCode.NOT_FOUND, message="Integrity report not found", status_code=status.HTTP_404_NOT_FOUND)
+
+        report["id"] = str(report.get("_id", report.get("id")))
+        report.pop("_id", None)
+        return report
+
+    async def get_accreditation_portfolio_data(
+        self,
+        classroom_id: str,
+    ) -> dict:
+        """
+        Aggregate comprehensive institutional portfolio dataset for NBA / NAAC accreditation.
+        Partitions class into Top 10%, Mid 10%, and Low 10% sampling tiers.
+        """
+        db = get_database()
+        cls_keys = [classroom_id]
+        if ObjectId.is_valid(classroom_id):
+            cls_keys.append(ObjectId(classroom_id))
+        cls_doc = db.classrooms.find_one({"_id": {"$in": cls_keys}})
+        if not cls_doc:
+            raise AppException(code=ErrorCode.NOT_FOUND, message="Classroom not found", status_code=status.HTTP_404_NOT_FOUND)
+
+        # Faculty Info
+        teacher_id = cls_doc.get("teacherId")
+        teacher_keys = [teacher_id]
+        if teacher_id and ObjectId.is_valid(teacher_id):
+            teacher_keys.append(ObjectId(teacher_id))
+        teacher_doc = db.users.find_one({"_id": {"$in": teacher_keys}}) if teacher_id else None
+        teacher_name = teacher_doc.get("profile", {}).get("name") or teacher_doc.get("email") or "Faculty Instructor"
+
+        # Assignments
+        asg_cursor = db.assignments.find({"classroomId": {"$in": cls_keys}}).sort("createdAt", 1)
+        assignments = list(asg_cursor)
+        asg_map = {str(a["_id"]): a for a in assignments}
+        asg_keys = [a["_id"] for a in assignments] + [str(a["_id"]) for a in assignments]
+
+        # Enrolled Students (support both studentId and userId, string and ObjectId)
+        memberships = list(db.classroom_memberships.find({"classroomId": {"$in": cls_keys}}))
+        raw_sids = [m.get("studentId") or m.get("userId") for m in memberships if (m.get("studentId") or m.get("userId"))]
+        student_keys = []
+        for s in raw_sids:
+            student_keys.append(s)
+            if isinstance(s, str) and ObjectId.is_valid(s):
+                student_keys.append(ObjectId(s))
+            elif isinstance(s, ObjectId):
+                student_keys.append(str(s))
+
+        students_cursor = db.users.find(
+            {"_id": {"$in": student_keys}},
+            {"_id": 1, "email": 1, "profile": 1}
+        )
+        student_docs = list(students_cursor)
+        student_map = {str(s["_id"]): s for s in student_docs}
+
+        # Fetch Journals
+        journals_cursor = db.journals.find(
+            {"assignmentId": {"$in": asg_keys}},
+            {"_id": 1, "studentId": 1, "assignmentId": 1, "title": 1, "marks": 1, "teacherRemarks": 1, "status": 1, "blocks": 1}
+        )
+        all_journals = list(journals_cursor)
+
+        # Group by student
+        student_journals_map: dict[str, list[dict]] = {}
+        for j in all_journals:
+            sid = str(j.get("studentId"))
+            if sid not in student_journals_map:
+                student_journals_map[sid] = []
+            student_journals_map[sid].append(j)
+
+        # Build Evaluation Matrix Rows
+        max_possible_marks = sum(a.get("maxMarks", 10) for a in assignments) or 10
+        evaluation_rows = []
+
+        for sid, s_user in student_map.items():
+            s_prof = s_user.get("profile") or {}
+            s_journals = student_journals_map.get(sid, [])
+
+            marks_per_asg = {}
+            total_obtained = 0
+
+            for asg in assignments:
+                asg_id_str = str(asg["_id"])
+                j_match = next((j for j in s_journals if str(j.get("assignmentId")) == asg_id_str), None)
+                if j_match and j_match.get("marks") is not None:
+                    m = j_match.get("marks", 0)
+                    marks_per_asg[asg.get("title", asg_id_str)] = m
+                    total_obtained += m
+                else:
+                    marks_per_asg[asg.get("title", asg_id_str)] = 0
+
+            percentage = round((total_obtained / max_possible_marks) * 100, 1) if max_possible_marks > 0 else 0.0
+
+            evaluation_rows.append({
+                "studentId": sid,
+                "enrollmentNumber": s_prof.get("enrollmentNumber", "—"),
+                "name": s_prof.get("name", "Student"),
+                "department": s_prof.get("department", "Engineering"),
+                "division": s_prof.get("division", "1"),
+                "batch": s_prof.get("batch", "A1"),
+                "marksPerAssignment": marks_per_asg,
+                "totalMarks": total_obtained,
+                "maxPossibleMarks": max_possible_marks,
+                "percentage": percentage,
+                "journalsCount": len(s_journals),
+            })
+
+        # Sort students descending by percentage
+        evaluation_rows.sort(key=lambda r: r["percentage"], reverse=True)
+
+        # Partition into NBA/NAAC Sampling Tiers (Top 10%, Mid 10%, Low 10%)
+        n_total = len(evaluation_rows)
+        sample_count = max(1, round(n_total * 0.10)) if n_total > 0 else 0
+
+        top_tier_students = evaluation_rows[:sample_count] if sample_count > 0 else []
+        low_tier_students = evaluation_rows[-sample_count:] if sample_count > 0 else []
+
+        mid_start = max(0, (n_total // 2) - (sample_count // 2))
+        mid_tier_students = evaluation_rows[mid_start : mid_start + sample_count] if sample_count > 0 else []
+
+        def _serialize_journals(student_tier_rows):
+            serialized = []
+            for s_row in student_tier_rows:
+                sid = s_row["studentId"]
+                s_journals = student_journals_map.get(sid, [])
+                for j in s_journals:
+                    asg = asg_map.get(str(j.get("assignmentId")), {})
+                    serialized.append({
+                        "journalId": str(j["_id"]),
+                        "studentName": s_row["name"],
+                        "enrollmentNumber": s_row["enrollmentNumber"],
+                        "assignmentTitle": asg.get("title", j.get("title", "Lab Practical")),
+                        "marks": j.get("marks"),
+                        "maxMarks": asg.get("maxMarks", 10),
+                        "teacherRemarks": j.get("teacherRemarks"),
+                        "blocks": j.get("blocks", []),
+                    })
+            return serialized
+
+        return {
+            "classroomId": classroom_id,
+            "classroomName": cls_doc.get("name", "Practical Course"),
+            "subjectCode": cls_doc.get("subjectCode", "LAB"),
+            "teacherName": teacher_name,
+            "academicTerm": cls_doc.get("academicTerm", "Active Semester"),
+            "generatedAt": datetime.now(timezone.utc).isoformat(),
+            "totalStudents": n_total,
+            "totalAssignments": len(assignments),
+            "sampleCount": sample_count,
+            "topTierCount": len(top_tier_students),
+            "midTierCount": len(mid_tier_students),
+            "lowTierCount": len(low_tier_students),
+            "evaluationMatrix": evaluation_rows,
+            "topTierJournals": _serialize_journals(top_tier_students),
+            "midTierJournals": _serialize_journals(mid_tier_students),
+            "lowTierJournals": _serialize_journals(low_tier_students),
+        }

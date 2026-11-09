@@ -16,6 +16,7 @@ from app.api.v1.notification import router as notification_router
 from app.api.v1.comment import router as comment_router
 from app.api.v1.gradebook import router as gradebook_router
 from app.api.v1.admin import router as admin_router
+from app.api.v1.announcement import router as announcement_router
 
 api_v1_router = APIRouter()
 
@@ -52,6 +53,5 @@ api_v1_router.include_router(gradebook_router, tags=["Gradebook"])
 # Institutional Administration & Governance
 api_v1_router.include_router(admin_router, tags=["Admin"])
 
-
-
-
+# Campus Broadcast Announcements & SSE
+api_v1_router.include_router(announcement_router, tags=["Announcements"])
