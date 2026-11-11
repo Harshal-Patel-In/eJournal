@@ -172,7 +172,7 @@ export default function CompileJournalPage({ params }: PageProps) {
   const singleItem = isSingleMode ? compiledPracticals[0] : null;
 
   return (
-    <div className="min-h-screen bg-neutral-100 dark:bg-neutral-950 text-foreground">
+    <div className="min-h-screen bg-neutral-100 dark:bg-neutral-950 text-foreground print:bg-white print:dark:bg-white print:min-h-0 print:m-0 print:p-0">
       {/* Top Navigation & Print Toolbar (Strictly hidden during print) */}
       <header className="sticky top-0 z-50 flex items-center justify-between px-4 sm:px-8 py-3 bg-card/95 backdrop-blur-xs border-b border-border shadow-xs print:hidden">
         <div className="flex items-center gap-3">
@@ -277,18 +277,37 @@ export default function CompileJournalPage({ params }: PageProps) {
           border-color: #a7f3d0 !important;
         }
         @media print {
-          body, html {
+          :root,
+          html,
+          html.dark,
+          body,
+          body.dark,
+          .dark {
+            color-scheme: light !important;
+            background: #ffffff !important;
+            background-color: #ffffff !important;
+            color: #000000 !important;
+          }
+          *, *::before, *::after {
+            box-shadow: none !important;
+          }
+          html, body {
+            background: #ffffff !important;
             background-color: #ffffff !important;
             color: #000000 !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
+          }
+          div, main, section, article {
+            background-color: #ffffff !important;
+            background-image: none !important;
           }
           .academic-paper {
             background-color: #ffffff !important;
             color: #000000 !important;
             box-shadow: none !important;
             border: none !important;
-            padding: 0 !important;
+            padding: 0 2mm !important;
             margin: 0 !important;
             width: 100% !important;
             max-width: 100% !important;
@@ -300,20 +319,31 @@ export default function CompileJournalPage({ params }: PageProps) {
           .academic-paper .katex * {
             color: #000000 !important;
           }
+          .academic-paper pre,
+          .academic-paper code,
+          .academic-paper pre code {
+            white-space: pre-wrap !important;
+            word-break: break-word !important;
+            overflow-x: visible !important;
+          }
           .academic-paper table {
             border-color: #000000 !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            table-layout: auto !important;
           }
           .academic-paper td,
           .academic-paper th {
             border-color: #71717a !important;
             color: #000000 !important;
+            word-break: break-word !important;
           }
         }
       `}} />
 
       {/* Main Bound Academic Document Container */}
       <main
-        className="academic-paper max-w-4xl mx-auto my-8 print:my-0 p-8 sm:p-12 print:p-0 bg-white text-zinc-950 shadow-2xl print:shadow-none rounded-2xl print:rounded-none border border-border print:border-none select-text"
+        className="academic-paper max-w-4xl mx-auto my-8 print:my-0 p-8 sm:p-12 print:px-2 print:py-0 bg-white text-zinc-950 shadow-2xl print:shadow-none rounded-2xl print:rounded-none border border-border print:border-none select-text"
         style={{
           colorScheme: "light",
           ["--foreground" as any]: "240 10% 3.9%",
@@ -523,15 +553,15 @@ export default function CompileJournalPage({ params }: PageProps) {
           return (
             <section
               key={item.index}
-              className={`${!isSingleMode ? "page-break-before pt-6" : "pt-0"} pb-12 border-b border-zinc-200 last:border-b-0`}
+              className={`${!isSingleMode ? "page-break-before pt-6" : "pt-0 print:pt-2"} pb-12 border-b border-zinc-200 last:border-b-0`}
             >
               {/* Practical Header Bar */}
               <div className="border-b-2 border-zinc-900 pb-4 mb-6">
                 {/* Department Course Code Line in Single Journal Mode */}
                 {isSingleMode && (
-                  <div className="flex items-center justify-between border-b border-zinc-200 pb-2 mb-3 text-xs text-zinc-600 font-serif">
-                    <div className="flex items-center gap-2">
-                      <GraduationCap className="size-4 text-zinc-800" />
+                  <div className="flex items-center justify-between border-b border-zinc-200 pb-2 mb-3 text-xs text-zinc-600 font-serif gap-2">
+                    <div className="flex items-center gap-2 flex-wrap min-w-0 pr-2">
+                      <GraduationCap className="size-4 text-zinc-800 shrink-0" />
                       <span className="font-bold uppercase tracking-wider text-zinc-900">
                         {classroom?.institutionName || "FACULTY OF ENGINEERING & TECHNOLOGY"}
                       </span>
@@ -540,7 +570,7 @@ export default function CompileJournalPage({ params }: PageProps) {
                         DEPT. OF {classroom?.department || "COMPUTER & PHYSICAL SCIENCES"}
                       </span>
                     </div>
-                    <div className="text-[11px] font-medium text-zinc-500">
+                    <div className="text-[11px] font-medium text-zinc-500 shrink-0 whitespace-nowrap">
                       Code: {classroom?.code || "LAB-101"}
                     </div>
                   </div>
@@ -576,7 +606,7 @@ export default function CompileJournalPage({ params }: PageProps) {
 
                 {/* Candidate Credentials card in Single Journal Mode */}
                 {isSingleMode && (
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4 pt-3 border-t border-zinc-200 text-xs text-zinc-700 bg-zinc-50/70 p-3 rounded border border-zinc-200">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 print:grid-cols-4 gap-2 mt-4 pt-3 border-t border-zinc-200 text-xs text-zinc-700 bg-zinc-50/70 p-3 rounded border border-zinc-200">
                     <div>
                       <span className="text-[10px] font-bold uppercase text-zinc-500 block">Candidate Name</span>
                       <strong className="text-zinc-950 font-bold">{candidateName}</strong>

@@ -716,12 +716,25 @@
    ========================================================================== */
 @page {
   size: A4 portrait;
-  margin: 14mm 14mm 14mm 14mm;
+  margin: 12mm 14mm 14mm 14mm;
 }
 
 @media print {
+  :root,
+  html,
+  html.dark,
+  body,
+  body.dark,
+  .dark {
+    color-scheme: light !important;
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    color: #18181b !important;
+  }
+
   html, body {
     background: #ffffff !important;
+    background-color: #ffffff !important;
     color: #18181b !important;
     font-size: 11pt;
     line-height: 1.5;
@@ -795,7 +808,7 @@
     border-color: #d1d5db !important;
   }
 
-  .bg-card, .bg-background, .bg-muted\/20, .bg-muted\/40 {
+  .bg-card, .bg-background, .bg-muted\/20, .bg-muted\/40, [class*="dark:bg-"], [class*="bg-neutral-"] {
     background-color: #ffffff !important;
   }
 
