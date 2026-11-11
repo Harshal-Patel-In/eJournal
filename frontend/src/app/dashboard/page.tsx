@@ -214,13 +214,13 @@ export default function DashboardPage() {
               eJournal
             </span>
           </Link>
-          <span className="text-muted-foreground/30 font-light select-none">/</span>
+          <span className="text-muted-foreground/30 font-light select-none hidden sm:inline">/</span>
           <span className="text-xs font-medium text-muted-foreground hidden sm:inline">
             {isStudent ? "Student workspace" : "Faculty review console"}
           </span>
         </div>
 
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex items-center gap-1.5 sm:gap-3">
           <ThemeToggle />
           <NotificationBell />
 
@@ -237,7 +237,7 @@ export default function DashboardPage() {
             </Link>
           )}
 
-          <Link href="/profile" title="View & Edit Academic Profile">
+          <Link href="/profile" title="View & Edit Academic Profile" className="hidden sm:inline-flex">
             <Button
               variant="outline"
               size="sm"
@@ -265,7 +265,7 @@ export default function DashboardPage() {
       </header>
 
       {/* Main Workspace */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 md:p-8 flex flex-col gap-6 relative z-10">
+      <main className="flex-1 max-w-7xl w-full mx-auto p-4 pb-24 sm:p-6 sm:pb-8 md:p-8 flex flex-col gap-6 relative z-10">
         {/* Teacher vs Student Workspace Hero & Operational Telemetry */}
         {isStudent ? (
           <>

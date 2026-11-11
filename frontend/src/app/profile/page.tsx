@@ -320,7 +320,7 @@ export default function ProfilePage() {
       </header>
 
       {/* Main Profile Canvas */}
-      <main className="max-w-5xl w-full mx-auto p-4 sm:p-6 md:p-8 flex flex-col gap-6 relative z-10">
+      <main className="max-w-5xl w-full mx-auto p-4 pb-24 sm:p-6 sm:pb-8 md:p-8 flex flex-col gap-6 relative z-10">
         {/* Top Header Card */}
         <div className="p-5 sm:p-6 rounded-lg border border-border bg-card shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
           <div className="flex items-center gap-4">

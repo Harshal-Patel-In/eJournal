@@ -1148,7 +1148,7 @@ export default function ClassroomPage({ params }: PageProps) {
       </header>
 
       {/* Subject Space Container with Left-Rail Desktop Two-Column Grid */}
-      <main className="max-w-7xl w-full mx-auto p-4 sm:p-6 md:p-8 relative z-10">
+      <main className="max-w-7xl w-full mx-auto p-4 pb-24 sm:p-6 sm:pb-8 md:p-8 relative z-10">
         <div className="flex flex-col lg:flex-row gap-6 items-start">
           {/* Desktop Intelligence Sidebar (Left Rail on Desktop: 320px/352px width, sticky on desktop, order-2 on mobile) */}
           <aside className="w-full lg:w-80 xl:w-88 shrink-0 flex flex-col gap-5 order-2 lg:order-1 lg:sticky lg:top-24">
@@ -1766,11 +1766,11 @@ export default function ClassroomPage({ params }: PageProps) {
 
         {/* Tab switcher & Action bar */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-b border-border pb-3">
-          {/* Segmented Control Pill (Locked Height, Zero-Jitter, No Scrollbar) */}
-          <div className="flex items-center p-0.5 border border-border bg-muted/40 rounded-md max-w-fit gap-1 shrink-0">
+          {/* Segmented Control Pill (Locked Height, Zero-Jitter, Touch-Scrollable) */}
+          <div className="flex items-center p-1 border border-border/80 bg-muted/40 rounded-xl overflow-x-auto no-scrollbar scroll-smooth max-w-full sm:max-w-fit gap-1 shrink-0">
             <button
               onClick={() => setActiveTab("assignments")}
-              className={`flex items-center gap-1.5 h-7.5 px-3 text-xs font-medium rounded transition-all cursor-pointer whitespace-nowrap ${
+              className={`flex items-center gap-1.5 h-8 sm:h-7.5 px-3 text-xs font-medium rounded-lg transition-all cursor-pointer whitespace-nowrap tap-feedback ${
                 activeTab === "assignments"
                   ? "bg-card text-foreground shadow-xs font-bold"
                   : "text-muted-foreground hover:text-foreground"
@@ -1797,7 +1797,7 @@ export default function ClassroomPage({ params }: PageProps) {
 
             <button
               onClick={() => setActiveTab("announcements")}
-              className={`flex items-center gap-1.5 h-7.5 px-3 text-xs font-medium rounded transition-all cursor-pointer whitespace-nowrap ${
+              className={`flex items-center gap-1.5 h-8 sm:h-7.5 px-3 text-xs font-medium rounded-lg transition-all cursor-pointer whitespace-nowrap tap-feedback ${
                 activeTab === "announcements"
                   ? "bg-card text-foreground shadow-xs font-bold"
                   : "text-muted-foreground hover:text-foreground"
@@ -1815,7 +1815,7 @@ export default function ClassroomPage({ params }: PageProps) {
             {isTeacher && (
               <button
                 onClick={() => setActiveTab("submissions")}
-                className={`flex items-center gap-1.5 h-7.5 px-3 text-xs font-medium rounded transition-all cursor-pointer whitespace-nowrap ${
+                className={`flex items-center gap-1.5 h-8 sm:h-7.5 px-3 text-xs font-medium rounded-lg transition-all cursor-pointer whitespace-nowrap tap-feedback ${
                   activeTab === "submissions"
                     ? "bg-card text-foreground shadow-xs font-bold"
                     : "text-muted-foreground hover:text-foreground"
@@ -1833,7 +1833,7 @@ export default function ClassroomPage({ params }: PageProps) {
 
             <button
               onClick={() => setActiveTab("roster")}
-              className={`flex items-center gap-1.5 h-7.5 px-3 text-xs font-medium rounded transition-all cursor-pointer whitespace-nowrap ${
+              className={`flex items-center gap-1.5 h-8 sm:h-7.5 px-3 text-xs font-medium rounded-lg transition-all cursor-pointer whitespace-nowrap tap-feedback ${
                 activeTab === "roster"
                   ? "bg-card text-foreground shadow-xs font-bold"
                   : "text-muted-foreground hover:text-foreground"

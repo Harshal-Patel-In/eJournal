@@ -244,7 +244,163 @@ export default function AdminFacultyPage() {
 
       {/* Faculty Directory Table */}
       <div className="rounded-3xl bg-card border border-border/80 overflow-hidden shadow-xs">
-        <div className="overflow-x-auto">
+        {/* Mobile & Tablet Adaptive Cards (<1024px) */}
+        <div className="lg:hidden p-3.5 sm:p-4 space-y-3">
+          {isLoading ? (
+            <div className="py-12 text-center text-muted-foreground text-xs">
+              <Loader2 className="size-5 animate-spin mx-auto mb-2 text-primary" />
+              Loading faculty registry...
+            </div>
+          ) : !data?.users || data.users.length === 0 ? (
+            <div className="py-12 text-center text-muted-foreground text-xs">
+              No faculty members found matching your search.
+            </div>
+          ) : (
+            data.users.map((f: any) => {
+              const isSuspended = f.status === "suspended";
+              const isTargetAdmin = Boolean(f.isAdmin || f.is_admin || f.role === "admin");
+              const isSelf = Boolean(
+                currentUser && (
+                  (currentUser.id && f.id === currentUser.id) ||
+                  (currentUser._id && f.id === currentUser._id) ||
+                  (currentUser.email && f.email === currentUser.email)
+                )
+              );
+
+              return (
+                <div
+                  key={f.id}
+                  className="p-4 rounded-2xl border border-border/80 bg-card shadow-xs flex flex-col gap-3"
+                >
+                  {/* Top Bar: Name + Badges */}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex flex-col min-w-0 pr-1">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-bold text-foreground text-sm tracking-tight truncate">
+                          {f.profile?.name || "Faculty Member"}
+                        </span>
+                        {isSelf && (
+                          <span className="px-1.5 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider bg-primary/10 text-primary border border-primary/20">
+                            You
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-[11px] text-muted-foreground truncate mt-0.5">
+                        {f.email}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1 shrink-0">
+                      <span
+                        className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase border ${
+                          isSuspended
+                            ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20"
+                            : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
+                        }`}
+                      >
+                        {isSuspended ? "Suspended" : "Active"}
+                      </span>
+                      {isTargetAdmin && (
+                        <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 flex items-center gap-1">
+                          <Crown className="size-2.5" />
+                          Admin
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Department & Role Banner */}
+                  <div className="flex items-center justify-between text-xs text-muted-foreground bg-muted/30 px-3 py-2 rounded-xl border border-border/50">
+                    <span className="font-semibold text-foreground">
+                      {f.profile?.department || "General"}
+                    </span>
+                    <span className="text-[11px] text-muted-foreground">
+                      {f.profile?.designation || "Instructor"} • Onboarded {formatDateIST(f.created_at || f.createdAt || new Date())}
+                    </span>
+                  </div>
+
+                  {/* Actions Grid with ≥44px Touch Targets */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 border-t border-border/60">
+                    {isSuperAdmin && (
+                      <Button
+                        variant="outline"
+                        color={isTargetAdmin ? "amber" : "neutral"}
+                        size="sm"
+                        onClick={() =>
+                          adminRoleMutation.mutate({
+                            userId: f.id,
+                            isAdmin: !isTargetAdmin,
+                          })
+                        }
+                        disabled={isSelf || adminRoleMutation.isPending}
+                        className="h-9 px-2.5 rounded-xl text-xs font-semibold cursor-pointer justify-center tap-feedback"
+                        title={isTargetAdmin ? "Revoke Administrative Authority" : "Grant Administrative Authority"}
+                      >
+                        <Crown className={`size-3.5 mr-1 ${isTargetAdmin ? "text-amber-500 fill-amber-500/20" : ""}`} />
+                        <span>{isTargetAdmin ? "Revoke Admin" : "Make Admin"}</span>
+                      </Button>
+                    )}
+
+                    {!isSuperAdmin && isTargetAdmin ? (
+                      <span className="inline-flex items-center justify-center gap-1 px-2.5 py-2 rounded-xl text-[10px] font-semibold text-amber-600 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 select-none col-span-2">
+                        <ShieldAlert className="size-3.5" />
+                        Protected Admin
+                      </span>
+                    ) : !isSelf && (
+                      <>
+                        <Button
+                          variant="outline"
+                          color={isSuspended ? "emerald" : "amber"}
+                          size="sm"
+                          onClick={() =>
+                            statusMutation.mutate({
+                              id: f.id,
+                              newStatus: isSuspended ? "active" : "suspended",
+                            })
+                          }
+                          disabled={statusMutation.isPending}
+                          className="h-9 px-2.5 rounded-xl text-xs font-semibold cursor-pointer justify-center tap-feedback"
+                        >
+                          {isSuspended ? <UserCheck className="size-3.5 mr-1" /> : <UserX className="size-3.5 mr-1" />}
+                          <span>{isSuspended ? "Reactivate" : "Suspend"}</span>
+                        </Button>
+
+                        <Button
+                          variant="outline"
+                          color="indigo"
+                          size="sm"
+                          onClick={() => resetMutation.mutate(f.id)}
+                          disabled={resetMutation.isPending}
+                          className="h-9 px-2.5 rounded-xl text-xs font-semibold cursor-pointer justify-center tap-feedback"
+                          title="Reset Password"
+                        >
+                          <KeyRound className="size-3.5 mr-1" />
+                          <span>Reset</span>
+                        </Button>
+
+                        <Button
+                          variant="outline"
+                          color="rose"
+                          size="sm"
+                          onClick={() => setDeleteConfirmUser(f)}
+                          disabled={deleteMutation.isPending}
+                          className="h-9 px-2.5 rounded-xl text-xs font-semibold cursor-pointer justify-center tap-feedback"
+                          title="Delete Faculty Account"
+                        >
+                          <Trash2 className="size-3.5 mr-1" />
+                          <span>Delete</span>
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Desktop Data Grid Table (Screens >= 1024px) */}
+        <div className="hidden lg:block overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead className="bg-muted/40 border-b border-border text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
               <tr>

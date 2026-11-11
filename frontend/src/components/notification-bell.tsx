@@ -239,6 +239,13 @@ export function NotificationBell() {
 
   useEffect(() => {
     setMounted(true);
+    const handleOpenNotifications = () => {
+      setIsOpen(true);
+    };
+    window.addEventListener("ejournal:open-notifications", handleOpenNotifications);
+    return () => {
+      window.removeEventListener("ejournal:open-notifications", handleOpenNotifications);
+    };
   }, []);
 
   // Close drawer on outside click, Escape key & lock body scroll while open

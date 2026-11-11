@@ -48,6 +48,7 @@ import { formatDateIST } from "@/lib/date";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { GlassDropdown, DropdownOption } from "@/components/ui/glass-dropdown";
+import { MobileAdaptiveSheet } from "@/components/ui/mobile-adaptive-sheet";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -71,6 +72,7 @@ export default function ClassroomGradesPage({ params }: PageProps) {
   const [sortOption, setSortOption] = useState<SortOptionType>("enrollment_asc");
   const [isCompactDensity, setIsCompactDensity] = useState<boolean>(false);
   const [isExportingCsv, setIsExportingCsv] = useState<boolean>(false);
+  const [inspectingStudent, setInspectingStudent] = useState<any | null>(null);
 
   useEffect(() => {
     if (urlAssignment) {
@@ -522,7 +524,7 @@ export default function ClassroomGradesPage({ params }: PageProps) {
       </header>
 
       {/* Main Workspace Content */}
-      <main className="flex-1 p-4 sm:p-6 md:p-8 max-w-7xl mx-auto w-full flex flex-col gap-4 relative z-10">
+      <main className="flex-1 p-4 sm:p-6 md:p-8 max-w-7xl mx-auto w-full flex flex-col gap-4 relative z-10 pb-24 sm:pb-8">
         {/* Unified Master Header & Telemetry Console */}
         <div className="p-4 sm:p-5 rounded-2xl bg-card border border-border/80 shadow-xs flex flex-col gap-3.5">
           {/* Top Row: Classroom identity & View mode switcher */}
@@ -951,7 +953,148 @@ export default function ClassroomGradesPage({ params }: PageProps) {
                 )}
               </div>
             ) : (
-              <div className="overflow-x-auto relative">
+              <>
+                {/* Mobile & Tablet Adaptive Grade Cards (< 1024px) */}
+                <div className="lg:hidden p-3.5 sm:p-4 space-y-3">
+                  {filteredMatrixStudents.map((student: any, idx: number) => {
+                    const initials = student.name
+                      ? student.name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)
+                      : "ST";
+                    const isCompleted = student.completedCount > 0;
+                    const standingLabel = student.standing || (
+                      student.percentage >= 75 ? "Distinction" :
+                      student.percentage >= 60 ? "First Class" :
+                      student.percentage >= 40 ? "Pass" : "Needs Imp."
+                    );
+                    const standingColor =
+                      student.percentage >= 75 ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30" :
+                      student.percentage >= 60 ? "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/30" :
+                      student.percentage >= 40 ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30" :
+                      "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30";
+
+                    const allAssignments = gradebookData?.assignments || assignments || [];
+
+                    return (
+                      <div
+                        key={student.studentId || idx}
+                        className="p-4 rounded-2xl border border-border/80 bg-card shadow-xs flex flex-col gap-3"
+                      >
+                        {/* Top: Student Profile & Standing */}
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="size-9 rounded-xl bg-gradient-to-br from-indigo-500/20 via-indigo-500/10 to-indigo-500/5 border border-indigo-500/25 flex items-center justify-center font-bold text-xs text-indigo-600 dark:text-indigo-400 shrink-0">
+                              {initials}
+                            </div>
+                            <div className="flex flex-col min-w-0">
+                              <span className="font-bold text-foreground text-sm tracking-tight truncate">
+                                {student.name}
+                              </span>
+                              <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-mono mt-0.5">
+                                <span>{student.enrollmentNumber}</span>
+                                {student.batch && student.batch !== "N/A" && (
+                                  <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-muted text-muted-foreground border border-border">
+                                    {student.batch}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="shrink-0 flex flex-col items-end gap-1">
+                            {isCompleted ? (
+                              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase border ${standingColor}`}>
+                                {standingLabel}
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-muted text-muted-foreground border border-border">
+                                Pending
+                              </span>
+                            )}
+                            <span className="text-[11px] font-extrabold text-foreground tabular-nums">
+                              {isCompleted ? `${student.percentage}%` : "—"}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Continuous Assessment Progress Metric */}
+                        <div className="bg-muted/30 px-3 py-2 rounded-xl border border-border/50 flex flex-col gap-1.5">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-muted-foreground">Continuous Marks</span>
+                            <span className="font-bold text-foreground tabular-nums">
+                              {student.totalMarksObtained} / {student.completedCount > 0 ? student.evaluatedMaxMarks : student.totalMaxMarks}
+                              <span className="text-[10px] text-muted-foreground font-normal ml-1">
+                                ({student.completedCount}/{student.totalAssignmentsCount} graded)
+                              </span>
+                            </span>
+                          </div>
+                          <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden border border-border/40">
+                            <div
+                              className={`h-full transition-all duration-300 rounded-full ${
+                                student.percentage >= 75 ? "bg-emerald-500" :
+                                student.percentage >= 60 ? "bg-indigo-500" :
+                                student.percentage >= 40 ? "bg-amber-500" : "bg-rose-500"
+                              }`}
+                              style={{ width: `${Math.min(100, student.percentage || 0)}%` }}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Visual Mini-Heatmap: Colored experiment chips */}
+                        <div className="flex flex-col gap-1.5">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                            Practical Status Map
+                          </span>
+                          <div className="flex flex-wrap gap-1.5">
+                            {allAssignments.map((asg: any) => {
+                              const g = student.grades?.[asg.id] || {};
+                              const st = g.status || "not_started";
+                              const isApp = st === "approved" && g.marks !== null;
+                              const isSub = st === "submitted" || st === "late_submitted";
+                              const isRev = st === "changes_requested";
+                              const isDft = st === "draft";
+
+                              return (
+                                <div
+                                  key={asg.id}
+                                  className={`px-2 py-1 rounded-lg text-[10px] font-bold border flex items-center gap-1 tabular-nums ${
+                                    isApp
+                                      ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30"
+                                      : isSub
+                                      ? "bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border-indigo-500/30"
+                                      : isRev
+                                      ? "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30"
+                                      : isDft
+                                      ? "bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/30"
+                                      : "bg-muted/40 text-muted-foreground border-border/60"
+                                  }`}
+                                  title={`Exp #${asg.experimentNumber}: ${asg.title || ""} (${st})`}
+                                >
+                                  <span>E#{asg.experimentNumber}</span>
+                                  {isApp && <span>: {g.marks}/{asg.maxMarks}</span>}
+                                  {isSub && <Clock className="size-2.5 text-indigo-500" />}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* Inspect Details Action with ≥44px Touch Target */}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setInspectingStudent(student)}
+                          className="h-10 w-full rounded-xl text-xs font-semibold cursor-pointer justify-center gap-1.5 tap-feedback border-border/80"
+                        >
+                          <BookOpen className="size-3.5 text-indigo-500" />
+                          <span>Inspect Practical Breakdown</span>
+                        </Button>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Desktop 2D Matrix Spreadsheet (>= 1024px) */}
+                <div className="hidden lg:block overflow-x-auto relative">
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
                     {/* Multi-Tiered Header Row 1 (Cluster Groupings) - Only if clusters exist */}
@@ -1198,7 +1341,8 @@ export default function ClassroomGradesPage({ params }: PageProps) {
                     })}
                   </tbody>
                 </table>
-              </div>
+                </div>
+              </>
             )}
           </div>
         )}
@@ -1380,6 +1524,113 @@ export default function ClassroomGradesPage({ params }: PageProps) {
           </div>
         )}
       </main>
+
+      {/* Mobile Practical Breakdown Inspection Sheet */}
+      {inspectingStudent && (
+        <MobileAdaptiveSheet
+          isOpen={!!inspectingStudent}
+          onClose={() => setInspectingStudent(null)}
+          title={`${inspectingStudent.name} • Practical Breakdown`}
+          subtitle={`Enrollment: ${inspectingStudent.enrollmentNumber} | Batch: ${inspectingStudent.batch || "N/A"}`}
+        >
+          <div className="space-y-4">
+            {/* Overview Metric Banner */}
+            <div className="p-4 rounded-2xl bg-muted/40 border border-border/70 flex items-center justify-between">
+              <div>
+                <span className="text-xs text-muted-foreground">Continuous Score</span>
+                <div className="text-lg font-black text-foreground tabular-nums">
+                  {inspectingStudent.totalMarksObtained} / {inspectingStudent.completedCount > 0 ? inspectingStudent.evaluatedMaxMarks : inspectingStudent.totalMaxMarks}
+                </div>
+              </div>
+              <div className="text-right">
+                <span className="text-xs text-muted-foreground">Standing</span>
+                <div className="text-sm font-black text-foreground">
+                  {inspectingStudent.percentage}% ({inspectingStudent.standing || (
+                    inspectingStudent.percentage >= 75 ? "Distinction" :
+                    inspectingStudent.percentage >= 60 ? "First Class" :
+                    inspectingStudent.percentage >= 40 ? "Pass" : "Needs Imp."
+                  )})
+                </div>
+              </div>
+            </div>
+
+            {/* List of Practicals */}
+            <div className="space-y-2.5">
+              {(gradebookData?.assignments || assignments || []).map((asg: any) => {
+                const g = inspectingStudent.grades?.[asg.id] || {};
+                const st = g.status || "not_started";
+                const isApp = st === "approved" && g.marks !== null;
+                const isSub = st === "submitted" || st === "late_submitted";
+                const isRev = st === "changes_requested";
+                const isDft = st === "draft";
+
+                return (
+                  <div
+                    key={asg.id}
+                    className="p-3.5 rounded-xl border border-border/70 bg-card flex flex-col gap-2"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-muted text-muted-foreground border border-border">
+                            Exp #{asg.experimentNumber}
+                          </span>
+                          <span className="font-bold text-xs text-foreground truncate">
+                            {asg.title}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-muted-foreground line-clamp-1 mt-0.5">
+                          Max Marks: {asg.maxMarks}
+                        </p>
+                      </div>
+
+                      <div className="shrink-0">
+                        {isApp ? (
+                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                            {g.marks} / {asg.maxMarks}
+                          </span>
+                        ) : isSub ? (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/30">
+                            Needs Grading
+                          </span>
+                        ) : isRev ? (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                            Revision
+                          </span>
+                        ) : isDft ? (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-500/30">
+                            Draft
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-muted text-muted-foreground border border-border">
+                            Not Started
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {g.journalId && (
+                      <div className="pt-2 border-t border-border/40 flex justify-end">
+                        <Button
+                          asChild
+                          size="sm"
+                          variant={isSub ? "default" : "outline"}
+                          className="h-9 px-3 text-xs font-semibold rounded-xl tap-feedback"
+                        >
+                          <Link href={`/editor/${g.journalId}`}>
+                            <span>{isSub ? "Grade Submission" : "Open in Editor"}</span>
+                            <ArrowRight className="size-3.5 ml-1" />
+                          </Link>
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </MobileAdaptiveSheet>
+      )}
     </div>
   );
 }

@@ -224,7 +224,7 @@ export default function TableBlock({ id, content, previewMode }: TableBlockProps
   return (
     <div className="flex flex-col gap-3 w-full border border-border/70 p-4 rounded-xl bg-card/85 backdrop-blur-md shadow-xs">
       {/* Table Toolbar */}
-      <div className="flex items-center justify-between border-b border-border/60 pb-2.5">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-border/60 pb-2.5">
         <div className="flex items-center gap-2">
           <span className="text-xs font-bold text-foreground font-mono uppercase tracking-wider">
             Data Grid Table
@@ -234,16 +234,17 @@ export default function TableBlock({ id, content, previewMode }: TableBlockProps
           </span>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 flex-wrap">
           {/* Plot Graph Button */}
           <Button
             variant="outline"
             size="xs"
             onClick={addGraphFromTable}
-            className="gap-1.5 cursor-pointer bg-teal-500/10 hover:bg-teal-500/20 text-teal-700 dark:text-teal-300 border-teal-500/30 font-semibold shadow-2xs active:scale-[0.98] transition-all"
+            className="gap-1 cursor-pointer bg-teal-500/10 hover:bg-teal-500/20 text-teal-700 dark:text-teal-300 border-teal-500/30 font-semibold shadow-2xs active:scale-[0.98] transition-all tap-feedback"
             title="Plot an experimental graph using this table's readings"
           >
-            <LineChart className="size-3" /> Plot Graph
+            <LineChart className="size-3" />
+            <span className="hidden xs:inline">Plot</span> Graph
           </Button>
 
           {/* Focus Spreadsheet Mode Button */}
@@ -251,29 +252,33 @@ export default function TableBlock({ id, content, previewMode }: TableBlockProps
             variant="outline"
             size="xs"
             onClick={() => setIsModalOpen(true)}
-            className="gap-1.5 cursor-pointer bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 border-indigo-500/30 font-semibold shadow-2xs active:scale-[0.98] transition-all"
+            className="gap-1 cursor-pointer bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 border-indigo-500/30 font-semibold shadow-2xs active:scale-[0.98] transition-all tap-feedback"
             title="Open distraction-free fullscreen spreadsheet editor"
           >
-            <Maximize2 className="size-3" /> Focus Spreadsheet
+            <Maximize2 className="size-3" />
+            <span>Spreadsheet</span>
           </Button>
 
           <Button
             variant="outline"
             size="xs"
             onClick={addColumn}
-            className="gap-1 cursor-pointer bg-card hover:bg-muted text-foreground border-border font-medium shadow-2xs active:scale-[0.98] transition-all"
+            className="gap-1 cursor-pointer bg-card hover:bg-muted text-foreground border-border font-medium shadow-2xs active:scale-[0.98] transition-all tap-feedback"
           >
-            <Plus className="size-3" /> Add Column
+            <Plus className="size-3" />
+            <span className="hidden xs:inline">Add</span> Column
           </Button>
+
           <Button
             variant="outline"
             size="xs"
             onClick={removeColumn}
             disabled={headers.length <= 1}
-            className="gap-1 cursor-pointer hover:bg-rose-500/10 hover:text-rose-600 dark:hover:text-rose-400 hover:border-rose-500/30 text-muted-foreground border-border font-medium disabled:opacity-40 shadow-2xs active:scale-[0.98] transition-all"
+            className="gap-1 cursor-pointer hover:bg-rose-500/10 hover:text-rose-600 dark:hover:text-rose-400 hover:border-rose-500/30 text-muted-foreground border-border font-medium disabled:opacity-40 shadow-2xs active:scale-[0.98] transition-all tap-feedback"
             title="Delete the rightmost column"
           >
-            <Trash2 className="size-3" /> Delete Column
+            <Trash2 className="size-3" />
+            <span className="hidden xs:inline">Delete</span> Column
           </Button>
         </div>
       </div>

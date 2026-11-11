@@ -112,7 +112,7 @@ export function CustomSelect({
         aria-controls={listboxId}
         disabled={disabled}
         onClick={() => setIsOpen((prev) => !prev)}
-        className={`w-full min-w-[180px] h-8 px-3 rounded-md bg-card border border-border text-xs font-medium text-foreground hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 flex items-center justify-between gap-2 shadow-2xs transition-[background-color,border-color] duration-120 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${triggerClassName}`}
+        className={`w-full min-w-[180px] h-9 sm:h-8 px-3 rounded-md bg-card border border-border text-xs font-medium text-foreground hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 flex items-center justify-between gap-2 shadow-2xs transition-[background-color,border-color] duration-120 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed tap-feedback ${triggerClassName}`}
       >
         <span className="flex items-center gap-2 truncate">
           {icon && <span className="shrink-0 text-muted-foreground">{icon}</span>}
@@ -132,7 +132,7 @@ export function CustomSelect({
         <div
           id={listboxId}
           role="listbox"
-          className="absolute left-0 right-0 mt-1 min-w-[190px] max-h-60 overflow-y-auto rounded-md bg-popover text-popover-foreground border border-border shadow-md p-1 z-50 animate-in fade-in-0 zoom-in-95 duration-120 origin-top"
+          className="absolute left-0 right-0 mt-1 min-w-[190px] max-h-72 sm:max-h-60 overflow-y-auto rounded-xl sm:rounded-md bg-popover text-popover-foreground border border-border shadow-xl p-1 z-50 animate-in fade-in-0 zoom-in-95 duration-120 origin-top overscroll-contain"
         >
           {options.map((opt) => {
             const isSelected = opt.value === value;
@@ -142,7 +142,7 @@ export function CustomSelect({
                 role="option"
                 aria-selected={isSelected}
                 onClick={() => handleSelect(opt.value)}
-                className={`w-full px-2.5 py-1.5 rounded text-xs flex items-center justify-between gap-2 cursor-pointer transition-colors duration-100 ${
+                className={`w-full px-3 py-2.5 sm:py-1.5 rounded-lg sm:rounded text-xs flex items-center justify-between gap-2 cursor-pointer transition-colors duration-100 tap-feedback ${
                   isSelected
                     ? "bg-primary text-primary-foreground font-semibold"
                     : "text-foreground hover:bg-muted"

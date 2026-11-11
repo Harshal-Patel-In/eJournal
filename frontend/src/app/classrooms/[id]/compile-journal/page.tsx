@@ -343,7 +343,7 @@ export default function CompileJournalPage({ params }: PageProps) {
 
       {/* Main Bound Academic Document Container */}
       <main
-        className="academic-paper max-w-4xl mx-auto my-8 print:my-0 p-8 sm:p-12 print:px-2 print:py-0 bg-white text-zinc-950 shadow-2xl print:shadow-none rounded-2xl print:rounded-none border border-border print:border-none select-text"
+        className="academic-paper w-full max-w-4xl mx-auto my-4 sm:my-8 print:my-0 p-4 sm:p-8 md:p-12 print:px-2 print:py-0 bg-white text-zinc-950 shadow-2xl print:shadow-none rounded-2xl print:rounded-none border border-border print:border-none select-text pb-24 sm:pb-12 print:pb-0"
         style={{
           colorScheme: "light",
           ["--foreground" as any]: "240 10% 3.9%",
@@ -671,6 +671,17 @@ export default function CompileJournalPage({ params }: PageProps) {
           );
         })}
       </main>
+
+      {/* Mobile Floating PDF Action Bar */}
+      <div className="sm:hidden fixed bottom-4 inset-x-4 z-40 print:hidden">
+        <Button
+          onClick={() => window.print()}
+          className="w-full h-11 rounded-2xl shadow-xl gap-2 text-xs font-bold tap-feedback"
+        >
+          <Printer className="size-4" />
+          <span>{isSingleMode ? "Save Lab Report as PDF" : "Save Master Journal as PDF"}</span>
+        </Button>
+      </div>
     </div>
   );
 }

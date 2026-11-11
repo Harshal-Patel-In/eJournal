@@ -272,7 +272,186 @@ export default function AdminStudentsPage() {
 
       {/* Students Table */}
       <div className="rounded-3xl bg-card border border-border/80 overflow-hidden shadow-xs">
-        <div className="overflow-x-auto">
+        {/* Mobile & Tablet Adaptive Cards (<1024px) */}
+        <div className="lg:hidden p-3.5 sm:p-4 space-y-3">
+          {isLoading ? (
+            <div className="py-12 text-center text-muted-foreground text-xs">
+              <Loader2 className="size-5 animate-spin mx-auto mb-2 text-primary" />
+              Loading student directory...
+            </div>
+          ) : !displayedUsers || displayedUsers.length === 0 ? (
+            <div className="py-12 text-center text-muted-foreground text-xs">
+              No students found matching your search.
+            </div>
+          ) : (
+            displayedUsers.map((s: any) => {
+              const isSuspended = s.status === "suspended";
+              const isUnverified = s.is_verified === false;
+              const profile = s.profile || {};
+              const isPendingSetup =
+                !isUnverified &&
+                (s.status === "pending_setup" ||
+                  s.must_change_password === true ||
+                  s.is_profile_complete === false ||
+                  !profile.enrollmentNumber);
+              const pendingReq = pendingRequestByUserId.get(s.id);
+
+              return (
+                <div
+                  key={s.id}
+                  className={`p-4 rounded-2xl border border-border/80 bg-card shadow-xs flex flex-col gap-3 transition-colors ${
+                    isPendingSetup ? "bg-amber-500/[0.02] border-amber-500/30" : ""
+                  }`}
+                >
+                  {/* Top Bar: Identity & Status Badge */}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex flex-col min-w-0 pr-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-bold text-foreground text-sm tracking-tight truncate">
+                          {profile.name || "Enrolled Student"}
+                        </span>
+                        {(profile.enrollmentNumber || profile.rollNumber) && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-muted/70 text-foreground font-mono font-semibold text-[11px]">
+                            {profile.enrollmentNumber || profile.rollNumber}
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-[11px] text-muted-foreground truncate mt-0.5">
+                        {s.email}
+                      </span>
+                    </div>
+
+                    <div className="shrink-0">
+                      {isUnverified ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase border bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/25">
+                          <Clock className="size-3" />
+                          Unverified
+                        </span>
+                      ) : isSuspended ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase border bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20">
+                          Suspended
+                        </span>
+                      ) : isPendingSetup ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase border bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30">
+                          <Clock className="size-3" />
+                          Pending Setup
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase border bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20">
+                          Active
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Academic Cohort Strip */}
+                  <div className="flex items-center gap-1.5 flex-wrap text-xs text-muted-foreground bg-muted/30 px-3 py-2 rounded-xl border border-border/50">
+                    <span className="font-semibold text-foreground text-xs">
+                      {profile.department || "General"}
+                    </span>
+                    {(profile.semester || profile.division || profile.batch) && <span>•</span>}
+                    {profile.semester && <span>Sem {profile.semester}</span>}
+                    {profile.division && <span>Div {profile.division}</span>}
+                    {profile.batch && <span>Batch {profile.batch}</span>}
+                  </div>
+
+                  {/* Active Correction Request Banner */}
+                  {pendingReq && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedStudentForEdit(s);
+                        setSelectedPendingRequest(pendingReq);
+                        setShowProfileEditorModal(true);
+                      }}
+                      className="inline-flex items-center justify-between w-full p-2.5 rounded-xl border bg-amber-500/15 hover:bg-amber-500/25 text-amber-800 dark:text-amber-300 border-amber-500/30 transition-all text-xs font-semibold cursor-pointer active:scale-[0.98] tap-feedback"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Clock className="size-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+                        <span>Correction Requested: <strong>{pendingReq.field}</strong></span>
+                      </div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
+                        Review &gt;
+                      </span>
+                    </button>
+                  )}
+
+                  {/* Actions Grid (Oversized 44px Touch Targets) */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 border-t border-border/60">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setSelectedStudentForEdit(s);
+                        setSelectedPendingRequest(pendingReq || null);
+                        setShowProfileEditorModal(true);
+                      }}
+                      className="h-9 px-3 rounded-xl text-xs font-semibold cursor-pointer justify-center tap-feedback"
+                      title="Edit Academic Profile"
+                    >
+                      <FileEdit className="size-3.5 mr-1.5 text-primary" />
+                      <span>Edit</span>
+                    </Button>
+
+                    {!isUnverified && (
+                      <Button
+                        variant="outline"
+                        color={isSuspended ? "emerald" : "amber"}
+                        size="sm"
+                        onClick={() =>
+                          statusMutation.mutate({
+                            id: s.id,
+                            newStatus: isSuspended ? "active" : "suspended",
+                          })
+                        }
+                        disabled={statusMutation.isPending}
+                        className="h-9 px-3 rounded-xl text-xs font-semibold cursor-pointer justify-center tap-feedback"
+                      >
+                        {isSuspended ? (
+                          <UserCheck className="size-3.5 mr-1.5" />
+                        ) : (
+                          <UserX className="size-3.5 mr-1.5" />
+                        )}
+                        <span>{isSuspended ? "Reactivate" : "Suspend"}</span>
+                      </Button>
+                    )}
+
+                    {!isUnverified && (
+                      <Button
+                        variant="outline"
+                        color="indigo"
+                        size="sm"
+                        onClick={() => resetMutation.mutate(s.id)}
+                        disabled={resetMutation.isPending}
+                        className="h-9 px-3 rounded-xl text-xs font-semibold cursor-pointer justify-center tap-feedback"
+                        title="Reset Password"
+                      >
+                        <KeyRound className="size-3.5 mr-1.5" />
+                        <span>Reset</span>
+                      </Button>
+                    )}
+
+                    <Button
+                      variant="outline"
+                      color="rose"
+                      size="sm"
+                      onClick={() => setDeleteConfirmUser(s)}
+                      disabled={deleteMutation.isPending}
+                      className="h-9 px-3 rounded-xl text-xs font-semibold cursor-pointer justify-center tap-feedback"
+                      title="Permanently Delete Student"
+                    >
+                      <Trash2 className="size-3.5 mr-1.5" />
+                      <span>Delete</span>
+                    </Button>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Desktop Data Grid Table (Screens >= 1024px) */}
+        <div className="hidden lg:block overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead className="bg-muted/40 border-b border-border text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
               <tr>

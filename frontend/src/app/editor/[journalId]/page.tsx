@@ -15,6 +15,7 @@ import EditorToolbar from "./editor-toolbar";
 import BlockWrapper from "./block-wrapper";
 import BlockRenderer from "./block-renderer";
 import FloatingToolbox from "./floating-toolbox";
+import { MobileKeyboardToolbar } from "./mobile-keyboard-toolbar";
 import TableOfContents from "./table-of-contents";
 import ConflictDialog from "./conflict-dialog";
 import ReviewDrawer from "./review-drawer";
@@ -861,8 +862,16 @@ export default function EditorPage({ params }: PageProps) {
       <div className={`flex-1 flex w-full relative pt-16 print:pt-0 ${
         isTeacher && showReviewDrawer ? "justify-center px-4 gap-6" : "justify-center"
       }`}>
-        {/* Floating Toolbox (Students Only) */}
+        {/* Floating Toolbox (Students Only - Desktop) */}
         {!isTeacher && !previewMode && isEditable && <FloatingToolbox />}
+
+        {/* Mobile Keyboard Accessory Toolbar (Students Only - Mobile/Tablet) */}
+        {!isTeacher && !previewMode && isEditable && (
+          <MobileKeyboardToolbar
+            onSave={() => saveMutation.mutate(buildSavePayload(useDocumentStore.getState()))}
+            isSaving={isSaving}
+          />
+        )}
 
         {/* Teacher Review Mode: Table of Contents on the LEFT */}
         {isTeacher && showReviewDrawer && (
@@ -870,8 +879,8 @@ export default function EditorPage({ params }: PageProps) {
         )}
 
         {/* Editor Main Canvas Wrapper */}
-        <main className={`editor-content flex-1 w-full max-w-4xl py-6 flex flex-col gap-6 relative z-10 print:p-0 print:m-0 print:max-w-none print:w-full ${
-          isTeacher && showReviewDrawer ? "px-2" : "mx-auto px-4 sm:px-6 lg:px-8"
+        <main className={`editor-content flex-1 w-full max-w-4xl py-6 flex flex-col gap-6 relative z-10 print:p-0 print:m-0 print:max-w-none print:w-full pb-24 md:pb-6 ${
+          isTeacher && showReviewDrawer ? "px-2" : "mx-auto px-3 sm:px-6 lg:px-8"
         }`}>
           {/* Academic Print-Only Single Journal Header */}
           <div className="hidden print:flex flex-col border-b-2 border-black pb-4 mb-4 select-none">
@@ -1109,7 +1118,7 @@ export default function EditorPage({ params }: PageProps) {
           )}
 
           {/* Paper Sheet Document Canvas Container */}
-          <div className="w-full bg-white dark:bg-zinc-900/90 border border-slate-200/80 dark:border-zinc-800/80 shadow-2xl rounded-2xl p-6 sm:p-10 md:p-12 min-h-[850px] flex flex-col gap-6">
+          <div className="w-full bg-white dark:bg-zinc-900/90 border border-slate-200/80 dark:border-zinc-800/80 shadow-2xl rounded-2xl p-4 sm:p-8 md:p-12 min-h-[850px] flex flex-col gap-6">
             {/* Academic Institutional Journal Metadata Header */}
             {isTeacher && (
               <div className="p-3.5 rounded-xl bg-slate-50/90 dark:bg-zinc-800/50 border border-slate-200/90 dark:border-zinc-700/60 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 text-xs select-none shadow-2xs">

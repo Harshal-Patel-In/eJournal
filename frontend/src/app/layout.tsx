@@ -5,6 +5,7 @@ import "katex/dist/katex.min.css";
 import { Providers } from "./providers";
 import { LiquidTooltipProvider } from "@/components/ui/liquid-tooltip";
 import { GlobalAnnouncementBanner } from "@/components/announcement-banner";
+import { MobileBottomDock } from "@/components/navigation/mobile-bottom-dock";
 
 const inter = Inter({
   variable: "--font-sans",
@@ -41,6 +42,7 @@ export default function RootLayout({
         <Providers>
           <GlobalAnnouncementBanner />
           {children}
+          <MobileBottomDock />
           <LiquidTooltipProvider />
         </Providers>
       </body>

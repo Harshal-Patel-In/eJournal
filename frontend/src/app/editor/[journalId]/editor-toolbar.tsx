@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -16,6 +17,7 @@ import {
   Lock,
   HelpCircle,
   RefreshCw,
+  MoreVertical,
 } from "lucide-react";
 import { useDocumentStore } from "./use-document-store";
 import { Button } from "@/components/ui/button";
@@ -68,11 +70,12 @@ export default function EditorToolbar({
 
   const isEditable = status === "draft" || status === "changes_requested";
   const isTeacher = userRole?.toLowerCase() === "teacher";
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
 
   return (
-    <header className="fixed top-3 left-3 right-3 sm:left-8 sm:right-8 md:left-12 md:right-12 z-40 flex items-center justify-between px-3 sm:px-4 py-2 bg-gradient-to-b from-white/95 via-white/85 to-white/75 dark:from-zinc-900/95 dark:via-zinc-900/90 dark:to-zinc-950/85 backdrop-blur-2xl backdrop-saturate-180 border border-white/80 dark:border-white/10 ring-1 ring-black/5 dark:ring-white/10 shadow-xl rounded-2xl select-none transition-all duration-300">
+    <header className="fixed top-3 left-3 right-3 sm:left-8 sm:right-8 md:left-12 md:right-12 z-40 flex items-center justify-between px-2.5 sm:px-4 py-2 bg-gradient-to-b from-white/95 via-white/85 to-white/75 dark:from-zinc-900/95 dark:via-zinc-900/90 dark:to-zinc-950/85 backdrop-blur-2xl backdrop-saturate-180 border border-white/80 dark:border-white/10 ring-1 ring-black/5 dark:ring-white/10 shadow-xl rounded-2xl select-none transition-all duration-300">
       {/* Left: Back Button, Divider & Title Input */}
-      <div className="flex items-center gap-2.5 sm:gap-3 flex-1 min-w-0 pr-2 sm:pr-4">
+      <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0 pr-1.5 sm:pr-4">
         <Link
           href={classroomId ? `/classrooms/${classroomId}` : "/dashboard"}
           title={classroomId ? "Back to Classroom" : "Back to Dashboard"}
@@ -89,12 +92,12 @@ export default function EditorToolbar({
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Untitled Experiment Record"
           disabled={!isEditable}
-          className="bg-transparent text-xs sm:text-sm md:text-base font-bold text-foreground border-0 border-b border-transparent hover:border-border/50 focus:border-primary/50 focus:ring-0 focus:outline-none px-2 py-0.5 rounded-lg transition-all min-w-[130px] max-w-[260px] sm:max-w-[340px] w-full text-ellipsis placeholder:text-muted-foreground/50 disabled:pointer-events-none"
+          className="bg-transparent text-xs sm:text-sm md:text-base font-bold text-foreground border-0 border-b border-transparent hover:border-border/50 focus:border-primary/50 focus:ring-0 focus:outline-none px-1.5 sm:px-2 py-0.5 rounded-lg transition-all min-w-0 max-w-[180px] sm:max-w-[340px] flex-1 text-ellipsis placeholder:text-muted-foreground/50 disabled:pointer-events-none"
         />
       </div>
 
       {/* Right: Controls & Actions */}
-      <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
+      <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
         {/* 1. Unified Status & Sync Indicator */}
         <button
           type="button"
@@ -233,44 +236,55 @@ export default function EditorToolbar({
                 </div>
               )
             ) : (
-              /* Apple HIG Segmented Mode Switch */
-              <div className="flex items-center p-0.5 rounded-xl bg-muted/60 dark:bg-zinc-800/80 border border-border/50 select-none">
+              <>
+                {/* Mode Switch: Mobile single toggle vs Desktop segmented pill */}
                 <button
                   type="button"
-                  onClick={() => previewMode && togglePreview()}
-                  className={cn(
-                    "flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-lg text-xs transition-all duration-200 cursor-pointer",
-                    !previewMode
-                      ? "bg-background text-foreground shadow-xs font-bold"
-                      : "text-muted-foreground hover:text-foreground font-medium"
-                  )}
-                  title="Edit Mode (Write & format blocks)"
+                  onClick={togglePreview}
+                  className="sm:hidden flex items-center justify-center size-8 rounded-xl bg-muted/60 dark:bg-zinc-800/80 border border-border/50 text-foreground cursor-pointer tap-feedback shrink-0"
+                  title={previewMode ? "Switch to Edit Mode" : "Switch to Preview Mode"}
                 >
-                  <EyeOff className="size-3.5" />
-                  <span className="hidden sm:inline">Edit</span>
+                  {previewMode ? <EyeOff className="size-3.5 text-primary" /> : <Eye className="size-3.5" />}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => !previewMode && togglePreview()}
-                  className={cn(
-                    "flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-lg text-xs transition-all duration-200 cursor-pointer",
-                    previewMode
-                      ? "bg-background text-foreground shadow-xs font-bold"
-                      : "text-muted-foreground hover:text-foreground font-medium"
-                  )}
-                  title="Preview Mode (Clean reader sheet view)"
-                >
-                  <Eye className="size-3.5" />
-                  <span className="hidden sm:inline">Preview</span>
-                </button>
-              </div>
+
+                <div className="hidden sm:flex items-center p-0.5 rounded-xl bg-muted/60 dark:bg-zinc-800/80 border border-border/50 select-none">
+                  <button
+                    type="button"
+                    onClick={() => previewMode && togglePreview()}
+                    className={cn(
+                      "flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs transition-all duration-200 cursor-pointer",
+                      !previewMode
+                        ? "bg-background text-foreground shadow-xs font-bold"
+                        : "text-muted-foreground hover:text-foreground font-medium"
+                    )}
+                    title="Edit Mode (Write & format blocks)"
+                  >
+                    <EyeOff className="size-3.5" />
+                    <span>Edit</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => !previewMode && togglePreview()}
+                    className={cn(
+                      "flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs transition-all duration-200 cursor-pointer",
+                      previewMode
+                        ? "bg-background text-foreground shadow-xs font-bold"
+                        : "text-muted-foreground hover:text-foreground font-medium"
+                    )}
+                    title="Preview Mode (Clean reader sheet view)"
+                  >
+                    <Eye className="size-3.5" />
+                    <span>Preview</span>
+                  </button>
+                </div>
+              </>
             )}
           </>
         )}
 
-        {/* 3. Utility Actions Cluster (Tactile Icon Group) */}
-        <div className="flex items-center gap-1 border-l border-border/60 pl-2">
-          {/* Version History Drawer */}
+        {/* 3. Utility Actions Cluster */}
+        {/* Desktop View: Full icon cluster */}
+        <div className="hidden sm:flex items-center gap-1 border-l border-border/60 pl-2">
           {onToggleVersionHistory && (
             <button
               type="button"
@@ -282,7 +296,6 @@ export default function EditorToolbar({
             </button>
           )}
 
-          {/* PDF Export */}
           <Link
             href={`/classrooms/${classroomId}/compile-journal?journalId=${journalId}`}
             title="Preview & Export as Printable PDF"
@@ -291,7 +304,6 @@ export default function EditorToolbar({
             <Download className="size-3.5 text-primary" />
           </Link>
 
-          {/* Guide / Handbook */}
           {onToggleHelp && (
             <button
               type="button"
@@ -303,20 +315,71 @@ export default function EditorToolbar({
             </button>
           )}
 
-          {/* Theme Toggle (Dark/Light with Circular View Transition) */}
           <ThemeToggle />
+        </div>
+
+        {/* Mobile View: Theme Toggle + Overflow Options Dropdown */}
+        <div className="sm:hidden flex items-center gap-1 relative border-l border-border/50 pl-1.5">
+          <ThemeToggle />
+          <button
+            type="button"
+            onClick={() => setShowMobileMenu((prev) => !prev)}
+            title="More document options"
+            className="size-8 rounded-xl bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground border border-border/40 flex items-center justify-center transition-all active:scale-95 cursor-pointer"
+          >
+            <MoreVertical className="size-3.5" />
+          </button>
+
+          {showMobileMenu && (
+            <div className="absolute right-0 top-full mt-2 w-48 rounded-2xl bg-card/95 backdrop-blur-2xl border border-border/80 shadow-2xl p-1.5 z-50 flex flex-col gap-0.5 animate-in fade-in zoom-in-95 duration-150">
+              {onToggleVersionHistory && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowMobileMenu(false);
+                    onToggleVersionHistory();
+                  }}
+                  className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-foreground hover:bg-muted/80 transition-colors cursor-pointer w-full text-left"
+                >
+                  <History className="size-3.5 text-indigo-500" />
+                  <span>Version History</span>
+                </button>
+              )}
+              <Link
+                href={`/classrooms/${classroomId}/compile-journal?journalId=${journalId}`}
+                onClick={() => setShowMobileMenu(false)}
+                className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-foreground hover:bg-muted/80 transition-colors cursor-pointer w-full text-left"
+              >
+                <Download className="size-3.5 text-primary" />
+                <span>Export as PDF</span>
+              </Link>
+              {onToggleHelp && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowMobileMenu(false);
+                    onToggleHelp();
+                  }}
+                  className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-foreground hover:bg-muted/80 transition-colors cursor-pointer w-full text-left"
+                >
+                  <HelpCircle className="size-3.5 text-blue-500" />
+                  <span>Student Guide (?)</span>
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         {/* 4. Student Primary Actions (Save & Hand In) */}
         {!isTeacher && (
-          <div className="flex items-center gap-1.5 ml-0.5">
+          <div className="flex items-center gap-1.5 ml-0.5 shrink-0">
             {isEditable && (
               <Button
                 variant="outline"
                 size="sm"
                 onClick={onSave}
                 disabled={!isDirty || isSaving}
-                className="gap-1.5 text-xs font-semibold shadow-xs hover:shadow active:scale-95 transition-all cursor-pointer disabled:pointer-events-none rounded-xl h-8"
+                className="hidden sm:inline-flex gap-1.5 text-xs font-semibold shadow-xs hover:shadow active:scale-95 transition-all cursor-pointer disabled:pointer-events-none rounded-xl h-8"
               >
                 <Save className="size-3.5" />
                 <span>Save Draft</span>
@@ -330,7 +393,7 @@ export default function EditorToolbar({
                 size="sm"
                 onClick={onSubmit}
                 disabled={isDirty || isSaving || isSubmitting}
-                className={`gap-1.5 text-xs font-semibold shadow-xs hover:shadow active:scale-95 transition-all cursor-pointer disabled:pointer-events-none rounded-xl h-8 ${
+                className={`gap-1.5 text-xs font-bold shadow-xs hover:shadow active:scale-95 transition-all cursor-pointer disabled:pointer-events-none rounded-xl h-8 px-2.5 sm:px-3 shrink-0 ${
                   status === "changes_requested"
                     ? "glass-btn-amber"
                     : "glass-btn-emerald-outline"
@@ -341,14 +404,16 @@ export default function EditorToolbar({
                 ) : (
                   <Send className="size-3.5" />
                 )}
-                <span>{status === "changes_requested" ? "Resubmit Changes" : "Hand In"}</span>
+                <span className="whitespace-nowrap">
+                  {status === "changes_requested" ? "Resubmit" : "Hand In"}
+                </span>
               </Button>
             ) : (
               <Button
                 variant="ghost"
                 size="sm"
                 disabled
-                className="gap-1.5 text-xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 disabled:opacity-100 rounded-xl h-8"
+                className="gap-1.5 text-xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 disabled:opacity-100 rounded-xl h-8 px-2.5 sm:px-3 shrink-0"
               >
                 <Check className="size-3.5" />
                 <span>{status === "approved" ? "Approved" : "Handed In"}</span>
