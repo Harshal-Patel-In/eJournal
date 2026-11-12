@@ -57,8 +57,8 @@ export function TermSealedDialog({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in-50 duration-200">
-      <div className="w-full max-w-lg rounded-3xl bg-card border border-border/80 shadow-2xl p-6 sm:p-7 space-y-6 relative overflow-hidden">
+    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 animate-in fade-in-50 duration-200 overflow-y-auto pb-safe">
+      <div className="w-full max-w-lg rounded-2xl sm:rounded-3xl bg-card border border-border/80 shadow-2xl p-5 sm:p-7 space-y-5 sm:space-y-6 relative overflow-hidden my-auto">
         {/* Institutional Glow Accent */}
         <div className="absolute -top-16 -right-16 size-40 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
 

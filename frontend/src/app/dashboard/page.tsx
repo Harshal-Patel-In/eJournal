@@ -504,9 +504,9 @@ export default function DashboardPage() {
 
 
 
-        {/* Section Title */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
+        {/* Section Title with Accessible Navigation Anchors */}
+        <div id="classroom-workspaces" className="flex items-center justify-between scroll-mt-24">
+          <div id="classrooms" className="flex items-center gap-2">
             <h2 className="text-lg sm:text-xl font-bold tracking-tight text-foreground font-serif">
               My classroom workspaces
             </h2>

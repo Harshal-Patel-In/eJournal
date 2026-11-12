@@ -1133,6 +1133,7 @@
    ========================================================================== */
 html, body {
   overflow-x: clip;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .pt-safe {
@@ -1141,6 +1142,14 @@ html, body {
 
 .pb-safe {
   padding-bottom: max(env(safe-area-inset-bottom, 0px), 0px);
+}
+
+.pb-safe-dock {
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), 12px);
+}
+
+.pb-safe-keyboard {
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), 16px);
 }
 
 .pl-safe {
@@ -1152,7 +1161,7 @@ html, body {
 }
 
 .min-h-safe-screen {
-  min-height: calc(100vh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  min-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
 }
 
 .tap-feedback {

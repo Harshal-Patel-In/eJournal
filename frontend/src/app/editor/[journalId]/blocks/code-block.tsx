@@ -141,7 +141,7 @@ export default function CodeBlock({ id, content, previewMode }: CodeBlockProps) 
       </div>
 
       {/* CodeMirror 6 Editor Canvas with Fira Code Ligatures */}
-      <div className="relative font-code text-[13px] leading-relaxed p-1 rounded-b-2xl">
+      <div className="relative font-code text-sm sm:text-[13px] leading-relaxed p-1 rounded-b-2xl overflow-x-auto">
         <CodeMirror
           value={text}
           extensions={languageExtension}

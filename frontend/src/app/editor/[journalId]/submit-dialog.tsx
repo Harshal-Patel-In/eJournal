@@ -39,8 +39,8 @@ export function SubmitDialog({
   const isAllChecked = checkedCover && checkedAim && checkedLock;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-md">
-      <div className="w-full max-w-md p-6 rounded-3xl glass-card flex flex-col gap-5 relative animate-in fade-in zoom-in-95 duration-200 border border-emerald-500/30">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-background/80 backdrop-blur-md overflow-y-auto pb-safe">
+      <div className="w-full max-w-md p-5 sm:p-6 rounded-2xl sm:rounded-3xl glass-card flex flex-col gap-4 sm:gap-5 relative animate-in fade-in zoom-in-95 duration-200 border border-emerald-500/30 my-auto shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">

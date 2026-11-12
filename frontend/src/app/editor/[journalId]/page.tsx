@@ -4,7 +4,7 @@ import { use, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
-import { Loader2, Plus, MessageSquare, History, CheckCircle2, Sparkles, AlertTriangle, Lock } from "lucide-react";
+import { Loader2, Plus, MessageSquare, History, CheckCircle2, Sparkles, AlertTriangle, Lock, GraduationCap } from "lucide-react";
 
 import { api } from "@/lib/api";
 import { toast } from "@/lib/toast";
@@ -26,6 +26,7 @@ import { VersionHistoryDrawer } from "@/components/editor/version-history-drawer
 import EditorHelpModal from "./editor-help-modal";
 import { AppLoadingScreen } from "@/components/ui/app-loading-screen";
 import { TermSealedDialog } from "./term-sealed-dialog";
+import { MobileAdaptiveSheet } from "@/components/ui/mobile-adaptive-sheet";
 
 interface PageProps {
   params: Promise<{ journalId: string }>;
@@ -42,6 +43,7 @@ export default function EditorPage({ params }: PageProps) {
   const [mounted, setMounted] = useState(false);
   const [showConflictDialog, setShowConflictDialog] = useState(false);
   const [showReviewDrawer, setShowReviewDrawer] = useState(true);
+  const [mobileReviewSheetOpen, setMobileReviewSheetOpen] = useState(false);
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [showVersionDrawer, setShowVersionDrawer] = useState(false);
   const [showTermSealedModal, setShowTermSealedModal] = useState(false);
@@ -878,9 +880,9 @@ export default function EditorPage({ params }: PageProps) {
           <TableOfContents isInlineSticky position="left" />
         )}
 
-        {/* Editor Main Canvas Wrapper */}
-        <main className={`editor-content flex-1 w-full max-w-4xl py-6 flex flex-col gap-6 relative z-10 print:p-0 print:m-0 print:max-w-none print:w-full pb-24 md:pb-6 ${
-          isTeacher && showReviewDrawer ? "px-2" : "mx-auto px-3 sm:px-6 lg:px-8"
+        {/* Editor Main Canvas Wrapper (Guaranteed Full Width on Mobile/Tablet) */}
+        <main className={`editor-content flex-1 w-full max-w-4xl py-6 flex flex-col gap-6 relative z-10 print:p-0 print:m-0 print:max-w-none print:w-full pb-28 md:pb-8 ${
+          isTeacher && showReviewDrawer ? "lg:px-2 mx-auto px-3 sm:px-6 lg:px-8" : "mx-auto px-3 sm:px-6 lg:px-8"
         }`}>
           {/* Academic Print-Only Single Journal Header */}
           <div className="hidden print:flex flex-col border-b-2 border-black pb-4 mb-4 select-none">
@@ -1225,10 +1227,10 @@ export default function EditorPage({ params }: PageProps) {
                                         activeAnnotationBlockId === block.id ? null : block.id
                                       )
                                     }
-                                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all cursor-pointer ${
+                                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all cursor-pointer tap-feedback ${
                                       activeAnnotationBlockId === block.id
                                         ? "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400"
-                                        : "text-muted-foreground/0 group-hover/block:text-muted-foreground/60 hover:!text-indigo-500 hover:!bg-indigo-500/5"
+                                        : "text-muted-foreground/70 lg:text-muted-foreground/0 lg:group-hover/block:text-muted-foreground/60 hover:!text-indigo-500 hover:!bg-indigo-500/5"
                                     }`}
                                   >
                                     <MessageSquare className="size-3" />
@@ -1300,9 +1302,9 @@ export default function EditorPage({ params }: PageProps) {
           </div>
         </main>
 
-        {/* Right-Side Teacher Review Cockpit Drawer */}
+        {/* Right-Side Teacher Review Cockpit Drawer (Desktop only: lg:block, prevents mobile canvas crush) */}
         {isTeacher && showReviewDrawer && (
-          <aside className="w-[330px] shrink-0 sticky top-[4.5rem] h-[calc(100vh-6rem)] my-2 rounded-2xl bg-gradient-to-b from-white/95 via-white/90 to-white/85 dark:from-zinc-900/95 dark:via-zinc-900/90 dark:to-zinc-950/85 backdrop-blur-2xl backdrop-saturate-150 border border-white/80 dark:border-white/10 ring-1 ring-black/5 dark:ring-white/10 shadow-xl z-20 overflow-hidden transition-all duration-300">
+          <aside className="hidden lg:block w-[330px] shrink-0 sticky top-[4.5rem] h-[calc(100vh-6rem)] my-2 rounded-2xl bg-gradient-to-b from-white/95 via-white/90 to-white/85 dark:from-zinc-900/95 dark:via-zinc-900/90 dark:to-zinc-950/85 backdrop-blur-2xl backdrop-saturate-150 border border-white/80 dark:border-white/10 ring-1 ring-black/5 dark:ring-white/10 shadow-xl z-20 overflow-hidden transition-all duration-300">
             <ReviewDrawer
               journalId={journalId}
               classroomId={classroomId}
@@ -1322,6 +1324,75 @@ export default function EditorPage({ params }: PageProps) {
           <TableOfContents isInlineSticky={false} position="right" />
         )}
       </div>
+
+      {/* Mobile/Tablet Floating Teacher Review Capsule (Docked at bottom, 100% canvas preserved) */}
+      {isTeacher && (
+        <aside
+          aria-label="Mobile Teacher Review Evaluation Dock"
+          style={{
+            paddingBottom: "max(0.75rem, env(safe-area-inset-bottom, 12px))",
+          }}
+          className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-card/95 dark:bg-zinc-950/95 backdrop-blur-xl border-t border-border/80 px-3 pt-2.5 shadow-[0_-8px_24px_-4px_rgba(0,0,0,0.16)] select-none"
+        >
+          <div className="flex items-center justify-between gap-2 max-w-lg mx-auto">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="size-8.5 rounded-xl bg-primary/10 text-primary border border-primary/20 flex items-center justify-center font-bold text-xs shrink-0 shadow-xs">
+                <GraduationCap className="size-4.5" />
+              </div>
+              <div className="flex flex-col min-w-0">
+                <span className="text-xs font-bold text-foreground truncate">
+                  {journal?.studentName || "Student Submission"}
+                </span>
+                <span className="text-[10px] text-muted-foreground font-semibold flex items-center gap-1.5">
+                  {journal?.marks !== undefined && journal?.marks !== null ? (
+                    <span className="text-emerald-600 dark:text-emerald-400 font-bold">
+                      Grade: {journal.marks} / {assignment?.maxMarks || 10}
+                    </span>
+                  ) : (
+                    <span>Awaiting Review</span>
+                  )}
+                  <span>•</span>
+                  <span className="capitalize">{status || "Submitted"}</span>
+                </span>
+              </div>
+            </div>
+
+            <Button
+              onClick={() => setMobileReviewSheetOpen(true)}
+              size="sm"
+              className="h-9 px-3.5 rounded-xl font-bold text-xs gap-1.5 shadow-sm tap-feedback cursor-pointer"
+            >
+              <Sparkles className="size-3.5" />
+              <span>Evaluate</span>
+            </Button>
+          </div>
+        </aside>
+      )}
+
+      {/* Mobile/Tablet Teacher Review Adaptive Bottom Sheet */}
+      {isTeacher && (
+        <MobileAdaptiveSheet
+          isOpen={mobileReviewSheetOpen}
+          onClose={() => setMobileReviewSheetOpen(false)}
+          title="Laboratory Practical Review"
+          subtitle={journal?.studentName ? `Evaluating: ${journal.studentName}` : "Student Submission Evaluation"}
+        >
+          <div className="h-[75vh] max-h-[820px] -mx-4 -my-4 sm:-mx-6 sm:-my-6 overflow-hidden rounded-b-2xl">
+            <ReviewDrawer
+              journalId={journalId}
+              classroomId={classroomId}
+              journalStatus={status}
+              assignment={assignment}
+              studentId={journal?.studentId}
+              maxMarks={assignment?.maxMarks || 10}
+              currentMarks={journal?.marks}
+              currentRemarks={journal?.teacherRemarks}
+              blocks={blocks}
+              onClose={() => setMobileReviewSheetOpen(false)}
+            />
+          </div>
+        </MobileAdaptiveSheet>
+      )}
     </div>
   );
 }

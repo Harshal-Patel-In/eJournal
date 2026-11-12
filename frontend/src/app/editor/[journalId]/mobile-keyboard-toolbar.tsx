@@ -7,9 +7,12 @@ import {
   Sigma,
   Code2,
   Table as TableIcon,
+  LineChart,
+  Image as ImageIcon,
   CheckSquare,
   Award,
   BookMarked,
+  Split,
   SplitSquareVertical,
   Save,
   Check,
@@ -99,8 +102,39 @@ export function MobileKeyboardToolbar({ onSave, isSaving = false }: MobileKeyboa
       action: () =>
         handleAdd(
           "table",
-          { headers: ["Column 1", "Column 2"], rows: [["", ""]] },
+          { headers: ["Speed (km/h)", "Distance (m)", "Time (s)"], rows: [["", "", ""]] },
           "Data Table"
+        ),
+    },
+    {
+      id: "graph",
+      label: "Graph",
+      icon: LineChart,
+      color: "text-cyan-600 dark:text-cyan-400",
+      bg: "bg-cyan-500/10 hover:bg-cyan-500/20",
+      action: () =>
+        handleAdd(
+          "graph",
+          {
+            title: "Experimental Graph Plot",
+            chartType: "scatter",
+            showTrendline: true,
+            showGrid: true,
+          },
+          "Graph Plot"
+        ),
+    },
+    {
+      id: "image",
+      label: "Figure",
+      icon: ImageIcon,
+      color: "text-amber-600 dark:text-amber-400",
+      bg: "bg-amber-500/10 hover:bg-amber-500/20",
+      action: () =>
+        handleAdd(
+          "image",
+          { url: "", caption: "Figure caption and experimental apparatus diagram" },
+          "Figure / Image"
         ),
     },
     {
@@ -133,6 +167,14 @@ export function MobileKeyboardToolbar({ onSave, isSaving = false }: MobileKeyboa
       action: () => handleAdd("reference", { citations: [""] }, "References"),
     },
     {
+      id: "divider",
+      label: "Divider",
+      icon: Split,
+      color: "text-zinc-600 dark:text-zinc-300",
+      bg: "bg-muted/70 hover:bg-muted",
+      action: () => handleAdd("divider", {}, "Divider"),
+    },
+    {
       id: "page_break",
       label: "Page Break",
       icon: SplitSquareVertical,
@@ -145,7 +187,10 @@ export function MobileKeyboardToolbar({ onSave, isSaving = false }: MobileKeyboa
   return (
     <aside
       aria-label="Mobile Keyboard Quick Accessory Dock"
-      className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-card/95 backdrop-blur-xl border-t border-border/80 px-2 py-1.5 pb-safe shadow-[0_-8px_24px_-4px_rgba(0,0,0,0.12)] flex items-center justify-between gap-1 select-none"
+      style={{
+        paddingBottom: "max(1rem, env(safe-area-inset-bottom, 16px))",
+      }}
+      className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-card/95 backdrop-blur-xl border-t border-border/80 px-2.5 pt-2 shadow-[0_-8px_24px_-4px_rgba(0,0,0,0.14)] flex items-center justify-between gap-1 select-none"
     >
       {/* Scrollable Block Insertion Ribbon */}
       <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar scroll-smooth flex-1 pr-2">

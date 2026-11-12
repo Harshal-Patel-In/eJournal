@@ -61,6 +61,7 @@ import { cn } from "@/lib/utils";
 import { getClassroomTheme, getClassroomCanvasStyle } from "@/lib/classroom-theme";
 import { AppLoadingScreen } from "@/components/ui/app-loading-screen";
 import { PublishExperimentModal } from "@/components/classroom/publish-experiment-modal";
+import { MobileCalendarSheet } from "@/components/navigation/mobile-calendar-sheet";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -101,6 +102,7 @@ export default function ClassroomPage({ params }: PageProps) {
   const [copiedCode, setCopiedCode] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [collapsedClusters, setCollapsedClusters] = useState<string[]>([]);
+  const [showMobileCalendarSheet, setShowMobileCalendarSheet] = useState(false);
   const [calendarDate, setCalendarDate] = useState<Date>(() => new Date());
   const [hoveredCalendarKey, setHoveredCalendarKey] = useState<string | null>(null);
   const [pinnedCalendarKey, setPinnedCalendarKey] = useState<string | null>(null);
@@ -1374,8 +1376,8 @@ export default function ClassroomPage({ params }: PageProps) {
               </div>
             )}
 
-            {/* Sidebar Card 3: Interactive Academic Calendar with Popovers */}
-            <div className="p-5 rounded-xl border border-border/70 bg-card/85 backdrop-blur-md shadow-xs flex flex-col gap-3.5 relative">
+            {/* Sidebar Card 3: Interactive Academic Calendar with Popovers (Desktop only: lg:flex, mobile has dedicated bottom dock & sheet) */}
+            <div className="hidden lg:flex p-5 rounded-xl border border-border/70 bg-card/85 backdrop-blur-md shadow-xs flex-col gap-3.5 relative">
               {/* Calendar Month & Navigation Header */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -1749,16 +1751,27 @@ export default function ClassroomPage({ params }: PageProps) {
                       </Button>
                     </>
                   ) : (
-                    <Link href={`/classrooms/${classroomId}/compile-journal`}>
+                    <>
                       <Button
                         size="sm"
-                        className="gap-2 text-xs font-semibold rounded-lg h-8 px-3.5 active:scale-[0.98] transition-all cursor-pointer whitespace-nowrap glass-btn-frosted shadow-xs"
-                        title="Compile all practical experiments into an official master lab manual"
+                        onClick={() => setShowMobileCalendarSheet(true)}
+                        className="lg:hidden gap-1.5 text-xs font-semibold rounded-lg h-8 px-3 active:scale-[0.98] transition-all cursor-pointer whitespace-nowrap glass-btn-frosted shadow-xs"
+                        title="Open interactive academic calendar"
                       >
-                        <BookOpen className={cn("size-3.5", theme.accentText)} />
-                        <span>Download complete journal</span>
+                        <Calendar className="size-3.5 text-primary" />
+                        <span>Calendar</span>
                       </Button>
-                    </Link>
+                      <Link href={`/classrooms/${classroomId}/compile-journal`}>
+                        <Button
+                          size="sm"
+                          className="gap-2 text-xs font-semibold rounded-lg h-8 px-3.5 active:scale-[0.98] transition-all cursor-pointer whitespace-nowrap glass-btn-frosted shadow-xs"
+                          title="Compile all practical experiments into an official master lab manual"
+                        >
+                          <BookOpen className={cn("size-3.5", theme.accentText)} />
+                          <span>Download complete journal</span>
+                        </Button>
+                      </Link>
+                    </>
                   )}
                 </div>
               </div>
@@ -1766,11 +1779,13 @@ export default function ClassroomPage({ params }: PageProps) {
 
         {/* Tab switcher & Action bar */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-b border-border pb-3">
-          {/* Segmented Control Pill (Locked Height, Zero-Jitter, Touch-Scrollable) */}
-          <div className="flex items-center p-1 border border-border/80 bg-muted/40 rounded-xl overflow-x-auto no-scrollbar scroll-smooth max-w-full sm:max-w-fit gap-1 shrink-0">
+          {/* Segmented Control Pill (Adaptive Grid on Mobile, Flex on Desktop - Zero Clipping Guaranteed) */}
+          <div className={`p-1 border border-border/80 bg-muted/40 rounded-xl gap-1 shrink-0 w-full sm:w-auto ${
+            isTeacher ? "grid grid-cols-4 sm:flex sm:items-center" : "grid grid-cols-3 sm:flex sm:items-center"
+          }`}>
             <button
               onClick={() => setActiveTab("assignments")}
-              className={`flex items-center gap-1.5 h-8 sm:h-7.5 px-3 text-xs font-medium rounded-lg transition-all cursor-pointer whitespace-nowrap tap-feedback ${
+              className={`flex items-center justify-center gap-1.5 h-9 sm:h-8 px-2 sm:px-3 text-xs font-semibold rounded-lg transition-all cursor-pointer whitespace-nowrap tap-feedback ${
                 activeTab === "assignments"
                   ? "bg-card text-foreground shadow-xs font-bold"
                   : "text-muted-foreground hover:text-foreground"
@@ -1778,14 +1793,14 @@ export default function ClassroomPage({ params }: PageProps) {
             >
               <FileText
                 className={cn(
-                  "size-3.5",
+                  "size-3.5 shrink-0",
                   activeTab === "assignments" ? theme.accentText : "text-muted-foreground"
                 )}
               />
-              <span>Practicals</span>
+              <span className="truncate">Practicals</span>
               <span
                 className={cn(
-                  "px-1.5 py-0.2 rounded text-[10px] font-semibold tabular-nums",
+                  "px-1.5 py-0.2 rounded text-[10px] font-semibold tabular-nums shrink-0",
                   activeTab === "assignments"
                     ? "bg-muted text-foreground border border-border"
                     : "text-muted-foreground"
@@ -1797,15 +1812,15 @@ export default function ClassroomPage({ params }: PageProps) {
 
             <button
               onClick={() => setActiveTab("announcements")}
-              className={`flex items-center gap-1.5 h-8 sm:h-7.5 px-3 text-xs font-medium rounded-lg transition-all cursor-pointer whitespace-nowrap tap-feedback ${
+              className={`flex items-center justify-center gap-1.5 h-9 sm:h-8 px-2 sm:px-3 text-xs font-semibold rounded-lg transition-all cursor-pointer whitespace-nowrap tap-feedback ${
                 activeTab === "announcements"
                   ? "bg-card text-foreground shadow-xs font-bold"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              <Sparkles className={cn("size-3.5", activeTab === "announcements" ? theme.accentText : "text-muted-foreground")} />
-              <span>Announcements</span>
-              <span className={`px-1.5 py-0.2 rounded text-[10px] font-semibold tabular-nums ${
+              <Sparkles className={cn("size-3.5 shrink-0", activeTab === "announcements" ? theme.accentText : "text-muted-foreground")} />
+              <span className="truncate">Updates</span>
+              <span className={`px-1.5 py-0.2 rounded text-[10px] font-semibold tabular-nums shrink-0 ${
                 activeTab === "announcements" ? "bg-muted text-foreground border border-border" : "text-muted-foreground"
               }`}>
                 {announcements?.length || 0}
@@ -1815,16 +1830,16 @@ export default function ClassroomPage({ params }: PageProps) {
             {isTeacher && (
               <button
                 onClick={() => setActiveTab("submissions")}
-                className={`flex items-center gap-1.5 h-8 sm:h-7.5 px-3 text-xs font-medium rounded-lg transition-all cursor-pointer whitespace-nowrap tap-feedback ${
+                className={`flex items-center justify-center gap-1.5 h-9 sm:h-8 px-2 sm:px-3 text-xs font-semibold rounded-lg transition-all cursor-pointer whitespace-nowrap tap-feedback ${
                   activeTab === "submissions"
                     ? "bg-card text-foreground shadow-xs font-bold"
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
-                <GraduationCap className={cn("size-3.5", activeTab === "submissions" ? theme.accentText : "text-muted-foreground")} />
-                <span>Gradebook</span>
+                <GraduationCap className={cn("size-3.5 shrink-0", activeTab === "submissions" ? theme.accentText : "text-muted-foreground")} />
+                <span className="truncate">Grades</span>
                 {pendingReviewsCount > 0 && (
-                  <span className="px-1.5 py-0.2 rounded text-[10px] font-bold tabular-nums bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/30">
+                  <span className="px-1.5 py-0.2 rounded text-[10px] font-bold tabular-nums bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/30 shrink-0">
                     {pendingReviewsCount}
                   </span>
                 )}
@@ -1833,15 +1848,15 @@ export default function ClassroomPage({ params }: PageProps) {
 
             <button
               onClick={() => setActiveTab("roster")}
-              className={`flex items-center gap-1.5 h-8 sm:h-7.5 px-3 text-xs font-medium rounded-lg transition-all cursor-pointer whitespace-nowrap tap-feedback ${
+              className={`flex items-center justify-center gap-1.5 h-9 sm:h-8 px-2 sm:px-3 text-xs font-semibold rounded-lg transition-all cursor-pointer whitespace-nowrap tap-feedback ${
                 activeTab === "roster"
                   ? "bg-card text-foreground shadow-xs font-bold"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              <Users className={cn("size-3.5", activeTab === "roster" ? theme.accentText : "text-muted-foreground")} />
-              <span>Members</span>
-              <span className={`px-1.5 py-0.2 rounded text-[10px] font-semibold tabular-nums ${
+              <Users className={cn("size-3.5 shrink-0", activeTab === "roster" ? theme.accentText : "text-muted-foreground")} />
+              <span className="truncate">Members</span>
+              <span className={`px-1.5 py-0.2 rounded text-[10px] font-semibold tabular-nums shrink-0 ${
                 activeTab === "roster" ? "bg-muted text-foreground border border-border" : "text-muted-foreground"
               }`}>
                 {totalStudents}
@@ -2576,6 +2591,13 @@ export default function ClassroomPage({ params }: PageProps) {
           </div>
         </div>
       )}
+
+      {/* Interactive Mobile Academic Calendar Sheet */}
+      <MobileCalendarSheet
+        isOpen={showMobileCalendarSheet}
+        onClose={() => setShowMobileCalendarSheet(false)}
+        activeClassroomId={classroomId}
+      />
     </div>
   );
 }
