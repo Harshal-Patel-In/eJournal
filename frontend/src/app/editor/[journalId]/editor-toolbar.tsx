@@ -92,13 +92,13 @@ export default function EditorToolbar({
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Untitled Experiment Record"
           disabled={!isEditable}
-          className="bg-transparent text-xs sm:text-sm md:text-base font-bold text-foreground border-0 border-b border-transparent hover:border-border/50 focus:border-primary/50 focus:ring-0 focus:outline-none px-1.5 sm:px-2 py-0.5 rounded-lg transition-all min-w-0 max-w-[180px] sm:max-w-[340px] flex-1 text-ellipsis placeholder:text-muted-foreground/50 disabled:pointer-events-none"
+          className="bg-transparent text-xs sm:text-sm md:text-base font-bold text-foreground border-0 border-b border-transparent hover:border-border/50 focus:border-primary/50 focus:ring-0 focus:outline-none px-1.5 sm:px-2 py-0.5 rounded-lg transition-all min-w-0 flex-1 truncate placeholder:text-muted-foreground/50 disabled:pointer-events-none"
         />
       </div>
 
       {/* Right: Controls & Actions */}
       <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
-        {/* 1. Unified Status & Sync Indicator */}
+        {/* 1. Unified Status & Sync Indicator (Desktop only) */}
         <button
           type="button"
           onClick={isDirty && isEditable ? onSave : undefined}
@@ -111,7 +111,7 @@ export default function EditorToolbar({
               : "All changes synced"
           }
           className={cn(
-            "hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs transition-all select-none border",
+            "hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs transition-all select-none border",
             isDirty && isEditable
               ? "bg-amber-500/10 border-amber-500/30 text-amber-700 dark:text-amber-300 hover:bg-amber-500/20 cursor-pointer animate-pulse"
               : "bg-muted/40 border-border/50 text-muted-foreground cursor-default"
@@ -237,17 +237,17 @@ export default function EditorToolbar({
               )
             ) : (
               <>
-                {/* Mode Switch: Mobile single toggle vs Desktop segmented pill */}
+                {/* Mode Switch: Mobile/Tablet single toggle vs Desktop segmented pill */}
                 <button
                   type="button"
                   onClick={togglePreview}
-                  className="sm:hidden flex items-center justify-center size-8 rounded-xl bg-muted/60 dark:bg-zinc-800/80 border border-border/50 text-foreground cursor-pointer tap-feedback shrink-0"
+                  className="md:hidden flex items-center justify-center size-8 rounded-xl bg-muted/60 dark:bg-zinc-800/80 border border-border/50 text-foreground cursor-pointer tap-feedback shrink-0"
                   title={previewMode ? "Switch to Edit Mode" : "Switch to Preview Mode"}
                 >
                   {previewMode ? <EyeOff className="size-3.5 text-primary" /> : <Eye className="size-3.5" />}
                 </button>
 
-                <div className="hidden sm:flex items-center p-0.5 rounded-xl bg-muted/60 dark:bg-zinc-800/80 border border-border/50 select-none">
+                <div className="hidden md:flex items-center p-0.5 rounded-xl bg-muted/60 dark:bg-zinc-800/80 border border-border/50 select-none">
                   <button
                     type="button"
                     onClick={() => previewMode && togglePreview()}
@@ -284,7 +284,7 @@ export default function EditorToolbar({
 
         {/* 3. Utility Actions Cluster */}
         {/* Desktop View: Full icon cluster */}
-        <div className="hidden sm:flex items-center gap-1 border-l border-border/60 pl-2">
+        <div className="hidden md:flex items-center gap-1 border-l border-border/60 pl-2">
           {onToggleVersionHistory && (
             <button
               type="button"
@@ -318,8 +318,8 @@ export default function EditorToolbar({
           <ThemeToggle />
         </div>
 
-        {/* Mobile View: Theme Toggle + Overflow Options Dropdown */}
-        <div className="sm:hidden flex items-center gap-1 relative border-l border-border/50 pl-1.5">
+        {/* Mobile & Tablet View: Theme Toggle + Overflow Options Dropdown */}
+        <div className="md:hidden flex items-center gap-1 relative border-l border-border/50 pl-1.5">
           <ThemeToggle />
           <button
             type="button"
@@ -379,7 +379,7 @@ export default function EditorToolbar({
                 size="sm"
                 onClick={onSave}
                 disabled={!isDirty || isSaving}
-                className="hidden sm:inline-flex gap-1.5 text-xs font-semibold shadow-xs hover:shadow active:scale-95 transition-all cursor-pointer disabled:pointer-events-none rounded-xl h-8"
+                className="hidden md:inline-flex gap-1.5 text-xs font-semibold shadow-xs hover:shadow active:scale-95 transition-all cursor-pointer disabled:pointer-events-none rounded-xl h-8"
               >
                 <Save className="size-3.5" />
                 <span>Save Draft</span>

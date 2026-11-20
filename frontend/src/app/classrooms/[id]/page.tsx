@@ -1779,13 +1779,14 @@ export default function ClassroomPage({ params }: PageProps) {
 
         {/* Tab switcher & Action bar */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-b border-border pb-3">
-          {/* Segmented Control Pill (Adaptive Grid on Mobile, Flex on Desktop - Zero Clipping Guaranteed) */}
-          <div className={`p-1 border border-border/80 bg-muted/40 rounded-xl gap-1 shrink-0 w-full sm:w-auto ${
-            isTeacher ? "grid grid-cols-4 sm:flex sm:items-center" : "grid grid-cols-3 sm:flex sm:items-center"
-          }`}>
+          {/* Segmented Control Ribbon (Fluid Momentum-Scrollable on Mobile, Flex on Desktop - Zero Clipping Guaranteed) */}
+          <div className="flex items-center p-1 border border-border/80 bg-muted/40 rounded-xl overflow-x-auto no-scrollbar scroll-smooth gap-1 w-full sm:w-auto shrink-0 select-none">
             <button
-              onClick={() => setActiveTab("assignments")}
-              className={`flex items-center justify-center gap-1.5 h-9 sm:h-8 px-2 sm:px-3 text-xs font-semibold rounded-lg transition-all cursor-pointer whitespace-nowrap tap-feedback ${
+              onClick={(e) => {
+                setActiveTab("assignments");
+                (e.currentTarget as HTMLElement).scrollIntoView({ inline: "center", behavior: "smooth", block: "nearest" });
+              }}
+              className={`flex items-center justify-center gap-1.5 h-9 sm:h-8 px-3.5 sm:px-3 text-xs font-semibold rounded-lg transition-all cursor-pointer whitespace-nowrap shrink-0 tap-feedback ${
                 activeTab === "assignments"
                   ? "bg-card text-foreground shadow-xs font-bold"
                   : "text-muted-foreground hover:text-foreground"
@@ -1797,7 +1798,7 @@ export default function ClassroomPage({ params }: PageProps) {
                   activeTab === "assignments" ? theme.accentText : "text-muted-foreground"
                 )}
               />
-              <span className="truncate">Practicals</span>
+              <span>Practicals</span>
               <span
                 className={cn(
                   "px-1.5 py-0.2 rounded text-[10px] font-semibold tabular-nums shrink-0",
@@ -1811,15 +1812,18 @@ export default function ClassroomPage({ params }: PageProps) {
             </button>
 
             <button
-              onClick={() => setActiveTab("announcements")}
-              className={`flex items-center justify-center gap-1.5 h-9 sm:h-8 px-2 sm:px-3 text-xs font-semibold rounded-lg transition-all cursor-pointer whitespace-nowrap tap-feedback ${
+              onClick={(e) => {
+                setActiveTab("announcements");
+                (e.currentTarget as HTMLElement).scrollIntoView({ inline: "center", behavior: "smooth", block: "nearest" });
+              }}
+              className={`flex items-center justify-center gap-1.5 h-9 sm:h-8 px-3.5 sm:px-3 text-xs font-semibold rounded-lg transition-all cursor-pointer whitespace-nowrap shrink-0 tap-feedback ${
                 activeTab === "announcements"
                   ? "bg-card text-foreground shadow-xs font-bold"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
               <Sparkles className={cn("size-3.5 shrink-0", activeTab === "announcements" ? theme.accentText : "text-muted-foreground")} />
-              <span className="truncate">Updates</span>
+              <span>Updates</span>
               <span className={`px-1.5 py-0.2 rounded text-[10px] font-semibold tabular-nums shrink-0 ${
                 activeTab === "announcements" ? "bg-muted text-foreground border border-border" : "text-muted-foreground"
               }`}>
@@ -1829,15 +1833,18 @@ export default function ClassroomPage({ params }: PageProps) {
 
             {isTeacher && (
               <button
-                onClick={() => setActiveTab("submissions")}
-                className={`flex items-center justify-center gap-1.5 h-9 sm:h-8 px-2 sm:px-3 text-xs font-semibold rounded-lg transition-all cursor-pointer whitespace-nowrap tap-feedback ${
+                onClick={(e) => {
+                  setActiveTab("submissions");
+                  (e.currentTarget as HTMLElement).scrollIntoView({ inline: "center", behavior: "smooth", block: "nearest" });
+                }}
+                className={`flex items-center justify-center gap-1.5 h-9 sm:h-8 px-3.5 sm:px-3 text-xs font-semibold rounded-lg transition-all cursor-pointer whitespace-nowrap shrink-0 tap-feedback ${
                   activeTab === "submissions"
                     ? "bg-card text-foreground shadow-xs font-bold"
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
                 <GraduationCap className={cn("size-3.5 shrink-0", activeTab === "submissions" ? theme.accentText : "text-muted-foreground")} />
-                <span className="truncate">Grades</span>
+                <span>Grades</span>
                 {pendingReviewsCount > 0 && (
                   <span className="px-1.5 py-0.2 rounded text-[10px] font-bold tabular-nums bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/30 shrink-0">
                     {pendingReviewsCount}
@@ -1847,15 +1854,18 @@ export default function ClassroomPage({ params }: PageProps) {
             )}
 
             <button
-              onClick={() => setActiveTab("roster")}
-              className={`flex items-center justify-center gap-1.5 h-9 sm:h-8 px-2 sm:px-3 text-xs font-semibold rounded-lg transition-all cursor-pointer whitespace-nowrap tap-feedback ${
+              onClick={(e) => {
+                setActiveTab("roster");
+                (e.currentTarget as HTMLElement).scrollIntoView({ inline: "center", behavior: "smooth", block: "nearest" });
+              }}
+              className={`flex items-center justify-center gap-1.5 h-9 sm:h-8 px-3.5 sm:px-3 text-xs font-semibold rounded-lg transition-all cursor-pointer whitespace-nowrap shrink-0 tap-feedback ${
                 activeTab === "roster"
                   ? "bg-card text-foreground shadow-xs font-bold"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
               <Users className={cn("size-3.5 shrink-0", activeTab === "roster" ? theme.accentText : "text-muted-foreground")} />
-              <span className="truncate">Members</span>
+              <span>Members</span>
               <span className={`px-1.5 py-0.2 rounded text-[10px] font-semibold tabular-nums shrink-0 ${
                 activeTab === "roster" ? "bg-muted text-foreground border border-border" : "text-muted-foreground"
               }`}>

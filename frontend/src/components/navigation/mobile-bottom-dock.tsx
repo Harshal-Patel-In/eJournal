@@ -57,6 +57,14 @@ export function MobileBottomDock() {
     enabled: !isAuthPage && !isLandingPage,
   });
 
+  // Fetch enrolled/managed classrooms for smart contextual navigation
+  const { data: classrooms } = useQuery<any[]>({
+    queryKey: ["classrooms"],
+    queryFn: () => api.get("/classrooms"),
+    staleTime: 60000,
+    enabled: !isAuthPage && !isLandingPage && !!user,
+  });
+
   if (isAuthPage || isLandingPage || isEditorPage || isCompilePage || !user) {
     return null;
   }
@@ -64,16 +72,21 @@ export function MobileBottomDock() {
   const isTeacher = user.role === "teacher";
   const isAdmin = user.role === "admin" || user.is_admin || user.isAdmin;
 
-  // Handler for Practicals / Classrooms tap
+  // Context-aware handler for Practicals / Classrooms tap
   const handleClassroomsClick = () => {
-    if (pathname === "/dashboard") {
-      const el = document.getElementById("classroom-workspaces") || document.getElementById("classrooms");
-      if (el) {
-        el.scrollIntoView({ behavior: "smooth", block: "start" });
+    // 1. If currently inside a classroom page (/classrooms/[id])
+    if (pathname.startsWith("/classrooms/")) {
+      // If user scrolled down the practicals list, smoothly scroll to top
+      if (typeof window !== "undefined" && window.scrollY > 80) {
+        window.scrollTo({ top: 0, behavior: "smooth" });
         return;
       }
+      // If already at top, open the practicals hub to quickly jump to any practical or switch subjects
+      setIsClassroomOpen(true);
+      return;
     }
-    // If on another page or if anchor not present, open the fast classroom sheet
+
+    // 2. Otherwise (dashboard or any other page), open the interactive practicals hub
     setIsClassroomOpen(true);
   };
 
