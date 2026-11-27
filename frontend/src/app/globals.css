@@ -767,9 +767,11 @@
     print-color-adjust: exact !important;
   }
 
-  * {
+  *, *::before, *::after {
     -ms-overflow-style: none !important;
     scrollbar-width: none !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
   ::-webkit-scrollbar {
     display: none !important;
@@ -833,8 +835,31 @@
     border-color: #d1d5db !important;
   }
 
-  .bg-card, .bg-background, .bg-muted\/20, .bg-muted\/40, [class*="dark:bg-"], [class*="bg-neutral-"] {
+  .bg-card, .bg-background {
     background-color: #ffffff !important;
+  }
+
+  /* Preserve rich highlighter & syntax colors in browser print/PDF even without Background Graphics enabled */
+  mark {
+    background-color: #fef08a !important;
+    color: #1c1917 !important;
+    border: 1px solid #fde047 !important;
+  }
+
+  code:not(pre code):not(.cm-editor *) {
+    background-color: #f4f4f5 !important;
+    color: #4338ca !important;
+    border-color: #e4e4e7 !important;
+  }
+
+  .cm-editor {
+    background-color: #ffffff !important;
+  }
+
+  .cm-gutters {
+    background-color: #f8fafc !important;
+    color: #94a3b8 !important;
+    border-right: 1px solid #e2e8f0 !important;
   }
 
   .shadow-xs, .shadow-sm, .shadow-md, .shadow-xl, .shadow-2xl {

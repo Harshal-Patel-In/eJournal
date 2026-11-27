@@ -17,9 +17,10 @@ interface BlockRendererProps {
   content: any;
   previewMode: boolean;
   allBlocks?: any[];
+  forceLightTheme?: boolean;
 }
 
-export default function BlockRenderer({ id, type, content, previewMode, allBlocks }: BlockRendererProps) {
+export default function BlockRenderer({ id, type, content, previewMode, allBlocks, forceLightTheme }: BlockRendererProps) {
   switch (type) {
     case "heading":
       return <HeadingBlock id={id} content={content} previewMode={previewMode} />;
@@ -32,7 +33,7 @@ export default function BlockRenderer({ id, type, content, previewMode, allBlock
     case "image":
       return <ImageBlock id={id} content={content} previewMode={previewMode} />;
     case "code":
-      return <CodeBlock id={id} content={content} previewMode={previewMode} />;
+      return <CodeBlock id={id} content={content} previewMode={previewMode} forceLightTheme={forceLightTheme} />;
     case "observation":
       return <ObservationBlock id={id} content={content} previewMode={previewMode} />;
     case "result":

@@ -258,22 +258,36 @@ export default function CompileJournalPage({ params }: PageProps) {
         .academic-paper th {
           color: #09090b !important;
         }
+        .academic-paper mark {
+          background-color: #fef08a !important;
+          color: #1c1917 !important;
+          border: 1px solid #fde047 !important;
+        }
+        .academic-paper code:not(pre code):not(.cm-editor *) {
+          background-color: #f4f4f5 !important;
+          color: #4338ca !important;
+          border: 1px solid #e4e4e7 !important;
+        }
         .academic-paper .dark\\:text-blue-100\\/80 {
           color: #1e3a8a !important;
         }
-        .academic-paper .dark\\:bg-blue-950\\/10 {
+        .academic-paper .dark\\:bg-blue-950\\/10,
+        .academic-paper .bg-blue-50\\/20 {
           background-color: #eff6ff !important;
         }
-        .academic-paper .dark\\:border-blue-900\\/30 {
+        .academic-paper .dark\\:border-blue-900\\/30,
+        .academic-paper .border-blue-200\\/60 {
           border-color: #bfdbfe !important;
         }
         .academic-paper .dark\\:text-emerald-100\\/90 {
           color: #064e3b !important;
         }
-        .academic-paper .dark\\:bg-emerald-950\\/10 {
+        .academic-paper .dark\\:bg-emerald-950\\/10,
+        .academic-paper .bg-emerald-50\\/20 {
           background-color: #ecfdf5 !important;
         }
-        .academic-paper .dark\\:border-emerald-900\\/30 {
+        .academic-paper .dark\\:border-emerald-900\\/30,
+        .academic-paper .border-emerald-200\\/60 {
           border-color: #a7f3d0 !important;
         }
         @media print {
@@ -286,25 +300,25 @@ export default function CompileJournalPage({ params }: PageProps) {
             color-scheme: light !important;
             background: #ffffff !important;
             background-color: #ffffff !important;
-            color: #000000 !important;
+            color: #111827 !important;
           }
           *, *::before, *::after {
             box-shadow: none !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
           }
           html, body {
             background: #ffffff !important;
             background-color: #ffffff !important;
-            color: #000000 !important;
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
+            color: #111827 !important;
           }
-          div, main, section, article {
+          main, section, article {
             background-color: #ffffff !important;
             background-image: none !important;
           }
           .academic-paper {
             background-color: #ffffff !important;
-            color: #000000 !important;
+            color: #111827 !important;
             box-shadow: none !important;
             border: none !important;
             padding: 0 2mm !important;
@@ -312,8 +326,54 @@ export default function CompileJournalPage({ params }: PageProps) {
             width: 100% !important;
             max-width: 100% !important;
           }
-          .academic-paper * {
-            color: #000000 !important;
+          .academic-paper h1,
+          .academic-paper h2,
+          .academic-paper h3,
+          .academic-paper h4,
+          .academic-paper h5,
+          .academic-paper h6,
+          .academic-paper p,
+          .academic-paper li,
+          .academic-paper strong {
+            color: #111827 !important;
+          }
+          .academic-paper mark {
+            background-color: #fef08a !important;
+            color: #1c1917 !important;
+            border: 1px solid #fde047 !important;
+          }
+          .academic-paper mark * {
+            color: #1c1917 !important;
+          }
+          .academic-paper code:not(pre code):not(.cm-editor *) {
+            background-color: #f4f4f5 !important;
+            color: #4338ca !important;
+            border: 1px solid #e4e4e7 !important;
+          }
+          .academic-paper .journal-code-block {
+            background-color: #ffffff !important;
+            border-color: #d4d4d8 !important;
+          }
+          .academic-paper .journal-code-header {
+            background-color: #f4f4f5 !important;
+            border-color: #d4d4d8 !important;
+          }
+          .academic-paper .cm-editor {
+            background-color: #ffffff !important;
+            color: #1e293b !important;
+          }
+          .academic-paper .cm-gutters {
+            background-color: #f8fafc !important;
+            color: #94a3b8 !important;
+            border-right: 1px solid #e2e8f0 !important;
+          }
+          .academic-paper .cm-scroller {
+            overflow: visible !important;
+          }
+          .academic-paper .cm-content,
+          .academic-paper .cm-line {
+            white-space: pre-wrap !important;
+            word-break: break-word !important;
           }
           .academic-paper .katex,
           .academic-paper .katex * {
@@ -646,6 +706,7 @@ export default function CompileJournalPage({ params }: PageProps) {
                         content={block.content}
                         previewMode={true}
                         allBlocks={blocks}
+                        forceLightTheme={true}
                       />
                     </div>
                   ))}
