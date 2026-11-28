@@ -80,7 +80,7 @@ export default function AdminClassroomsPage() {
       queryClient.invalidateQueries({ queryKey: ["admin-classrooms"] });
       const isSealed = Boolean(res?.is_frozen ?? res?.isFrozen);
       toast.success(res?.message || (isSealed ? "Academic term officially sealed for this classroom." : "Academic term officially unsealed for this classroom."), {
-        title: isSealed ? "🔒 Academic Term Sealed" : "🔓 Academic Term Unsealed",
+        title: isSealed ? "Academic Term Sealed" : "Academic Term Unsealed",
       });
     },
     onError: (err: any) => {
@@ -105,7 +105,7 @@ export default function AdminClassroomsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-border/60">
         <div>
-          <h1 className="text-2xl font-black tracking-tight text-foreground">Classroom Supervision & Academic Continuity</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground font-serif">Classroom Supervision & Academic Continuity</h1>
           <p className="text-xs text-muted-foreground mt-0.5">
             Oversee university lab practical courses, student enrollments, seal academic terms, and reclaim storage
           </p>
@@ -116,7 +116,7 @@ export default function AdminClassroomsPage() {
           size="sm"
           onClick={() => refetch()}
           disabled={isRefetching}
-          className="rounded-xl text-xs font-semibold gap-1.5 cursor-pointer self-start sm:self-auto"
+          className="rounded-xl h-10 sm:h-8 px-3 text-xs font-semibold gap-1.5 cursor-pointer self-start sm:self-auto"
         >
           <RefreshCw className={`size-3.5 ${isRefetching ? "animate-spin" : ""}`} />
           <span>Refresh</span>
@@ -158,12 +158,14 @@ export default function AdminClassroomsPage() {
                     <span className="px-2 py-0.5 rounded-md bg-muted text-[10px] font-bold tracking-wider text-muted-foreground border border-border">
                       {c.subjectCode || "LAB"}
                     </span>
-                    <h3 className="text-sm font-bold text-foreground mt-1.5 leading-snug">{c.name}</h3>
+                    <h2 className="text-sm font-bold text-foreground mt-1.5 leading-snug">{c.name}</h2>
                   </div>
                   <div className="flex flex-col items-end gap-1 shrink-0">
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
-                      {c.joinCode}
-                    </span>
+                    {c.joinCode && (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                        {c.joinCode}
+                      </span>
+                    )}
                     {c.is_frozen || c.isFrozen ? (
                       <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/25 flex items-center gap-1">
                         <Lock className="size-2.5" /> Sealed Term

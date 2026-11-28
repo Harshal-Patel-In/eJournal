@@ -91,7 +91,7 @@ export default function ChangePasswordPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-4 sm:p-6 select-none">
+    <main id="main-content" className="flex min-h-screen items-center justify-center bg-background p-4 sm:p-6 select-none">
       <div className="w-full max-w-md rounded-2xl border border-border/80 bg-card text-card-foreground p-6 sm:p-8 shadow-lg space-y-5">
         <div className="flex flex-col items-center text-center space-y-1.5">
           <div className="size-9 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 flex items-center justify-center">
@@ -112,12 +112,13 @@ export default function ChangePasswordPage() {
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-1">
-            <label className="text-xs font-medium text-muted-foreground">Current / temporary password</label>
+            <label htmlFor="cp-current" className="text-xs font-medium text-muted-foreground">Current / temporary password</label>
             <input
+              id="cp-current"
               type="password"
               {...register("current_password")}
-              placeholder="Enter temporary password from issuance"
-              className="w-full h-10 rounded-xl border border-input bg-muted/40 focus:bg-background px-3.5 py-2 text-xs text-foreground placeholder:text-muted-foreground/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary transition-all"
+              placeholder="Temporary password"
+              className="w-full h-10 rounded-xl border border-input bg-muted/40 focus:bg-background px-3.5 py-2 text-xs text-foreground placeholder:text-muted-foreground/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary transition-[background-color,border-color,box-shadow]"
             />
             {errors.current_password && (
               <p className="text-[11px] text-destructive mt-0.5">{errors.current_password.message}</p>
@@ -125,12 +126,13 @@ export default function ChangePasswordPage() {
           </div>
 
           <div className="space-y-1">
-            <label className="text-xs font-medium text-muted-foreground">New permanent password</label>
+            <label htmlFor="cp-new" className="text-xs font-medium text-muted-foreground">New permanent password</label>
             <input
+              id="cp-new"
               type="password"
               {...register("new_password")}
               placeholder="At least 8 characters (mixed case + number)"
-              className="w-full h-10 rounded-xl border border-input bg-muted/40 focus:bg-background px-3.5 py-2 text-xs text-foreground placeholder:text-muted-foreground/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary transition-all"
+              className="w-full h-10 rounded-xl border border-input bg-muted/40 focus:bg-background px-3.5 py-2 text-xs text-foreground placeholder:text-muted-foreground/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary transition-[background-color,border-color,box-shadow]"
             />
             {errors.new_password && (
               <p className="text-[11px] text-destructive mt-0.5">{errors.new_password.message}</p>
@@ -138,12 +140,13 @@ export default function ChangePasswordPage() {
           </div>
 
           <div className="space-y-1">
-            <label className="text-xs font-medium text-muted-foreground">Confirm new password</label>
+            <label htmlFor="cp-confirm" className="text-xs font-medium text-muted-foreground">Confirm new password</label>
             <input
+              id="cp-confirm"
               type="password"
               {...register("confirm_password")}
               placeholder="Re-enter your new password"
-              className="w-full h-10 rounded-xl border border-input bg-muted/40 focus:bg-background px-3.5 py-2 text-xs text-foreground placeholder:text-muted-foreground/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary transition-all"
+              className="w-full h-10 rounded-xl border border-input bg-muted/40 focus:bg-background px-3.5 py-2 text-xs text-foreground placeholder:text-muted-foreground/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary transition-[background-color,border-color,box-shadow]"
             />
             {errors.confirm_password && (
               <p className="text-[11px] text-destructive mt-0.5">{errors.confirm_password.message}</p>
@@ -154,12 +157,12 @@ export default function ChangePasswordPage() {
             type="submit"
             size="default"
             disabled={mutation.isPending}
-            className="w-full mt-2 h-10 rounded-xl font-semibold text-xs glass-btn-indigo-solid active:scale-[0.98] transition-all cursor-pointer shadow-xs"
+            className="w-full mt-2 h-10 rounded-xl font-semibold text-xs glass-btn-indigo-solid active:scale-[0.98] transition-[transform,box-shadow,background-color] cursor-pointer shadow-xs"
           >
             {mutation.isPending ? (
               <>
                 <Loader2 className="size-3.5 animate-spin mr-1.5" />
-                Updating credentials...
+                Updating credentials…
               </>
             ) : (
               <>
@@ -170,6 +173,6 @@ export default function ChangePasswordPage() {
           </Button>
         </form>
       </div>
-    </div>
+    </main>
   );
 }

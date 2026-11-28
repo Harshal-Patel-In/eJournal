@@ -126,7 +126,8 @@ export default function ReviewDrawer({
     addressedActionItems,
     totalActionItems,
   } = useMemo(() => {
-    if (!comments || comments.length === 0) {
+    const safeComments = Array.isArray(comments) ? comments : [];
+    if (safeComments.length === 0) {
       return {
         activeComments: [],
         removedBlockComments: [],
@@ -144,7 +145,7 @@ export default function ReviewDrawer({
     const removed: any[] = [];
 
     // Filter root comments
-    const rootComments = comments.filter((c) => !c.parentCommentId);
+    const rootComments = safeComments.filter((c) => !c.parentCommentId);
 
     for (const c of rootComments) {
       if (c.blockId && !activeBlockIds.has(c.blockId)) {
@@ -175,7 +176,7 @@ export default function ReviewDrawer({
 
       if (type === "suggestion" || type === "warning" || type === "question") {
         actionItems += 1;
-        const hasReplies = comments.some((child) => child.parentCommentId === c.id);
+        const hasReplies = safeComments.some((child) => child.parentCommentId === c.id);
         if (isResolved || (type === "question" && hasReplies)) {
           actionItemsAddressed += 1;
         }

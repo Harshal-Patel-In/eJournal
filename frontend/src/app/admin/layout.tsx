@@ -114,9 +114,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
 
-  // Restore collapsed preference on mount
+  // Restore collapsed preference on mount & sync client hydration boundary
   useEffect(() => {
+    setIsMounted(true);
     const saved = localStorage.getItem("admin_sidebar_collapsed");
     if (saved !== null) {
       setIsCollapsed(saved === "true");
@@ -209,11 +211,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   };
 
   return (
-    <div className="flex min-h-screen bg-slate-50 dark:bg-zinc-950 text-foreground selection:bg-amber-500/10">
+    <div className="flex flex-col lg:flex-row min-h-screen bg-slate-50 dark:bg-zinc-950 text-foreground selection:bg-amber-500/10">
       {/* 1. Desktop Liquid Glass Collapsible Sidebar */}
       <aside
         data-no-tooltip="true"
-        className={`hidden lg:flex flex-col fixed inset-y-0 left-0 z-40 bg-card/75 dark:bg-zinc-900/80 backdrop-blur-2xl backdrop-saturate-180 border-r border-border/70 justify-between transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+        style={{ top: "var(--announcement-height, 0px)" }}
+        className={`hidden lg:flex flex-col fixed bottom-0 left-0 z-40 bg-card/75 dark:bg-zinc-900/80 backdrop-blur-2xl backdrop-saturate-180 border-r border-border/70 justify-between transition-[width,padding,top] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
           isCollapsed ? "w-20 p-3" : "w-72 p-5"
         }`}
       >
@@ -356,16 +359,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <div className="p-3 rounded-2xl bg-muted/40 border border-border/60 flex items-center justify-between">
               <div className="flex flex-col min-w-0 pr-2">
                 <span className="text-xs font-bold text-foreground truncate">
-                  {user?.fullName || "Super Administrator"}
+                  {isMounted && user?.fullName ? user.fullName : "Super Administrator"}
                 </span>
                 <span className="text-[10px] text-muted-foreground truncate">
-                  {user?.email || "admin@ejournal.com"}
+                  {isMounted && user?.email ? user.email : "admin@ejournal.com"}
                 </span>
               </div>
               <button
                 type="button"
                 onClick={() => setShowPasswordModal(true)}
-                className="size-7 rounded-lg bg-background border border-border/80 text-muted-foreground hover:text-foreground hover:border-amber-500/40 flex items-center justify-center transition-all cursor-pointer"
+                aria-label="Update Admin Password"
+                className="size-8 rounded-lg bg-background border border-border/80 text-muted-foreground hover:text-foreground hover:border-amber-500/40 flex items-center justify-center transition-[color,border-color,background-color] cursor-pointer"
               >
                 <KeyRound className="size-3.5" />
               </button>
@@ -407,20 +411,21 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </div>
       </aside>
 
-      {/* 2. Mobile Responsive Top Header */}
-      <div className="lg:hidden fixed top-0 inset-x-0 z-40 bg-card/85 dark:bg-zinc-900/85 backdrop-blur-xl border-b border-border/70 px-4 py-2.5 flex items-center justify-between">
+      {/* 2. Mobile Responsive Sticky Header (Stacks cleanly below announcement banner) */}
+      <div className="lg:hidden sticky top-0 w-full z-40 bg-card/90 dark:bg-zinc-900/90 backdrop-blur-xl border-b border-border/70 px-4 py-2 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
           <img src="/logo.png" alt="eJournal Logo" className="size-7 object-contain" />
           <span className="text-sm font-bold text-foreground">eJournal Admin</span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           <NotificationBell />
           <ThemeToggle />
           <Button
             variant="ghost"
             size="icon"
+            aria-label={mobileMenuOpen ? "Close navigation menu" : "Open navigation menu"}
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="size-8 rounded-xl cursor-pointer"
+            className="size-10 rounded-xl cursor-pointer"
           >
             {mobileMenuOpen ? <X className="size-4" /> : <Menu className="size-4" />}
           </Button>
@@ -519,9 +524,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       {/* 3. Main Dashboard Content Canvas with Dynamic Synchronization */}
       <main
-        className={`flex-1 transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+        id="main-content"
+        className={`flex-1 transition-[padding] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
           isCollapsed ? "lg:pl-20" : "lg:pl-72"
-        } w-full pt-16 lg:pt-0 min-h-screen`}
+        } w-full min-h-screen`}
       >
         <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">{children}</div>
       </main>

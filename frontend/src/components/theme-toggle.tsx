@@ -20,7 +20,8 @@ export function ThemeToggle({ className }: { className?: string }) {
       <Button
         variant="outline"
         size="icon"
-        className={`size-8 rounded-md glass-btn-elevated ${className || ""}`}
+        aria-label="Toggle theme"
+        className={`size-10 sm:size-8 rounded-md glass-btn-elevated ${className || ""}`}
       >
         <span className="size-3.5" />
       </Button>
@@ -98,11 +99,12 @@ export function ThemeToggle({ className }: { className?: string }) {
     <Button
       variant="outline"
       size="icon"
+      aria-label={isDark ? "Switch to Day Mode" : "Switch to Night Mode"}
       onClick={toggleTheme}
       data-tooltip={isDark ? "Switch to Day Mode" : "Switch to Night Mode"}
       data-tooltip-subtext={isDark ? "Click for Day Mode" : "Click for Night Mode"}
       data-tooltip-side="bottom"
-      className={`size-8 rounded-md glass-btn-elevated text-foreground cursor-pointer ${className || ""}`}
+      className={`size-10 sm:size-8 rounded-md glass-btn-elevated text-foreground cursor-pointer ${className || ""}`}
     >
       {isDark ? (
         <Moon className="size-3.5 text-foreground transition-transform duration-150" />

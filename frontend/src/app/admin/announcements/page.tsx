@@ -22,6 +22,7 @@ import {
 import { api } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
+import { CustomSelect } from "@/components/ui/custom-select";
 
 export default function AdminAnnouncementsPage() {
   const queryClient = useQueryClient();
@@ -121,7 +122,7 @@ export default function AdminAnnouncementsPage() {
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-border/60">
         <div>
-          <h1 className="text-2xl font-black tracking-tight text-foreground">Campus Broadcast Announcements</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground font-serif">Campus Broadcast Announcements</h1>
           <p className="text-xs text-muted-foreground mt-0.5">
             Instantaneous dual-layer campus communication (Server-Sent Events push + persistent database cache)
           </p>
@@ -167,33 +168,37 @@ export default function AdminAnnouncementsPage() {
             </div>
 
             {/* Category & Priority Grid */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <label className="font-bold text-muted-foreground">Category</label>
-                <select
+                <CustomSelect
                   value={category}
-                  onChange={(e: any) => setCategory(e.target.value)}
-                  className="w-full h-9 px-3 rounded-xl border border-input bg-card text-xs focus:outline-none focus:border-primary"
-                >
-                  <option value="general_info">General Info (Blue)</option>
-                  <option value="academic_deadline">Academic Deadline (Amber)</option>
-                  <option value="system_alert">System Alert (Red - Locked)</option>
-                  <option value="action_required">Action Required (Violet)</option>
-                </select>
+                  onChange={(val) => setCategory(val as typeof category)}
+                  options={[
+                    { value: "general_info", label: "General Info (Blue)" },
+                    { value: "academic_deadline", label: "Academic Deadline (Amber)" },
+                    { value: "system_alert", label: "System Alert (Red - Locked)" },
+                    { value: "action_required", label: "Action Required (Violet)" },
+                  ]}
+                  placeholder="Select category"
+                  className="w-full text-xs"
+                />
               </div>
 
               <div className="space-y-1.5">
                 <label className="font-bold text-muted-foreground">Priority</label>
-                <select
+                <CustomSelect
                   value={priority}
-                  onChange={(e: any) => setPriority(e.target.value)}
-                  className="w-full h-9 px-3 rounded-xl border border-input bg-card text-xs focus:outline-none focus:border-primary"
-                >
-                  <option value="normal">Normal</option>
-                  <option value="high">High</option>
-                  <option value="urgent">Urgent</option>
-                  <option value="low">Low</option>
-                </select>
+                  onChange={(val) => setPriority(val as typeof priority)}
+                  options={[
+                    { value: "normal", label: "Normal" },
+                    { value: "high", label: "High" },
+                    { value: "urgent", label: "Urgent" },
+                    { value: "low", label: "Low" },
+                  ]}
+                  placeholder="Select priority"
+                  className="w-full text-xs"
+                />
               </div>
             </div>
 
@@ -357,11 +362,12 @@ export default function AdminAnnouncementsPage() {
               </div>
             ) : (
               announcements.map((item) => {
-                const isExpired = new Date(item.expiresAt) < new Date();
+                const isExpired = item.expiresAt ? new Date(item.expiresAt) < new Date() : false;
+                const categoryLabel = (item.category || "general_info").replace(/_/g, " ");
                 return (
                   <div
                     key={item.id}
-                    className={`p-4 rounded-3xl border transition-all ${
+                    className={`p-4 rounded-3xl border transition-colors ${
                       item.isActive && !isExpired
                         ? "bg-card border-border/90 shadow-2xs"
                         : "bg-muted/20 border-border/50 opacity-60"
@@ -381,15 +387,15 @@ export default function AdminAnnouncementsPage() {
                                 : "bg-blue-500/10 text-blue-600"
                             }`}
                           >
-                            {item.category.replace("_", " ")}
+                            {categoryLabel}
                           </span>
 
                           <span className="text-[10px] font-semibold text-muted-foreground">
-                            Priority: {item.priority}
+                            Priority: {item.priority || "normal"}
                           </span>
 
                           <span className="text-[10px] text-muted-foreground">
-                            Audience: {item.targetRoles?.join(", ")}
+                            Audience: {Array.isArray(item.targetRoles) ? item.targetRoles.join(", ") : "all"}
                           </span>
                         </div>
 
@@ -399,7 +405,7 @@ export default function AdminAnnouncementsPage() {
                         <div className="flex items-center gap-4 text-[11px] text-muted-foreground pt-1">
                           <span className="flex items-center gap-1 font-mono">
                             <Clock className="size-3 text-muted-foreground" />
-                            Expires: {new Date(item.expiresAt).toLocaleDateString()}
+                            Expires: {item.expiresAt ? new Date(item.expiresAt).toLocaleDateString() : "—"}
                           </span>
 
                           {item.action?.actionType === "acknowledge" && (

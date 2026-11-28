@@ -30,6 +30,7 @@ export function middleware(request: NextRequest) {
   // Path classifications
   const isChangePasswordRoute = pathname === "/auth/change-password";
   const isAuthRoute = pathname.startsWith("/auth");
+  const isPublicRoute = isAuthRoute || pathname === "/";
   const isProfileSetupRoute = pathname === "/profile/setup";
   const isAdminRoute = pathname.startsWith("/admin");
   const isStaticRoute =
@@ -47,7 +48,7 @@ export function middleware(request: NextRequest) {
 
   // 1. Unauthenticated workflow
   if (!token) {
-    if (!isAuthRoute) {
+    if (!isPublicRoute) {
       return NextResponse.redirect(new URL("/auth/login", request.url));
     }
     return NextResponse.next();

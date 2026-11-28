@@ -200,7 +200,7 @@ export default function AdminStudentsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-border/60">
         <div>
-          <h1 className="text-2xl font-black tracking-tight text-foreground">University Student Directory</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground font-serif">University Student Directory</h1>
           <p className="text-xs text-muted-foreground mt-0.5">
             Supervise enrolled students, inspect academic profiles, and manage disciplinary status
           </p>
@@ -210,7 +210,7 @@ export default function AdminStudentsPage() {
           <Button
             size="sm"
             onClick={() => setShowBulkModal(true)}
-            className="rounded-xl text-xs font-bold gap-1.5 cursor-pointer shadow-xs"
+            className="rounded-xl h-10 sm:h-8 px-3.5 text-xs font-bold gap-1.5 cursor-pointer shadow-xs"
           >
             <UserPlus className="size-3.5" />
             <span>Bulk Onboard Students</span>
@@ -221,7 +221,7 @@ export default function AdminStudentsPage() {
             size="sm"
             onClick={() => refetch()}
             disabled={isRefetching}
-            className="rounded-xl text-xs font-semibold gap-1.5 cursor-pointer"
+            className="rounded-xl h-10 sm:h-8 px-3 text-xs font-semibold gap-1.5 cursor-pointer"
           >
             <RefreshCw className={`size-3.5 ${isRefetching ? "animate-spin" : ""}`} />
             <span>Refresh</span>

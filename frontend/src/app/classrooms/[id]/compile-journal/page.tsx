@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useMemo } from "react";
+import { use, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { ArrowLeft, Printer, BookOpen, FileText, GraduationCap, ShieldCheck, CheckCircle2, Loader2 } from "lucide-react";
@@ -20,6 +20,11 @@ export default function CompileJournalPage({ params }: PageProps) {
   const searchParams = useSearchParams();
   const targetJournalId = searchParams.get("journalId");
   const isSingleMode = Boolean(targetJournalId);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   // 1. Fetch User Profile
   const { data: user, isLoading: userLoading } = useQuery<any>({
@@ -159,7 +164,7 @@ export default function CompileJournalPage({ params }: PageProps) {
   const isLoading =
     userLoading || classroomLoading || assignmentsLoading || journalsLoading || (isSingleMode && singleJournalLoading);
 
-  if (isLoading) {
+  if (!isMounted || isLoading) {
     return (
       <AppLoadingScreen
         title={isSingleMode ? "Preparing Lab Report..." : "Compiling Master Lab Journal..."}
@@ -174,36 +179,38 @@ export default function CompileJournalPage({ params }: PageProps) {
   return (
     <div className="min-h-screen bg-neutral-100 dark:bg-neutral-950 text-foreground print:bg-white print:dark:bg-white print:min-h-0 print:m-0 print:p-0">
       {/* Top Navigation & Print Toolbar (Strictly hidden during print) */}
-      <header className="sticky top-0 z-50 flex items-center justify-between px-4 sm:px-8 py-3 bg-card/95 backdrop-blur-xs border-b border-border shadow-xs print:hidden">
-        <div className="flex items-center gap-3">
+      <header className="sticky top-0 z-50 flex items-center justify-between gap-2 px-3 sm:px-8 py-2.5 sm:py-3 bg-card/95 backdrop-blur-xs border-b border-border shadow-xs print:hidden">
+        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
           <Link
             href={backHref}
-            className="flex items-center justify-center size-8 rounded-md border border-border bg-card hover:bg-muted text-muted-foreground hover:text-foreground transition-all active:scale-[0.98] cursor-pointer"
+            className="flex items-center justify-center size-9 sm:size-8 rounded-md border border-border bg-card hover:bg-muted text-muted-foreground hover:text-foreground transition-[background-color,color,transform] active:scale-[0.98] cursor-pointer shrink-0"
+            aria-label={isSingleMode ? "Back to editor" : "Back to classroom"}
             title={isSingleMode ? "Back to editor" : "Back to classroom"}
           >
             <ArrowLeft className="size-4" />
           </Link>
-          <div>
-            <h1 className="text-sm font-bold text-foreground flex items-center gap-2 font-serif">
-              {isSingleMode ? <FileText className="size-4 text-primary" /> : <BookOpen className="size-4 text-primary" />}
-              <span>{isSingleMode ? "Official lab report export" : "Master lab journal compiler"}</span>
+          <div className="min-w-0 flex-1">
+            <h1 className="text-xs sm:text-sm font-bold text-foreground flex items-center gap-1.5 sm:gap-2 font-serif truncate">
+              {isSingleMode ? <FileText className="size-3.5 sm:size-4 text-primary shrink-0" /> : <BookOpen className="size-3.5 sm:size-4 text-primary shrink-0" />}
+              <span className="truncate">{isSingleMode ? "Official lab report export" : "Master lab journal compiler"}</span>
             </h1>
-            <p className="text-[11px] text-muted-foreground font-medium">
-              {classroom?.name || "Classroom"} •{" "}
+            <p className="text-[11px] text-muted-foreground font-medium truncate">
+              {classroom?.name || "Classroom"} ·{" "}
               {isSingleMode
-                ? `Experiment #${singleItem?.index || 1}: ${singleItem?.assignment?.title || "Practical"}`
-                : `${compiledPracticals.length} laboratory practicals`}
+                ? `Exp #${singleItem?.index || 1}: ${singleItem?.assignment?.title || "Practical"}`
+                : `${compiledPracticals.length} practicals`}
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 shrink-0">
           <Button
             onClick={() => window.print()}
-            className="gap-2 text-xs font-semibold transition-all cursor-pointer h-8 px-3.5 rounded-md active:scale-[0.98]"
+            className="gap-1.5 sm:gap-2 text-xs font-semibold cursor-pointer h-9 sm:h-8 px-2.5 sm:px-3.5 rounded-md active:scale-[0.98]"
           >
             <Printer className="size-3.5" />
-            <span>{isSingleMode ? "Save as PDF" : "Save master journal as PDF"}</span>
+            <span className="hidden sm:inline">{isSingleMode ? "Save as PDF" : "Save master journal as PDF"}</span>
+            <span className="sm:hidden">Save PDF</span>
           </Button>
         </div>
       </header>
@@ -403,6 +410,7 @@ export default function CompileJournalPage({ params }: PageProps) {
 
       {/* Main Bound Academic Document Container */}
       <main
+        id="main-content"
         className="academic-paper w-full max-w-4xl mx-auto my-4 sm:my-8 print:my-0 p-4 sm:p-8 md:p-12 print:px-2 print:py-0 bg-white text-zinc-950 shadow-2xl print:shadow-none rounded-2xl print:rounded-none border border-border print:border-none select-text pb-24 sm:pb-12 print:pb-0"
         style={{
           colorScheme: "light",
@@ -619,16 +627,18 @@ export default function CompileJournalPage({ params }: PageProps) {
               <div className="border-b-2 border-zinc-900 pb-4 mb-6">
                 {/* Department Course Code Line in Single Journal Mode */}
                 {isSingleMode && (
-                  <div className="flex items-center justify-between border-b border-zinc-200 pb-2 mb-3 text-xs text-zinc-600 font-serif gap-2">
-                    <div className="flex items-center gap-2 flex-wrap min-w-0 pr-2">
-                      <GraduationCap className="size-4 text-zinc-800 shrink-0" />
-                      <span className="font-bold uppercase tracking-wider text-zinc-900">
-                        {classroom?.institutionName || "FACULTY OF ENGINEERING & TECHNOLOGY"}
-                      </span>
-                      <span>•</span>
-                      <span className="uppercase text-zinc-600">
-                        DEPT. OF {classroom?.department || "COMPUTER & PHYSICAL SCIENCES"}
-                      </span>
+                  <div className="flex items-start sm:items-center justify-between border-b border-zinc-200 pb-2 mb-3 text-xs text-zinc-600 font-serif gap-2">
+                    <div className="flex items-start sm:items-center gap-2 min-w-0 pr-2">
+                      <GraduationCap className="size-4 text-zinc-800 shrink-0 mt-0.5 sm:mt-0" />
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:gap-2 min-w-0">
+                        <span className="font-bold uppercase tracking-wider text-zinc-900">
+                          {classroom?.institutionName || "FACULTY OF ENGINEERING & TECHNOLOGY"}
+                        </span>
+                        <span className="hidden sm:inline" aria-hidden="true">•</span>
+                        <span className="uppercase text-zinc-600">
+                          DEPT. OF {classroom?.department || "COMPUTER & PHYSICAL SCIENCES"}
+                        </span>
+                      </div>
                     </div>
                     <div className="text-[11px] font-medium text-zinc-500 shrink-0 whitespace-nowrap">
                       Code: {classroom?.code || "LAB-101"}

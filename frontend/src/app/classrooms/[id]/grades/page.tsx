@@ -484,28 +484,26 @@ export default function ClassroomGradesPage({ params }: PageProps) {
     <div className="flex min-h-screen flex-col bg-textured-workspace text-foreground relative overflow-x-hidden">
       {/* Top Bar Header */}
       <header className="sticky top-0 z-40 w-full border-b border-border bg-card/95 backdrop-blur-xs">
-        <div className="flex h-14 items-center justify-between px-4 sm:px-8 max-w-7xl mx-auto w-full">
-          <div className="flex items-center gap-3">
-            <Button asChild variant="outline" size="sm" className="rounded-md h-8 px-2.5 gap-1.5 glass-btn-elevated text-xs font-semibold text-foreground cursor-pointer">
-              <Link href={`/classrooms/${classroomId}`}>
+        <div className="flex h-14 items-center justify-between gap-2 px-3 sm:px-8 max-w-7xl mx-auto w-full">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+            <Button asChild variant="outline" size="sm" className="rounded-md h-9 sm:h-8 px-2.5 gap-1.5 glass-btn-elevated text-xs font-semibold text-foreground cursor-pointer shrink-0">
+              <Link href={`/classrooms/${classroomId}`} aria-label="Back to classroom">
                 <ArrowLeft className="size-3.5" />
                 <span className="hidden sm:inline">Back to classroom</span>
               </Link>
             </Button>
-            <div className="h-4 w-px bg-border" />
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
-                <span className="font-serif">{classroom?.name || "Classroom"}</span>
-                <ChevronRight className="size-3 text-muted-foreground/60" />
-                <span className="text-muted-foreground font-medium">Gradebook</span>
-              </div>
+            <div className="h-4 w-px bg-border shrink-0" />
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground min-w-0">
+              <span className="font-serif truncate">{classroom?.name || "Classroom"}</span>
+              <ChevronRight className="size-3 text-muted-foreground/60 hidden sm:inline shrink-0" />
+              <span className="text-muted-foreground font-medium hidden sm:inline shrink-0">Gradebook</span>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             <ThemeToggle />
-            <Link href="/profile" title="View & Edit Academic Profile">
-              <div className="size-8 rounded-md glass-btn-elevated flex items-center justify-center font-bold text-xs cursor-pointer text-foreground">
+            <Link href="/profile" title="View & Edit Academic Profile" aria-label="View & Edit Academic Profile">
+              <div className="size-9 sm:size-8 rounded-md glass-btn-elevated flex items-center justify-center font-bold text-xs cursor-pointer text-foreground">
                 <User className="size-3.5" />
               </div>
             </Link>
@@ -514,27 +512,28 @@ export default function ClassroomGradesPage({ params }: PageProps) {
               disabled={isExportingCsv}
               variant="default"
               size="sm"
-              className="rounded-md h-8 px-3.5 gap-1.5 text-xs font-semibold cursor-pointer shadow-xs"
+              className="rounded-md h-9 sm:h-8 px-2.5 sm:px-3.5 gap-1.5 text-xs font-semibold cursor-pointer shadow-xs shrink-0"
             >
               <Download className={`size-3.5 ${isExportingCsv ? "animate-bounce" : "text-white/80"}`} />
-              <span>{isExportingCsv ? "Exporting..." : "Export CSV"}</span>
+              <span className="hidden sm:inline">{isExportingCsv ? "Exporting…" : "Export CSV"}</span>
+              <span className="sm:hidden">{isExportingCsv ? "…" : "CSV"}</span>
             </Button>
           </div>
         </div>
       </header>
 
       {/* Main Workspace Content */}
-      <main className="flex-1 p-4 sm:p-6 md:p-8 max-w-7xl mx-auto w-full flex flex-col gap-4 relative z-10 pb-24 sm:pb-8">
+      <main id="main-content" className="flex-1 p-4 sm:p-6 md:p-8 max-w-7xl mx-auto w-full flex flex-col gap-4 relative z-10 pb-24 sm:pb-8">
         {/* Unified Master Header & Telemetry Console */}
         <div className="p-4 sm:p-5 rounded-2xl bg-card border border-border/80 shadow-xs flex flex-col gap-3.5">
           {/* Top Row: Classroom identity & View mode switcher */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="flex flex-col">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="flex flex-col min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <h2 className="text-lg font-bold tracking-tight text-foreground font-serif">
+                  <h1 className="text-lg sm:text-xl font-bold tracking-tight text-foreground font-serif">
                     {classroom?.name || "Classroom"}
-                  </h2>
+                  </h1>
                   <span className="text-xs px-2 py-0.5 rounded font-medium border border-border bg-muted/40 text-foreground">
                     {classroom?.subject}
                   </span>
@@ -653,7 +652,7 @@ export default function ClassroomGradesPage({ params }: PageProps) {
         </div>
 
         {/* Single Unified Horizontal Toolbar */}
-        <div className="w-full max-w-full px-3.5 py-2.5 rounded-2xl border border-border/80 bg-card shadow-xs flex items-center gap-2 sm:gap-2.5 relative z-30 flex-nowrap overflow-x-auto">
+        <div className="w-full max-w-full px-3.5 py-2.5 rounded-2xl border border-border/80 bg-card shadow-xs flex items-center gap-2 sm:gap-2.5 relative z-30 flex-wrap sm:flex-nowrap sm:overflow-x-auto">
           {/* 1. Search Box */}
           <div className="relative w-36 sm:w-40 shrink-0">
             <Search className="size-3.5 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
@@ -1021,9 +1020,13 @@ export default function ClassroomGradesPage({ params }: PageProps) {
                           <div className="flex items-center justify-between text-xs">
                             <span className="text-muted-foreground">Continuous Marks</span>
                             <span className="font-bold text-foreground tabular-nums">
-                              {student.totalMarksObtained} / {student.completedCount > 0 ? student.evaluatedMaxMarks : student.totalMaxMarks}
+                              {(() => {
+                                const earned = student.totalMarksObtained ?? 0;
+                                const denom = ((student.completedCount ?? 0) > 0 ? student.evaluatedMaxMarks : student.totalMaxMarks) ?? 0;
+                                return denom > 0 ? `${earned} / ${denom}` : "—";
+                              })()}
                               <span className="text-[10px] text-muted-foreground font-normal ml-1">
-                                ({student.completedCount}/{student.totalAssignmentsCount} graded)
+                                ({student.completedCount ?? 0}/{student.totalAssignmentsCount ?? allAssignments.length ?? 0} graded)
                               </span>
                             </span>
                           </div>
@@ -1296,12 +1299,16 @@ export default function ClassroomGradesPage({ params }: PageProps) {
                           {/* Totals & Standing */}
                           <td className={`text-center border-l border-border/40 bg-muted/20 ${isCompactDensity ? "py-1.5" : "py-3"}`}>
                             <div className="flex flex-col items-center justify-center">
-                              <span className="font-extrabold text-foreground">
-                                {student.totalMarksObtained} / {student.completedCount > 0 ? student.evaluatedMaxMarks : student.totalMaxMarks}
+                              <span className="font-extrabold text-foreground tabular-nums">
+                                {(() => {
+                                  const earned = student.totalMarksObtained ?? 0;
+                                  const denom = ((student.completedCount ?? 0) > 0 ? student.evaluatedMaxMarks : student.totalMaxMarks) ?? 0;
+                                  return denom > 0 ? `${earned} / ${denom}` : "—";
+                                })()}
                               </span>
                               {!isCompactDensity && (
                                 <span className="text-[9px] text-muted-foreground/70 font-semibold">
-                                  {student.completedCount} of {student.totalAssignmentsCount} graded
+                                  {student.completedCount ?? 0} of {student.totalAssignmentsCount ?? gradebookData?.assignments?.length ?? 0} graded
                                 </span>
                               )}
                             </div>

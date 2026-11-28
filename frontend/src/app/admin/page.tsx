@@ -204,9 +204,9 @@ export default function AdminDashboardPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-border/60">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-black tracking-tight text-foreground">Institutional Command Center</h1>
-            <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] font-extrabold border border-emerald-500/20 flex items-center gap-1">
-              <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            <h1 className="text-2xl font-bold tracking-tight text-foreground font-serif">Institutional Command Center</h1>
+            <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 text-[11px] font-semibold border border-emerald-500/20 flex items-center gap-1.5">
+              <span className="size-1.5 rounded-full bg-emerald-500" />
               Live
             </span>
           </div>
@@ -364,7 +364,7 @@ export default function AdminDashboardPage() {
               <div className="flex items-start justify-between">
                 <div className="space-y-1">
                   <span className="text-xs font-semibold text-muted-foreground">{kpi.title}</span>
-                  <div className="text-2xl font-black text-foreground tracking-tight tabular-nums">
+                  <div className="text-2xl font-bold text-foreground tracking-tight tabular-nums">
                     {isLoading ? <div className="h-8 w-16 bg-muted/60 animate-pulse rounded-lg" /> : kpi.value}
                   </div>
                 </div>
@@ -391,11 +391,11 @@ export default function AdminDashboardPage() {
                 <Server className="size-4" />
               </div>
               <div>
-                <h3 className="text-sm font-bold text-foreground">Infrastructure Health</h3>
+                <h2 className="text-sm font-bold text-foreground">Infrastructure Health</h2>
                 <p className="text-[11px] text-muted-foreground">Live datastores & telemetry</p>
               </div>
             </div>
-            <span className="size-2 rounded-full bg-emerald-500 animate-ping" title="Telemetry Active" />
+            <span className="size-2 rounded-full bg-emerald-500" title="Telemetry Active" />
           </div>
 
           <div className="space-y-3 pt-1">
@@ -494,7 +494,7 @@ export default function AdminDashboardPage() {
                 <Activity className="size-4" />
               </div>
               <div>
-                <h3 className="text-sm font-bold text-foreground">Recent Security Audit Events</h3>
+                <h2 className="text-sm font-bold text-foreground">Recent Security Audit Events</h2>
                 <p className="text-[11px] text-muted-foreground">Real-time platform activity stream (last 5 days)</p>
               </div>
             </div>

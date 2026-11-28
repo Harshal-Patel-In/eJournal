@@ -4,7 +4,22 @@ import { use, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
-import { Loader2, Plus, MessageSquare, History, CheckCircle2, Sparkles, AlertTriangle, Lock, GraduationCap } from "lucide-react";
+import {
+  Loader2,
+  Plus,
+  MessageSquare,
+  History,
+  CheckCircle2,
+  Award,
+  AlertTriangle,
+  Lock,
+  GraduationCap,
+  Save,
+  Lightbulb,
+  Highlighter,
+  HelpCircle,
+  Clock,
+} from "lucide-react";
 
 import { api } from "@/lib/api";
 import { toast } from "@/lib/toast";
@@ -614,7 +629,7 @@ export default function EditorPage({ params }: PageProps) {
     const handleOnline = () => {
       const state = useDocumentStore.getState();
       state.setSyncStatus(state.isDirty ? "unsaved" : "synced");
-      toast.success("Network connection restored.", { title: "🌐 Online" });
+      toast.success("Network connection restored.", { title: "Connection Restored" });
       if (state.isDirty && !state.isSaving && state.title && (state.status === "draft" || state.status === "changes_requested")) {
         saveMutationRef.current.mutate(buildSavePayload(state));
       }
@@ -624,7 +639,7 @@ export default function EditorPage({ params }: PageProps) {
       const state = useDocumentStore.getState();
       if (state.syncStatus !== "offline") {
         state.setSyncStatus("offline");
-        toast.warning("Working offline. Changes are saved locally.", { title: "📡 Offline" });
+        toast.warning("Working offline. Changes are saved locally.", { title: "Offline Mode" });
       }
     };
 
@@ -739,6 +754,7 @@ export default function EditorPage({ params }: PageProps) {
     );
   }
 
+  const safeAnnotations = Array.isArray(annotations) ? annotations : [];
   const classroomId = assignment?.classroomId || "";
   const isTeacher = user?.role === "teacher";
   const isPastDeadline = Boolean(
@@ -800,7 +816,7 @@ export default function EditorPage({ params }: PageProps) {
               setRevision(nextRev, res.updatedAt);
               setShowConflictDialog(false);
               queryClient.setQueryData(["journal", journalId], res);
-              toast.success("Document overwritten with local draft.", { title: "✅ Saved" });
+              toast.success("Document overwritten with local draft.", { title: "Draft Saved" });
             }
           } catch (err: any) {
             toast.error(err.message || "Failed to force save local draft.");
@@ -881,9 +897,12 @@ export default function EditorPage({ params }: PageProps) {
         )}
 
         {/* Editor Main Canvas Wrapper (Guaranteed Full Width on Mobile/Tablet) */}
-        <main className={`editor-content flex-1 w-full max-w-4xl py-6 flex flex-col gap-6 relative z-10 print:p-0 print:m-0 print:max-w-none print:w-full pb-28 md:pb-8 ${
+        <main id="main-content" className={`editor-content flex-1 w-full max-w-4xl py-6 flex flex-col gap-6 relative z-10 print:p-0 print:m-0 print:max-w-none print:w-full pb-28 md:pb-8 ${
           isTeacher && showReviewDrawer ? "lg:px-2 mx-auto px-3 sm:px-6 lg:px-8" : "mx-auto px-3 sm:px-6 lg:px-8"
         }`}>
+          <h1 className="sr-only print:hidden">
+            {title || assignment?.title || "Laboratory Journal Editor"}
+          </h1>
           {/* Academic Print-Only Single Journal Header */}
           <div className="hidden print:flex flex-col border-b-2 border-black pb-4 mb-4 select-none">
             <div className="flex justify-between items-start">
@@ -920,8 +939,8 @@ export default function EditorPage({ params }: PageProps) {
           {localRecoverySnapshot && isEditable && (
             <div className="p-4 rounded-xl border border-blue-500/30 bg-blue-500/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-in fade-in-50 duration-200">
               <div className="flex items-center gap-2.5">
-                <span className="size-2 rounded-full bg-blue-500 animate-pulse shrink-0" />
-                <span className="text-sm font-bold text-foreground">💾 Unsaved Offline Draft Recovered</span>
+                <Save className="size-4 text-blue-600 dark:text-blue-400 shrink-0" />
+                <span className="text-sm font-bold text-foreground">Unsaved Offline Draft Recovered</span>
                 {localRecoverySnapshot.savedAt && (
                   <span className="text-xs text-muted-foreground hidden sm:inline">
                     (Saved locally at {formatTimeIST(localRecoverySnapshot.savedAt, false)})
@@ -947,7 +966,7 @@ export default function EditorPage({ params }: PageProps) {
                     loadLocalRecovery(localRecoverySnapshot.title, localRecoverySnapshot.blocks);
                     clearLocalSnapshot(journalId);
                     setLocalRecoverySnapshot(null);
-                    toast.success("Offline draft restored into editor!", { title: "💾 Restored" });
+                    toast.success("Offline draft restored into editor!", { title: "Draft Restored" });
                   }}
                   className="rounded-xl text-xs font-semibold cursor-pointer"
                 >
@@ -1009,12 +1028,12 @@ export default function EditorPage({ params }: PageProps) {
 
                 {journal?.marks !== undefined && journal?.marks !== null && (
                   <div className="flex items-center gap-2 bg-muted/40 border border-border/50 px-3 py-1.5 rounded-xl shrink-0 self-start sm:self-auto">
-                    <Sparkles className="size-3.5 text-amber-500" />
+                    <Award className="size-3.5 text-amber-500" />
                     <span className="text-xs font-semibold text-muted-foreground">Grade:</span>
-                    <span className="text-sm font-black text-foreground tabular-nums">
+                    <span className="text-sm font-bold text-foreground tabular-nums">
                       {journal.marks} / {assignment?.maxMarks || 10}
                     </span>
-                    <span className="text-[11px] font-extrabold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md ml-0.5 border border-emerald-500/20">
+                    <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md ml-0.5 border border-emerald-500/20">
                       {Math.round((journal.marks / (assignment?.maxMarks || 10)) * 100)}%
                     </span>
                   </div>
@@ -1031,32 +1050,40 @@ export default function EditorPage({ params }: PageProps) {
               )}
 
               {/* Interactive Annotation Jump Buttons */}
-              {annotations && annotations.length > 0 && (
+              {safeAnnotations.length > 0 && (
                 <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-border/40 text-xs">
                   <span className="text-[11px] font-bold text-muted-foreground mr-1">
-                    Feedback Items ({annotations.length}):
+                    Feedback Items ({safeAnnotations.length}):
                   </span>
                   {Object.entries(
-                    annotations.reduce((acc: Record<string, number>, a: any) => {
+                    safeAnnotations.reduce((acc: Record<string, number>, a: any) => {
                       const t = a.type || "Comment";
                       acc[t] = (acc[t] || 0) + 1;
                       return acc;
                     }, {})
                   ).map(([type, count]) => {
-                    const typeIcons: Record<string, string> = {
-                      Comment: "💬",
-                      Suggestion: "✨",
-                      Highlight: "🖍",
-                      Warning: "⚠️",
-                      Approval: "✅",
-                      Question: "❓",
+                    const renderTypeIcon = (t: string) => {
+                      switch (t) {
+                        case "Suggestion":
+                          return <Lightbulb className="size-3.5 text-amber-500" />;
+                        case "Highlight":
+                          return <Highlighter className="size-3.5 text-yellow-500" />;
+                        case "Warning":
+                          return <AlertTriangle className="size-3.5 text-rose-500" />;
+                        case "Approval":
+                          return <CheckCircle2 className="size-3.5 text-emerald-500" />;
+                        case "Question":
+                          return <HelpCircle className="size-3.5 text-indigo-500" />;
+                        default:
+                          return <MessageSquare className="size-3.5 text-sky-500" />;
+                      }
                     };
                     const num = Number(count);
                     return (
                       <button
                         key={type}
                         onClick={() => {
-                          const target = annotations.find((a: any) => (a.type || "Comment") === type);
+                          const target = safeAnnotations.find((a: any) => (a.type || "Comment") === type);
                           if (target?.blockId) {
                             setActiveAnnotationBlockId(target.blockId);
                             setShowReviewDrawer(true);
@@ -1070,10 +1097,10 @@ export default function EditorPage({ params }: PageProps) {
                             }
                           }
                         }}
-                        className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-muted/50 hover:bg-muted text-foreground border border-border/50 flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer"
+                        className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-muted/50 hover:bg-muted text-foreground border border-border/50 flex items-center gap-1.5 transition-[background-color,transform] active:scale-95 cursor-pointer"
                         title={`Click to jump to ${type} annotation in document`}
                       >
-                        <span>{typeIcons[type] || "💬"}</span>
+                        {renderTypeIcon(type)}
                         <span>{num} {type}{num > 1 ? "s" : ""}</span>
                       </button>
                     );
@@ -1085,7 +1112,8 @@ export default function EditorPage({ params }: PageProps) {
             <div className="p-4 rounded-2xl border border-amber-500/30 bg-amber-500/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
               <div className="flex flex-col gap-1">
                 <span className="text-sm font-bold text-foreground flex items-center gap-2">
-                  🔒 {journal?.isRevoked ? "Submission Revoked" : status === "late_submitted" ? "Late Handed In" : "Handed In"}
+                  <Lock className="size-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                  <span>{journal?.isRevoked ? "Submission Revoked" : status === "late_submitted" ? "Late Handed In" : "Handed In"}</span>
                   {journal?.isRevoked && (
                     <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-700">
                       Draft Revoked
@@ -1149,11 +1177,12 @@ export default function EditorPage({ params }: PageProps) {
 
                 <div className="flex items-center gap-2 shrink-0">
                   {status === "late_submitted" ? (
-                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/25 flex items-center gap-1">
-                      <span>🕒 Late Submission</span>
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/25 flex items-center gap-1">
+                      <Clock className="size-3" />
+                      <span>Late Submission</span>
                     </span>
                   ) : status === "submitted" ? (
-                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/25">
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/25">
                       On-Time Submission
                     </span>
                   ) : null}
@@ -1184,7 +1213,7 @@ export default function EditorPage({ params }: PageProps) {
                     className="flex flex-col gap-4 w-full select-text"
                   >
                     {blocks.map((block, idx) => {
-                      const blockAnns = annotations?.filter((a) => a.blockId === block.id) || [];
+                      const blockAnns = safeAnnotations.filter((a) => a.blockId === block.id);
                       const hasAnnotations = blockAnns.length > 0;
                       const borderAccent = hasAnnotations ? getDominantBorderColor(blockAnns) : "";
 
@@ -1360,9 +1389,9 @@ export default function EditorPage({ params }: PageProps) {
             <Button
               onClick={() => setMobileReviewSheetOpen(true)}
               size="sm"
-              className="h-9 px-3.5 rounded-xl font-bold text-xs gap-1.5 shadow-sm tap-feedback cursor-pointer"
+              className="h-10 sm:h-9 px-3.5 rounded-xl font-bold text-xs gap-1.5 shadow-sm tap-feedback cursor-pointer"
             >
-              <Sparkles className="size-3.5" />
+              <Award className="size-3.5" />
               <span>Evaluate</span>
             </Button>
           </div>
@@ -1388,7 +1417,6 @@ export default function EditorPage({ params }: PageProps) {
               currentMarks={journal?.marks}
               currentRemarks={journal?.teacherRemarks}
               blocks={blocks}
-              onClose={() => setMobileReviewSheetOpen(false)}
             />
           </div>
         </MobileAdaptiveSheet>

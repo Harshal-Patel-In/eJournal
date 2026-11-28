@@ -78,8 +78,9 @@ export default function EditorToolbar({
       <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0 pr-1.5 sm:pr-4">
         <Link
           href={classroomId ? `/classrooms/${classroomId}` : "/dashboard"}
+          aria-label={classroomId ? "Back to Classroom" : "Back to Dashboard"}
           title={classroomId ? "Back to Classroom" : "Back to Dashboard"}
-          className="flex items-center justify-center size-8 rounded-xl bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground active:scale-95 transition-all duration-200 cursor-pointer shrink-0 border border-border/40"
+          className="flex items-center justify-center size-10 sm:size-8 rounded-xl bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground active:scale-95 transition-[background-color,color,transform] duration-200 cursor-pointer shrink-0 border border-border/40"
         >
           <ArrowLeft className="size-4" />
         </Link>
@@ -88,11 +89,12 @@ export default function EditorToolbar({
 
         <input
           type="text"
+          aria-label="Journal Document Title"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Untitled Experiment Record"
           disabled={!isEditable}
-          className="bg-transparent text-xs sm:text-sm md:text-base font-bold text-foreground border-0 border-b border-transparent hover:border-border/50 focus:border-primary/50 focus:ring-0 focus:outline-none px-1.5 sm:px-2 py-0.5 rounded-lg transition-all min-w-0 flex-1 truncate placeholder:text-muted-foreground/50 disabled:pointer-events-none"
+          className="bg-transparent text-xs sm:text-sm md:text-base font-bold text-foreground border-0 border-b border-transparent hover:border-border/50 focus:border-primary/50 focus:ring-0 focus:outline-none transition-[border-color] px-1.5 sm:px-2 py-0.5 rounded-lg min-w-0 flex-1 truncate placeholder:text-muted-foreground/50 disabled:pointer-events-none"
         />
       </div>
 
@@ -161,14 +163,14 @@ export default function EditorToolbar({
         {/* 2. Teacher Specific Controls OR Student View Mode */}
         {isTeacher ? (
           <>
-            {/* Review Drawer Button */}
+            {/* Review Drawer Button (Desktop Only: hidden on touchscreens/mobile where the bottom evaluation dock is used) */}
             {onToggleReviewDrawer && (
               <Button
                 variant="outline"
                 size="sm"
                 onClick={onToggleReviewDrawer}
                 className={cn(
-                  "gap-1.5 text-xs font-semibold rounded-xl h-8 px-2.5 cursor-pointer transition-all active:scale-95",
+                  "hidden lg:inline-flex gap-1.5 text-xs font-semibold rounded-xl h-8 px-2.5 cursor-pointer transition-all active:scale-95",
                   showReviewDrawer
                     ? "border-indigo-500/60 bg-indigo-500/20 text-indigo-600 dark:text-indigo-300"
                     : "text-muted-foreground hover:text-foreground"
@@ -241,10 +243,11 @@ export default function EditorToolbar({
                 <button
                   type="button"
                   onClick={togglePreview}
-                  className="md:hidden flex items-center justify-center size-8 rounded-xl bg-muted/60 dark:bg-zinc-800/80 border border-border/50 text-foreground cursor-pointer tap-feedback shrink-0"
+                  aria-label={previewMode ? "Switch to Edit Mode" : "Switch to Preview Mode"}
+                  className="md:hidden flex items-center justify-center size-10 sm:size-8 rounded-xl bg-muted/60 dark:bg-zinc-800/80 border border-border/50 text-foreground cursor-pointer tap-feedback shrink-0"
                   title={previewMode ? "Switch to Edit Mode" : "Switch to Preview Mode"}
                 >
-                  {previewMode ? <EyeOff className="size-3.5 text-primary" /> : <Eye className="size-3.5" />}
+                  {previewMode ? <EyeOff className="size-4 text-primary" /> : <Eye className="size-4" />}
                 </button>
 
                 <div className="hidden md:flex items-center p-0.5 rounded-xl bg-muted/60 dark:bg-zinc-800/80 border border-border/50 select-none">
@@ -324,10 +327,11 @@ export default function EditorToolbar({
           <button
             type="button"
             onClick={() => setShowMobileMenu((prev) => !prev)}
+            aria-label="More document options"
             title="More document options"
-            className="size-8 rounded-xl bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground border border-border/40 flex items-center justify-center transition-all active:scale-95 cursor-pointer"
+            className="size-10 sm:size-8 rounded-xl bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground border border-border/40 flex items-center justify-center transition-[background-color,color,transform] active:scale-95 cursor-pointer"
           >
-            <MoreVertical className="size-3.5" />
+            <MoreVertical className="size-4" />
           </button>
 
           {showMobileMenu && (

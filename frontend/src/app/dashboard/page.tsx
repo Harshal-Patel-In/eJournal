@@ -6,7 +6,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -77,10 +77,15 @@ type CreateClassroomFields = zod.infer<typeof createClassroomSchema>;
 export default function DashboardPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const [isMounted, setIsMounted] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   // 1. Fetch user profile
   const { data: user, isLoading: userLoading } = useQuery<any>({
@@ -187,7 +192,7 @@ export default function DashboardPage() {
     resolver: zodResolver(createClassroomSchema),
   });
 
-  if (userLoading || classroomsLoading) {
+  if (!isMounted || userLoading || classroomsLoading) {
     return (
       <AppLoadingScreen
         title="Loading Academic Workspace..."
@@ -229,7 +234,7 @@ export default function DashboardPage() {
               <Button
                 variant="outline"
                 size="sm"
-                className="gap-1.5 text-xs font-semibold rounded-md h-8 px-2.5 glass-btn-accent-outline cursor-pointer"
+                className="gap-1.5 text-xs font-semibold rounded-md h-10 sm:h-8 px-3 sm:px-2.5 glass-btn-accent-outline cursor-pointer"
               >
                 <ShieldAlert className="size-3.5 text-indigo-600 dark:text-indigo-400" />
                 <span className="hidden sm:inline">Admin console</span>
@@ -255,7 +260,7 @@ export default function DashboardPage() {
             size="sm"
             onClick={() => logoutMutation.mutate()}
             disabled={logoutMutation.isPending}
-            className="gap-1.5 text-xs font-semibold rounded-md h-8 px-2.5 glass-btn-rose-outline cursor-pointer"
+            className="gap-1.5 text-xs font-semibold rounded-md h-10 sm:h-8 px-3 sm:px-2.5 glass-btn-rose-outline cursor-pointer"
             title="Sign out of eJournal"
           >
             <LogOut className="size-3.5" />
@@ -265,28 +270,28 @@ export default function DashboardPage() {
       </header>
 
       {/* Main Workspace */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 pb-24 sm:p-6 sm:pb-8 md:p-8 flex flex-col gap-6 relative z-10">
+      <main id="main-content" className="flex-1 max-w-7xl w-full mx-auto p-4 pb-24 sm:p-6 sm:pb-8 md:p-8 flex flex-col gap-6 relative z-10">
         {/* Teacher vs Student Workspace Hero & Operational Telemetry */}
         {isStudent ? (
           <>
-            {/* Student Welcome Deck */}
+            {/* Student Workspace Header */}
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pt-1">
               <div className="flex flex-col gap-1">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary">
                     <GraduationCap className="size-3.5" />
                     Student workspace
                   </span>
-                  <span className="text-muted-foreground/40">•</span>
+                  <span className="text-muted-foreground/40" aria-hidden="true">·</span>
                   <span className="text-xs font-medium text-muted-foreground">
                     {user?.profile?.department || "Computer Engineering"}
                   </span>
                 </div>
                 <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground font-serif">
-                  Welcome back, {userDisplayName}
+                  Academic lab workspace
                 </h1>
                 <p className="text-xs sm:text-sm text-muted-foreground max-w-xl">
-                  Active laboratory practicals, mathematical journals, and teacher review records.
+                  {userDisplayName} · Active laboratory practicals, mathematical journals, and review records.
                 </p>
               </div>
 
@@ -294,7 +299,7 @@ export default function DashboardPage() {
                 <Button
                   onClick={() => setShowJoinModal(true)}
                   size="sm"
-                  className="gap-2 font-medium rounded-md h-9 px-4 shadow-xs glass-btn-indigo-solid active:scale-[0.98] transition-all cursor-pointer"
+                  className="gap-2 font-medium rounded-md h-10 sm:h-9 px-4 shadow-xs glass-btn-indigo-solid active:scale-[0.98] transition-[transform,box-shadow,background-color] cursor-pointer"
                 >
                   <UserPlus className="size-3.5" />
                   <span>Join classroom</span>
@@ -388,24 +393,24 @@ export default function DashboardPage() {
           </>
         ) : (
           <>
-            {/* Faculty Welcome Deck */}
+            {/* Faculty Console Header */}
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pt-1">
               <div className="flex flex-col gap-1">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary">
                     <Building2 className="size-3.5" />
                     Faculty review console
                   </span>
-                  <span className="text-muted-foreground/40">•</span>
+                  <span className="text-muted-foreground/40" aria-hidden="true">·</span>
                   <span className="text-xs font-medium text-muted-foreground">
                     {user?.profile?.department || "Computer Engineering"}
                   </span>
                 </div>
                 <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground font-serif">
-                  Welcome back, {userDisplayName}
+                  Laboratory evaluation console
                 </h1>
                 <p className="text-xs sm:text-sm text-muted-foreground max-w-xl">
-                  Student practical submissions, in-line reviews, and laboratory evaluation cohorts.
+                  {userDisplayName} · Student practical submissions, in-line reviews, and cohort evaluation.
                 </p>
               </div>
 
@@ -413,7 +418,7 @@ export default function DashboardPage() {
                 <Button
                   onClick={() => setShowCreateModal(true)}
                   size="sm"
-                  className="gap-2 font-medium rounded-md h-9 px-4 shadow-xs glass-btn-indigo-solid active:scale-[0.98] transition-all cursor-pointer"
+                  className="gap-2 font-medium rounded-md h-10 sm:h-9 px-4 shadow-xs glass-btn-indigo-solid active:scale-[0.98] transition-[transform,box-shadow,background-color] cursor-pointer"
                 >
                   <Plus className="size-3.5" />
                   <span>Create classroom</span>
@@ -538,7 +543,7 @@ export default function DashboardPage() {
                   key={room.id}
                   onClick={() => router.push(`/classrooms/${room.id}`)}
                   className={cn(
-                    "group relative p-5 rounded-xl border border-border/80 bg-card hover:border-border hover:shadow-md transition-all duration-200 flex flex-col justify-between min-h-[208px] cursor-pointer overflow-hidden",
+                    "group relative p-5 rounded-xl border border-border/80 bg-card hover:border-border hover:shadow-md transition-[border-color,box-shadow] duration-200 flex flex-col justify-between min-h-[208px] cursor-pointer overflow-hidden",
                     theme.hoverBorder
                   )}
                   role="button"
@@ -550,10 +555,10 @@ export default function DashboardPage() {
                     }
                   }}
                 >
-                  {/* Vertical Batch Anchor Notch with subject glow */}
+                  {/* Vertical Classroom Color Identity Indicator Notch */}
                   <div
                     className={cn(
-                      "absolute left-0 top-4 bottom-4 w-1 rounded-r-full transition-all duration-200",
+                      "absolute left-0 top-3.5 bottom-3.5 w-1.5 rounded-r-full transition-all duration-200",
                       theme.indicator,
                       theme.notchGlow
                     )}
@@ -607,7 +612,7 @@ export default function DashboardPage() {
                         {room.name}
                       </h3>
                       <p className="text-xs text-muted-foreground font-medium mt-1">
-                        {room.department} • Semester {room.semester}
+                        {room.department} · Semester {room.semester}
                       </p>
                     </div>
 
@@ -703,24 +708,6 @@ export default function DashboardPage() {
                 </div>
               );
             })
-            .concat(
-              !isStudent && classrooms.length > 0 && classrooms.length % 3 !== 0 ? [
-                <button
-                  key="create-new-cohort-placeholder"
-                  type="button"
-                  onClick={() => setShowCreateModal(true)}
-                  className="p-5 rounded-xl border-2 border-dashed border-border/70 hover:border-primary/50 bg-card hover:bg-muted/40 transition-all flex flex-col items-center justify-center gap-2.5 text-center min-h-[208px] cursor-pointer group select-none shadow-2xs"
-                >
-                  <div className="size-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center group-hover:scale-110 transition-transform">
-                    <Plus className="size-5" />
-                  </div>
-                  <div className="flex flex-col gap-0.5">
-                    <span className="text-xs font-bold text-foreground">Create new cohort</span>
-                    <span className="text-[11px] text-muted-foreground">Add another division or subject space</span>
-                  </div>
-                </button>
-              ] : []
-            )
           ) : (
             <div className="col-span-full py-14 flex flex-col items-center justify-center border border-dashed border-border rounded-lg bg-card/50">
               <div className="size-12 rounded-md bg-muted text-foreground flex items-center justify-center mb-3 border border-border">

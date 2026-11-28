@@ -13,6 +13,8 @@ import {
   ArrowLeft,
   ArrowRight,
   ArrowUpRight,
+  Award,
+  Bell,
   BookOpen,
   Calendar,
   Check,
@@ -38,9 +40,9 @@ import {
   MessageSquareQuote,
   MoreVertical,
   Plus,
-  Sparkles,
   Square,
   Trash2,
+  TrendingUp,
   Users,
   User,
 } from "lucide-react";
@@ -104,9 +106,14 @@ export default function ClassroomPage({ params }: PageProps) {
   const [collapsedClusters, setCollapsedClusters] = useState<string[]>([]);
   const [showMobileCalendarSheet, setShowMobileCalendarSheet] = useState(false);
   const [calendarDate, setCalendarDate] = useState<Date>(() => new Date());
+  const [isMounted, setIsMounted] = useState(false);
   const [hoveredCalendarKey, setHoveredCalendarKey] = useState<string | null>(null);
   const [pinnedCalendarKey, setPinnedCalendarKey] = useState<string | null>(null);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const toggleClusterCollapse = (cName: string) => {
     setCollapsedClusters((prev) =>
@@ -683,7 +690,7 @@ export default function ClassroomPage({ params }: PageProps) {
         } ${isSelected ? "ring-2 ring-primary/40 bg-muted/40" : ""}`}
       >
         <div className="flex items-start gap-3 max-w-xl flex-1">
-          {/* Checkbox for teacher bulk actions with gentle resting state (Hover Reveal) */}
+          {/* Checkbox for teacher bulk actions with touch-friendly target */}
           {isTeacher && (
             <button
               type="button"
@@ -692,12 +699,12 @@ export default function ClassroomPage({ params }: PageProps) {
                   prev.includes(asg.id) ? prev.filter((id) => id !== asg.id) : [...prev, asg.id]
                 );
               }}
-              className={`mt-1 text-muted-foreground hover:text-foreground transition-all cursor-pointer shrink-0 ${
+              className={`size-9 sm:size-6 -m-1.5 sm:m-0 sm:mt-0.5 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground transition-opacity cursor-pointer shrink-0 ${
                 isSelected
                   ? "opacity-100"
                   : selectedAssignmentIds.length > 0
                   ? "opacity-60 hover:opacity-100"
-                  : "opacity-0 group-hover:opacity-100"
+                  : "opacity-100 lg:opacity-0 lg:group-hover:opacity-100"
               }`}
               title={isSelected ? "Deselect" : "Select for bulk cluster action"}
             >
@@ -721,9 +728,9 @@ export default function ClassroomPage({ params }: PageProps) {
                   {asg.clusterName}
                 </span>
               )}
-              <h4 className={cn("font-bold text-sm tracking-tight text-foreground transition-colors", theme.hoverTitle)}>
+              <h3 className={cn("font-bold text-sm tracking-tight text-foreground transition-colors", theme.hoverTitle)}>
                 {asg.title}
-              </h4>
+              </h3>
             </div>
             <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">
               {asg.aim}
@@ -791,11 +798,11 @@ export default function ClassroomPage({ params }: PageProps) {
             <div className="flex flex-wrap items-center gap-3 mt-0.5 text-[11px] font-medium text-muted-foreground">
               {hasMarks ? (
                 <span className="flex items-center gap-1 text-foreground font-bold bg-muted/60 border border-border px-2 py-0.5 rounded tabular-nums">
-                  <Sparkles className="size-3 text-primary" /> Marks: {relatedJournal.marks} / {asg.maxMarks} ({Math.round((relatedJournal.marks / asg.maxMarks) * 100)}%)
+                  <Award className="size-3 text-primary" /> Marks: {relatedJournal.marks} / {asg.maxMarks} ({Math.round((relatedJournal.marks / asg.maxMarks) * 100)}%)
                 </span>
               ) : (
                 <span className="flex items-center gap-1 text-foreground font-medium tabular-nums">
-                  <Sparkles className="size-3 text-muted-foreground" /> Max marks: {asg.maxMarks}
+                  <Award className="size-3 text-muted-foreground" /> Max marks: {asg.maxMarks}
                 </span>
               )}
 
@@ -1096,7 +1103,7 @@ export default function ClassroomPage({ params }: PageProps) {
     );
   };
 
-  if (classroomLoading || assignmentsLoading) {
+  if (!isMounted || classroomLoading || assignmentsLoading) {
     return (
       <AppLoadingScreen
         title="Loading Classroom Workspace..."
@@ -1107,12 +1114,12 @@ export default function ClassroomPage({ params }: PageProps) {
 
   if (!classroom) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-background p-6">
-        <h3 className="font-bold text-xl">Classroom not found</h3>
+      <main id="main-content" className="flex min-h-screen flex-col items-center justify-center bg-background p-6">
+        <h1 className="font-bold text-xl">Classroom not found</h1>
         <Button asChild className="mt-4 rounded-xl">
           <Link href="/dashboard">Return to Dashboard</Link>
         </Button>
-      </div>
+      </main>
     );
   }
 
@@ -1122,12 +1129,13 @@ export default function ClassroomPage({ params }: PageProps) {
       style={getClassroomCanvasStyle(theme)}
     >
       {/* Grounded Institutional Archival Header */}
-      <header className="sticky top-0 z-40 w-full border-b border-border bg-card/95 backdrop-blur-xs px-4 sm:px-8 py-3 flex items-center justify-between transition-colors">
+      <header className="sticky top-0 z-40 w-full border-b border-border bg-card/95 backdrop-blur-xs px-4 sm:px-8 py-2.5 sm:py-3 flex items-center justify-between transition-colors">
         <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
           <Link
             href="/dashboard"
+            aria-label="Back to dashboard"
             title="Back to dashboard"
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold text-foreground glass-btn-elevated cursor-pointer shrink-0"
+            className="flex items-center justify-center gap-1.5 h-10 sm:h-auto min-w-[40px] sm:min-w-0 px-2.5 py-1 rounded-md text-xs font-semibold text-foreground glass-btn-elevated cursor-pointer shrink-0"
           >
             <ArrowLeft className="size-3.5" />
             <span className="hidden sm:inline">Dashboard</span>
@@ -1141,8 +1149,8 @@ export default function ClassroomPage({ params }: PageProps) {
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           <ThemeToggle />
           <NotificationBell />
-          <Link href="/profile" title="View & Edit Academic Profile">
-            <div className="size-8 rounded-md glass-btn-elevated flex items-center justify-center font-bold text-xs cursor-pointer text-foreground">
+          <Link href="/profile" title="View & Edit Academic Profile" aria-label="View & Edit Academic Profile">
+            <div className="size-10 sm:size-8 rounded-md glass-btn-elevated flex items-center justify-center font-bold text-xs cursor-pointer text-foreground">
               <User className="size-3.5" />
             </div>
           </Link>
@@ -1150,7 +1158,7 @@ export default function ClassroomPage({ params }: PageProps) {
       </header>
 
       {/* Subject Space Container with Left-Rail Desktop Two-Column Grid */}
-      <main className="max-w-7xl w-full mx-auto p-4 pb-24 sm:p-6 sm:pb-8 md:p-8 relative z-10">
+      <main id="main-content" className="max-w-7xl w-full mx-auto p-4 pb-24 sm:p-6 sm:pb-8 md:p-8 relative z-10">
         <div className="flex flex-col lg:flex-row gap-6 items-start">
           {/* Desktop Intelligence Sidebar (Left Rail on Desktop: 320px/352px width, sticky on desktop, order-2 on mobile) */}
           <aside className="w-full lg:w-80 xl:w-88 shrink-0 flex flex-col gap-5 order-2 lg:order-1 lg:sticky lg:top-24">
@@ -1160,14 +1168,14 @@ export default function ClassroomPage({ params }: PageProps) {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Users className="size-3.5 text-muted-foreground" />
-                    <h4 className="font-bold text-xs uppercase tracking-wider text-muted-foreground">
+                    <h2 className="font-semibold text-xs text-muted-foreground">
                       Classroom cohort
-                    </h4>
+                    </h2>
                   </div>
                   <button
                     type="button"
                     onClick={() => setActiveTab("roster")}
-                    className={cn("text-[10px] font-semibold hover:underline cursor-pointer", theme.accentText)}
+                    className={cn("text-xs font-semibold hover:underline py-1.5 px-1.5 -my-1.5 cursor-pointer", theme.accentText)}
                   >
                     View all ({totalStudents})
                   </button>
@@ -1179,13 +1187,13 @@ export default function ClassroomPage({ params }: PageProps) {
 
                 <div className="flex items-center justify-between p-2.5 rounded-lg bg-muted/40 border border-border">
                   <div className="flex flex-col">
-                    <span className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">Student join code</span>
+                    <span className="text-[11px] font-medium text-muted-foreground">Student join code</span>
                     <code className="font-mono text-xs font-bold text-foreground">{classroom.joinCode}</code>
                   </div>
                   <button
                     type="button"
                     onClick={handleCopyCode}
-                    className="px-2.5 py-1 rounded-md text-xs font-medium bg-muted hover:bg-muted/80 text-foreground border border-border transition-all cursor-pointer flex items-center gap-1 active:scale-[0.98]"
+                    className="px-2.5 py-1.5 sm:py-1 rounded-md text-xs font-medium bg-muted hover:bg-muted/80 text-foreground border border-border transition-[background-color,transform] cursor-pointer flex items-center gap-1 active:scale-[0.98]"
                   >
                     {copiedCode ? <Check className="size-3 text-emerald-600 dark:text-emerald-400" /> : <Copy className="size-3" />}
                     <span>{copiedCode ? "Copied" : "Copy"}</span>
@@ -1199,9 +1207,9 @@ export default function ClassroomPage({ params }: PageProps) {
                     <div className="size-6 rounded bg-muted text-foreground flex items-center justify-center border border-border">
                       <BookOpen className={cn("size-3.5", theme.accentText)} />
                     </div>
-                    <h4 className="font-bold text-xs uppercase tracking-wider text-muted-foreground">
+                    <h2 className="font-semibold text-xs text-muted-foreground">
                       Up next
-                    </h4>
+                    </h2>
                   </div>
                   <span
                     className={`px-2 py-0.5 rounded text-[10px] font-medium border ${
@@ -1224,9 +1232,9 @@ export default function ClassroomPage({ params }: PageProps) {
                   <div className="flex items-center gap-1.5 text-[11px] font-bold text-primary">
                     <span>Experiment #{upNextPractical.asg.experimentNumber}</span>
                   </div>
-                  <h5 className="font-bold text-sm text-foreground tracking-tight line-clamp-1 mt-0.5">
+                  <h3 className="font-bold text-sm text-foreground tracking-tight line-clamp-1 mt-0.5">
                     {upNextPractical.asg.title}
-                  </h5>
+                  </h3>
                   <p className="text-xs text-muted-foreground line-clamp-2 mt-1 leading-relaxed">
                     {upNextPractical.asg.aim}
                   </p>
@@ -1279,7 +1287,7 @@ export default function ClassroomPage({ params }: PageProps) {
                 <div className="size-8 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 flex items-center justify-center shadow-xs">
                   <CheckCircle2 className="size-4" />
                 </div>
-                <h4 className="font-bold text-xs text-foreground uppercase tracking-wider">Coursework current</h4>
+                <h2 className="font-semibold text-xs text-foreground">Coursework current</h2>
                 <p className="text-xs text-muted-foreground leading-relaxed max-w-[240px]">
                   All practical experiments in this classroom have been submitted or approved.
                 </p>
@@ -1292,10 +1300,10 @@ export default function ClassroomPage({ params }: PageProps) {
                 <div className="p-5 rounded-xl border border-border/70 bg-card/85 backdrop-blur-md shadow-xs flex flex-col gap-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span className="flex h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
-                      <h4 className="font-bold text-xs uppercase tracking-wider text-muted-foreground">
+                      <span className="flex h-2 w-2 rounded-full bg-amber-500" />
+                      <h2 className="font-semibold text-xs text-muted-foreground">
                         Needs grading ({pendingReviewsCount})
-                      </h4>
+                      </h2>
                     </div>
                     <span className="text-[10px] font-medium text-amber-700 dark:text-amber-400">Action required</span>
                   </div>
@@ -1305,7 +1313,7 @@ export default function ClassroomPage({ params }: PageProps) {
                       <Link
                         key={item.id}
                         href={`/classrooms/${classroomId}/grades?assignment=${item.id}`}
-                        className="flex items-center justify-between p-2.5 rounded-lg bg-muted/40 hover:bg-muted border border-border transition-all group"
+                        className="flex items-center justify-between p-2.5 rounded-lg bg-muted/40 hover:bg-muted border border-border transition-colors group"
                       >
                         <div className="flex flex-col min-w-0 pr-2">
                           <span className={cn("text-xs font-bold text-foreground truncate transition-colors", theme.hoverTitle)}>
@@ -1328,7 +1336,7 @@ export default function ClassroomPage({ params }: PageProps) {
                   <div className="size-8 rounded bg-muted text-emerald-600 dark:text-emerald-400 border border-border flex items-center justify-center">
                     <CheckCircle2 className="size-4" />
                   </div>
-                  <h4 className="font-bold text-xs text-foreground uppercase tracking-wider">All reviews cleared</h4>
+                  <h2 className="font-semibold text-xs text-foreground">All reviews cleared</h2>
                   <p className="text-[11px] text-muted-foreground leading-relaxed max-w-[240px]">
                     All student journals for this classroom have been reviewed and graded.
                   </p>
@@ -1338,10 +1346,10 @@ export default function ClassroomPage({ params }: PageProps) {
               <div className="p-5 rounded-xl border border-border/70 bg-card/85 backdrop-blur-md shadow-xs flex flex-col gap-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Sparkles className={cn("size-3.5", theme.accentText)} />
-                    <h4 className="font-bold text-xs uppercase tracking-wider text-muted-foreground">
+                    <TrendingUp className={cn("size-3.5", theme.accentText)} />
+                    <h2 className="font-semibold text-xs text-muted-foreground">
                       Practical progress
-                    </h4>
+                    </h2>
                   </div>
                   <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-muted text-foreground border border-border tabular-nums">
                     {totalPracticals > 0 ? Math.round((studentCompletedCount / totalPracticals) * 100) : 0}% done
@@ -1357,7 +1365,7 @@ export default function ClassroomPage({ params }: PageProps) {
 
                 <div className="h-2 w-full bg-muted/80 rounded-full overflow-hidden border border-border/50">
                   <div
-                    className="h-full bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full transition-all duration-500"
+                    className="h-full bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full transition-[width] duration-500"
                     style={{
                       width: `${totalPracticals > 0 ? (studentCompletedCount / totalPracticals) * 100 : 0}%`,
                     }}
@@ -1382,24 +1390,25 @@ export default function ClassroomPage({ params }: PageProps) {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Calendar className="size-3.5 text-muted-foreground" />
-                  <h4 className="font-bold text-xs uppercase tracking-wider text-muted-foreground">
+                  <h2 className="font-semibold text-xs text-muted-foreground">
                     Academic calendar
-                  </h4>
+                  </h2>
                 </div>
 
                 <div className="flex items-center gap-1">
                   <button
                     type="button"
                     onClick={handlePrevMonth}
-                    className="p-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5 transition-all cursor-pointer"
+                    className="size-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
                     title="Previous Month"
+                    aria-label="Previous Month"
                   >
                     <ChevronLeft className="size-3.5" />
                   </button>
                   <button
                     type="button"
                     onClick={handleJumpToToday}
-                    className="text-xs font-bold px-1.5 py-0.5 rounded-md hover:bg-black/5 dark:hover:bg-white/5 text-foreground transition-all cursor-pointer tabular-nums"
+                    className="text-xs font-bold px-2 py-1 rounded-md hover:bg-black/5 dark:hover:bg-white/5 text-foreground transition-colors cursor-pointer tabular-nums"
                     title="Jump to Today"
                   >
                     {calendarMonthName}
@@ -1407,8 +1416,9 @@ export default function ClassroomPage({ params }: PageProps) {
                   <button
                     type="button"
                     onClick={handleNextMonth}
-                    className="p-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5 transition-all cursor-pointer"
+                    className="size-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
                     title="Next Month"
+                    aria-label="Next Month"
                   >
                     <ChevronRight className="size-3.5" />
                   </button>
@@ -1779,99 +1789,102 @@ export default function ClassroomPage({ params }: PageProps) {
 
         {/* Tab switcher & Action bar */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-b border-border pb-3">
-          {/* Segmented Control Ribbon (Fluid Momentum-Scrollable on Mobile, Flex on Desktop - Zero Clipping Guaranteed) */}
-          <div className="flex items-center p-1 border border-border/80 bg-muted/40 rounded-xl overflow-x-auto no-scrollbar scroll-smooth gap-1 w-full sm:w-auto shrink-0 select-none">
-            <button
-              onClick={(e) => {
-                setActiveTab("assignments");
-                (e.currentTarget as HTMLElement).scrollIntoView({ inline: "center", behavior: "smooth", block: "nearest" });
-              }}
-              className={`flex items-center justify-center gap-1.5 h-9 sm:h-8 px-3.5 sm:px-3 text-xs font-semibold rounded-lg transition-all cursor-pointer whitespace-nowrap shrink-0 tap-feedback ${
-                activeTab === "assignments"
-                  ? "bg-card text-foreground shadow-xs font-bold"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <FileText
-                className={cn(
-                  "size-3.5 shrink-0",
-                  activeTab === "assignments" ? theme.accentText : "text-muted-foreground"
-                )}
-              />
-              <span>Practicals</span>
-              <span
-                className={cn(
-                  "px-1.5 py-0.2 rounded text-[10px] font-semibold tabular-nums shrink-0",
-                  activeTab === "assignments"
-                    ? "bg-muted text-foreground border border-border"
-                    : "text-muted-foreground"
-                )}
-              >
-                {assignments?.length || 0}
-              </span>
-            </button>
-
-            <button
-              onClick={(e) => {
-                setActiveTab("announcements");
-                (e.currentTarget as HTMLElement).scrollIntoView({ inline: "center", behavior: "smooth", block: "nearest" });
-              }}
-              className={`flex items-center justify-center gap-1.5 h-9 sm:h-8 px-3.5 sm:px-3 text-xs font-semibold rounded-lg transition-all cursor-pointer whitespace-nowrap shrink-0 tap-feedback ${
-                activeTab === "announcements"
-                  ? "bg-card text-foreground shadow-xs font-bold"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <Sparkles className={cn("size-3.5 shrink-0", activeTab === "announcements" ? theme.accentText : "text-muted-foreground")} />
-              <span>Updates</span>
-              <span className={`px-1.5 py-0.2 rounded text-[10px] font-semibold tabular-nums shrink-0 ${
-                activeTab === "announcements" ? "bg-muted text-foreground border border-border" : "text-muted-foreground"
-              }`}>
-                {announcements?.length || 0}
-              </span>
-            </button>
-
-            {isTeacher && (
+          {/* Segmented Control Ribbon (Fluid Momentum-Scrollable on Mobile with Edge Fade Cue) */}
+          <div className="relative w-full sm:w-auto shrink-0">
+            <div className="flex items-center p-1 border border-border/80 bg-muted/40 rounded-xl overflow-x-auto no-scrollbar scroll-smooth gap-1 w-full sm:w-auto pr-8 sm:pr-1 select-none">
               <button
                 onClick={(e) => {
-                  setActiveTab("submissions");
+                  setActiveTab("assignments");
                   (e.currentTarget as HTMLElement).scrollIntoView({ inline: "center", behavior: "smooth", block: "nearest" });
                 }}
-                className={`flex items-center justify-center gap-1.5 h-9 sm:h-8 px-3.5 sm:px-3 text-xs font-semibold rounded-lg transition-all cursor-pointer whitespace-nowrap shrink-0 tap-feedback ${
-                  activeTab === "submissions"
+                className={`flex items-center justify-center gap-1.5 h-9 sm:h-8 px-3.5 sm:px-3 text-xs font-semibold rounded-lg transition-[background-color,color,box-shadow] cursor-pointer whitespace-nowrap shrink-0 tap-feedback ${
+                  activeTab === "assignments"
                     ? "bg-card text-foreground shadow-xs font-bold"
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
-                <GraduationCap className={cn("size-3.5 shrink-0", activeTab === "submissions" ? theme.accentText : "text-muted-foreground")} />
-                <span>Grades</span>
-                {pendingReviewsCount > 0 && (
-                  <span className="px-1.5 py-0.2 rounded text-[10px] font-bold tabular-nums bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/30 shrink-0">
-                    {pendingReviewsCount}
-                  </span>
-                )}
+                <FileText
+                  className={cn(
+                    "size-3.5 shrink-0",
+                    activeTab === "assignments" ? theme.accentText : "text-muted-foreground"
+                  )}
+                />
+                <span>Practicals</span>
+                <span
+                  className={cn(
+                    "px-1.5 py-0.2 rounded text-[10px] font-semibold tabular-nums shrink-0",
+                    activeTab === "assignments"
+                      ? "bg-muted text-foreground border border-border"
+                      : "text-muted-foreground"
+                  )}
+                >
+                  {assignments?.length || 0}
+                </span>
               </button>
-            )}
 
-            <button
-              onClick={(e) => {
-                setActiveTab("roster");
-                (e.currentTarget as HTMLElement).scrollIntoView({ inline: "center", behavior: "smooth", block: "nearest" });
-              }}
-              className={`flex items-center justify-center gap-1.5 h-9 sm:h-8 px-3.5 sm:px-3 text-xs font-semibold rounded-lg transition-all cursor-pointer whitespace-nowrap shrink-0 tap-feedback ${
-                activeTab === "roster"
-                  ? "bg-card text-foreground shadow-xs font-bold"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <Users className={cn("size-3.5 shrink-0", activeTab === "roster" ? theme.accentText : "text-muted-foreground")} />
-              <span>Members</span>
-              <span className={`px-1.5 py-0.2 rounded text-[10px] font-semibold tabular-nums shrink-0 ${
-                activeTab === "roster" ? "bg-muted text-foreground border border-border" : "text-muted-foreground"
-              }`}>
-                {totalStudents}
-              </span>
-            </button>
+              <button
+                onClick={(e) => {
+                  setActiveTab("announcements");
+                  (e.currentTarget as HTMLElement).scrollIntoView({ inline: "center", behavior: "smooth", block: "nearest" });
+                }}
+                className={`flex items-center justify-center gap-1.5 h-9 sm:h-8 px-3.5 sm:px-3 text-xs font-semibold rounded-lg transition-[background-color,color,box-shadow] cursor-pointer whitespace-nowrap shrink-0 tap-feedback ${
+                  activeTab === "announcements"
+                    ? "bg-card text-foreground shadow-xs font-bold"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <Bell className={cn("size-3.5 shrink-0", activeTab === "announcements" ? theme.accentText : "text-muted-foreground")} />
+                <span>Updates</span>
+                <span className={`px-1.5 py-0.2 rounded text-[10px] font-semibold tabular-nums shrink-0 ${
+                  activeTab === "announcements" ? "bg-muted text-foreground border border-border" : "text-muted-foreground"
+                }`}>
+                  {announcements?.length || 0}
+                </span>
+              </button>
+
+              {isTeacher && (
+                <button
+                  onClick={(e) => {
+                    setActiveTab("submissions");
+                    (e.currentTarget as HTMLElement).scrollIntoView({ inline: "center", behavior: "smooth", block: "nearest" });
+                  }}
+                  className={`flex items-center justify-center gap-1.5 h-9 sm:h-8 px-3.5 sm:px-3 text-xs font-semibold rounded-lg transition-[background-color,color,box-shadow] cursor-pointer whitespace-nowrap shrink-0 tap-feedback ${
+                    activeTab === "submissions"
+                      ? "bg-card text-foreground shadow-xs font-bold"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <GraduationCap className={cn("size-3.5 shrink-0", activeTab === "submissions" ? theme.accentText : "text-muted-foreground")} />
+                  <span>Grades</span>
+                  {pendingReviewsCount > 0 && (
+                    <span className="px-1.5 py-0.2 rounded text-[10px] font-bold tabular-nums bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/30 shrink-0">
+                      {pendingReviewsCount}
+                    </span>
+                  )}
+                </button>
+              )}
+
+              <button
+                onClick={(e) => {
+                  setActiveTab("roster");
+                  (e.currentTarget as HTMLElement).scrollIntoView({ inline: "center", behavior: "smooth", block: "nearest" });
+                }}
+                className={`flex items-center justify-center gap-1.5 h-9 sm:h-8 px-3.5 sm:px-3 text-xs font-semibold rounded-lg transition-[background-color,color,box-shadow] cursor-pointer whitespace-nowrap shrink-0 tap-feedback ${
+                  activeTab === "roster"
+                    ? "bg-card text-foreground shadow-xs font-bold"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <Users className={cn("size-3.5 shrink-0", activeTab === "roster" ? theme.accentText : "text-muted-foreground")} />
+                <span>Members</span>
+                <span className={`px-1.5 py-0.2 rounded text-[10px] font-semibold tabular-nums shrink-0 ${
+                  activeTab === "roster" ? "bg-muted text-foreground border border-border" : "text-muted-foreground"
+                }`}>
+                  {totalStudents}
+                </span>
+              </button>
+            </div>
+            <div className="sm:hidden pointer-events-none absolute right-0 top-1 bottom-1 w-8 rounded-r-xl bg-gradient-to-l from-card/90 to-transparent" aria-hidden="true" />
           </div>
 
           {/* Contextual Action Group (Only for Sub-views) */}
@@ -1962,8 +1975,8 @@ export default function ClassroomPage({ params }: PageProps) {
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center p-12 text-center rounded-lg border border-dashed border-border bg-card gap-2.5">
-                <Sparkles className="size-6 text-muted-foreground mb-1" />
-                <h3 className="text-sm font-bold text-foreground">No announcements yet</h3>
+                <Bell className="size-6 text-muted-foreground mb-1" />
+                <h2 className="text-sm font-bold text-foreground">No announcements yet</h2>
                 <p className="text-xs text-muted-foreground max-w-sm">
                   {isTeacher
                     ? "Post an announcement to notify students in your classroom or specific lab batches."
@@ -2002,7 +2015,7 @@ export default function ClassroomPage({ params }: PageProps) {
                               <Folder className="size-3 text-indigo-600 dark:text-indigo-400" />
                             </div>
                             <div className="flex items-center gap-2 truncate">
-                              <h3 className="font-bold text-sm text-foreground tracking-tight">{cName}</h3>
+                              <h2 className="font-bold text-sm text-foreground tracking-tight">{cName}</h2>
                               <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold tabular-nums bg-muted text-muted-foreground border border-border/80 shrink-0">
                                 {cAssignments.length} {cAssignments.length === 1 ? "practical" : "practicals"}
                               </span>
@@ -2051,9 +2064,9 @@ export default function ClassroomPage({ params }: PageProps) {
                       {existingClusterNames.length > 0 && (
                         <div className="flex items-center gap-2 px-1 pt-2">
                           <FileText className="size-3.5 text-muted-foreground" />
-                          <h4 className="font-bold text-xs uppercase tracking-wider text-muted-foreground">
+                          <h2 className="font-semibold text-xs text-muted-foreground">
                             Independent practicals ({clusterGroups.unclustered.length})
-                          </h4>
+                          </h2>
                           <div className="flex-1 h-px bg-border ml-2" />
                         </div>
                       )}
@@ -2066,6 +2079,7 @@ export default function ClassroomPage({ params }: PageProps) {
               ) : (
                 /* Flat Sequential List for Students */
                 <div className="flex flex-col gap-2.5">
+                  <h2 className="sr-only">Practical experiments</h2>
                   {[...assignments]
                     .sort((a, b) => a.experimentNumber - b.experimentNumber)
                     .map((asg) => renderAssignmentCard(asg, false))}
@@ -2076,7 +2090,7 @@ export default function ClassroomPage({ params }: PageProps) {
                 <div className="size-10 rounded bg-muted text-muted-foreground flex items-center justify-center mb-3 border border-border">
                   <FileText className="size-5" />
                 </div>
-                <h4 className="font-bold text-base tracking-tight font-serif">No experiments published</h4>
+                <h2 className="font-bold text-base tracking-tight font-serif">No experiments published</h2>
                 <p className="text-xs text-muted-foreground mt-1 text-center max-w-sm leading-relaxed">
                   {isTeacher
                     ? "Click 'Publish experiment' above to create a new lab assignment for your students."
@@ -2370,7 +2384,7 @@ export default function ClassroomPage({ params }: PageProps) {
           <div className="w-full max-w-lg p-6 rounded-lg bg-card border border-border shadow-lg flex flex-col gap-4 relative animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Sparkles className="size-4 text-primary" />
+                <Bell className="size-4 text-primary" />
                 <h3 className="font-serif font-bold text-base text-foreground">Post classroom announcement</h3>
               </div>
               <button

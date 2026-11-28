@@ -94,7 +94,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center p-4 sm:p-6 bg-background relative select-none">
+    <main id="main-content" className="flex min-h-screen flex-col items-center justify-center p-4 sm:p-6 bg-background relative select-none">
       <div className="w-full max-w-[400px] p-6 sm:p-8 rounded-2xl bg-card text-card-foreground border border-border/80 shadow-lg flex flex-col gap-5 relative">
         {/* Header */}
         <div className="flex flex-col items-center gap-1.5 text-center">
@@ -103,7 +103,7 @@ export default function LoginPage() {
             alt="eJournal Logo"
             className="h-12 w-auto object-contain mb-1"
           />
-          <h2 className="text-xl font-bold tracking-tight text-foreground font-serif">Sign in</h2>
+          <h1 className="text-xl font-bold tracking-tight text-foreground font-serif">Sign in</h1>
           <p className="text-xs text-muted-foreground">
             Access your academic reviews & lab journals
           </p>
@@ -118,13 +118,14 @@ export default function LoginPage() {
           )}
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-medium text-muted-foreground">
+            <label htmlFor="login-email" className="text-xs font-medium text-muted-foreground">
               Institutional email
             </label>
             <input
+              id="login-email"
               type="email"
               placeholder="email@university.edu"
-              className="h-10 rounded-xl border border-input bg-muted/40 focus:bg-background px-3.5 py-2 text-xs text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary transition-all disabled:cursor-not-allowed disabled:opacity-50"
+              className="h-10 rounded-xl border border-input bg-muted/40 focus:bg-background px-3.5 py-2 text-xs text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary transition-[background-color,border-color,box-shadow] disabled:cursor-not-allowed disabled:opacity-50"
               {...register("email")}
             />
             {errors.email && (
@@ -134,21 +135,22 @@ export default function LoginPage() {
 
           <div className="flex flex-col gap-1.5">
             <div className="flex justify-between items-center">
-              <label className="text-xs font-medium text-muted-foreground">
+              <label htmlFor="login-password" className="text-xs font-medium text-muted-foreground">
                 Password
               </label>
               <button
                 type="button"
                 onClick={() => setShowForgotPasswordModal(true)}
-                className="text-xs font-medium text-primary hover:underline bg-transparent border-0 p-0 cursor-pointer"
+                className="text-xs font-medium text-primary hover:underline bg-transparent border-0 py-2 px-1 -my-2 cursor-pointer"
               >
                 Forgot password?
               </button>
             </div>
             <input
+              id="login-password"
               type="password"
               placeholder="••••••••"
-              className="h-10 rounded-xl border border-input bg-muted/40 focus:bg-background px-3.5 py-2 text-xs text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary transition-all disabled:cursor-not-allowed disabled:opacity-50"
+              className="h-10 rounded-xl border border-input bg-muted/40 focus:bg-background px-3.5 py-2 text-xs text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary transition-[background-color,border-color,box-shadow] disabled:cursor-not-allowed disabled:opacity-50"
               {...register("password")}
             />
             {errors.password && (
@@ -159,17 +161,17 @@ export default function LoginPage() {
           <Button
             type="submit"
             size="default"
-            className="w-full mt-2 h-10 rounded-xl font-semibold text-xs glass-btn-indigo-solid active:scale-[0.98] transition-all cursor-pointer shadow-xs"
+            className="w-full mt-2 h-10 rounded-xl font-semibold text-xs glass-btn-indigo-solid active:scale-[0.98] transition-[transform,box-shadow,background-color] cursor-pointer shadow-xs"
             disabled={mutation.isPending}
           >
-            {mutation.isPending ? "Signing in..." : "Sign in"}
+            {mutation.isPending ? "Signing in…" : "Sign in"}
           </Button>
         </form>
 
         {/* Footer */}
         <div className="text-center text-xs text-muted-foreground pt-1 border-t border-border/60">
           New to eJournal?{" "}
-          <Link href="/auth/register" className="font-semibold text-primary hover:underline">
+          <Link href="/auth/register" className="inline-flex items-center font-semibold text-primary hover:underline py-2 px-1">
             Register account
           </Link>
         </div>
@@ -267,6 +269,6 @@ export default function LoginPage() {
           </div>
         </div>
       )}
-    </div>
+    </main>
   );
 }

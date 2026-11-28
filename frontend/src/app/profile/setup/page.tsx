@@ -44,7 +44,12 @@ type ProfileFields = zod.infer<typeof profileSchema>;
 
 export default function ProfileSetupPage() {
   const router = useRouter();
+  const [isMounted, setIsMounted] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   // Enrollment duplicate validation states
   const [enrollmentError, setEnrollmentError] = useState<string | null>(null);
@@ -196,7 +201,7 @@ export default function ProfileSetupPage() {
     mutation.mutate(data);
   };
 
-  if (isLoading) {
+  if (!isMounted || isLoading) {
     return (
       <AppLoadingScreen
         title="Loading Profile Setup..."
@@ -212,7 +217,7 @@ export default function ProfileSetupPage() {
   const isStudent = user.role === "student";
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center p-4 sm:p-6 bg-background relative select-none">
+    <main id="main-content" className="flex min-h-screen flex-col items-center justify-center p-4 sm:p-6 bg-background relative select-none">
       <div className="w-full max-w-[540px] p-6 sm:p-8 rounded-2xl bg-card text-card-foreground border border-border/80 shadow-lg flex flex-col gap-5 relative">
         {/* Header */}
         <div className="flex flex-col items-center gap-1.5 text-center">
@@ -221,7 +226,7 @@ export default function ProfileSetupPage() {
             alt="eJournal Logo"
             className="h-12 w-auto object-contain mb-1"
           />
-          <h2 className="text-xl font-bold tracking-tight text-foreground font-serif">Setup profile</h2>
+          <h1 className="text-xl font-bold tracking-tight text-foreground font-serif">Setup profile</h1>
           <p className="text-xs text-muted-foreground">
             Complete your academic information as a{" "}
             <span className="font-semibold text-foreground capitalize">{user.role}</span>
@@ -452,6 +457,6 @@ export default function ProfileSetupPage() {
           </Button>
         </form>
       </div>
-    </div>
+    </main>
   );
 }

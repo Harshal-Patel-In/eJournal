@@ -182,7 +182,7 @@ export default function AdminFacultyPage() {
       {/* Top Banner */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-border/60">
         <div>
-          <h1 className="text-2xl font-black tracking-tight text-foreground">Faculty Member Management</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground font-serif">Faculty Member Management</h1>
           <p className="text-xs text-muted-foreground mt-0.5">
             Onboard professors, manage departmental appointments, and control institutional access
           </p>
@@ -194,7 +194,7 @@ export default function AdminFacultyPage() {
             size="sm"
             onClick={() => refetch()}
             disabled={isRefetching}
-            className="rounded-xl text-xs font-semibold gap-1.5 cursor-pointer"
+            className="rounded-xl h-10 sm:h-8 px-3 text-xs font-semibold gap-1.5 cursor-pointer"
           >
             <RefreshCw className={`size-3.5 ${isRefetching ? "animate-spin" : ""}`} />
             <span>Refresh</span>
@@ -209,7 +209,7 @@ export default function AdminFacultyPage() {
               setPassword("");
               setShowCreateModal(true);
             }}
-            className="rounded-xl text-xs font-bold gap-1.5 cursor-pointer shadow-sm"
+            className="rounded-xl h-10 sm:h-8 px-3.5 text-xs font-bold gap-1.5 cursor-pointer shadow-sm"
           >
             <Plus className="size-3.5" />
             <span>Provision New Faculty</span>

@@ -67,7 +67,8 @@ export default function CommentPopover({
     postCommentMutation.mutate(payload);
   };
 
-  const blockComments = comments.filter((c) => c.blockId === blockId);
+  const safeComments = Array.isArray(comments) ? comments : [];
+  const blockComments = safeComments.filter((c) => c.blockId === blockId);
 
   return (
     <div className="absolute right-2 top-2 z-40 w-72 bg-white dark:bg-zinc-900 border border-border rounded-2xl p-4 shadow-2xl flex flex-col gap-3 animate-in fade-in slide-in-from-top-1 duration-150 select-none">

@@ -341,7 +341,7 @@ export default function TableBlock({ id, content, previewMode }: TableBlockProps
                             setInitialFormulaCol(colIdx);
                             setIsModalOpen(true);
                           }}
-                          className="px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-700 dark:text-violet-300 border border-violet-500/30 font-mono text-[9px] font-bold shrink-0 cursor-pointer hover:bg-violet-500/20 transition-colors shadow-2xs"
+                          className="min-h-[36px] min-w-[36px] sm:min-h-0 sm:min-w-0 px-2 py-1 sm:px-1.5 sm:py-0.5 rounded bg-violet-500/10 text-violet-700 dark:text-violet-300 border border-violet-500/30 font-mono text-[10px] sm:text-[9px] font-bold shrink-0 cursor-pointer hover:bg-violet-500/20 transition-colors shadow-2xs"
                           title={`Active formula: = ${columnFormulas[colIdx]}`}
                         >
                           fx
@@ -353,7 +353,7 @@ export default function TableBlock({ id, content, previewMode }: TableBlockProps
                             setInitialFormulaCol(colIdx);
                             setIsModalOpen(true);
                           }}
-                          className="size-5 rounded hover:bg-violet-500/10 hover:text-violet-600 text-muted-foreground/60 opacity-0 group-hover/header:opacity-100 transition-opacity flex items-center justify-center text-[10px] font-mono font-bold shrink-0 cursor-pointer"
+                          className="size-9 sm:size-5 rounded hover:bg-violet-500/10 hover:text-violet-600 text-muted-foreground/60 lg:opacity-0 lg:group-hover/header:opacity-100 transition-opacity flex items-center justify-center text-[11px] sm:text-[10px] font-mono font-bold shrink-0 cursor-pointer"
                           title="Calculate this column in Spreadsheet Mode (fx)"
                         >
                           fx
@@ -418,7 +418,8 @@ export default function TableBlock({ id, content, previewMode }: TableBlockProps
                   <button
                     onClick={() => removeRow(rowIdx)}
                     disabled={rows.length <= 1}
-                    className="p-1 hover:bg-rose-500/10 text-muted-foreground hover:text-rose-600 rounded transition-colors disabled:opacity-20 disabled:hover:bg-transparent cursor-pointer"
+                    aria-label="Delete Row"
+                    className="size-9 sm:size-7 inline-flex items-center justify-center hover:bg-rose-500/10 text-muted-foreground hover:text-rose-600 rounded transition-colors disabled:opacity-20 disabled:hover:bg-transparent cursor-pointer"
                     title="Delete Row"
                   >
                     <Trash2 className="size-3.5" />

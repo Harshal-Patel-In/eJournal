@@ -56,7 +56,7 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center p-4 sm:p-6 bg-background relative select-none">
+    <main id="main-content" className="flex min-h-screen flex-col items-center justify-center p-4 sm:p-6 bg-background relative select-none">
       <div className="w-full max-w-[400px] p-6 sm:p-8 rounded-2xl bg-card text-card-foreground border border-border/80 shadow-lg flex flex-col gap-5 relative">
         {/* Header */}
         <div className="flex flex-col items-center gap-1.5 text-center">
@@ -65,7 +65,7 @@ export default function RegisterPage() {
             alt="eJournal Logo"
             className="h-12 w-auto object-contain mb-1"
           />
-          <h2 className="text-xl font-bold tracking-tight text-foreground font-serif">Student registration</h2>
+          <h1 className="text-xl font-bold tracking-tight text-foreground font-serif">Student registration</h1>
           <p className="text-xs text-muted-foreground">
             Create your student journal account
           </p>
@@ -88,13 +88,14 @@ export default function RegisterPage() {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-medium text-muted-foreground">
+            <label htmlFor="register-email" className="text-xs font-medium text-muted-foreground">
               Institutional email
             </label>
             <input
+              id="register-email"
               type="email"
               placeholder="email@university.edu"
-              className="h-10 rounded-xl border border-input bg-muted/40 focus:bg-background px-3.5 py-2 text-xs text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary transition-all disabled:cursor-not-allowed disabled:opacity-50"
+              className="h-10 rounded-xl border border-input bg-muted/40 focus:bg-background px-3.5 py-2 text-xs text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary transition-[background-color,border-color,box-shadow] disabled:cursor-not-allowed disabled:opacity-50"
               {...register("email")}
             />
             {errors.email && (
@@ -103,13 +104,14 @@ export default function RegisterPage() {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-medium text-muted-foreground">
+            <label htmlFor="register-password" className="text-xs font-medium text-muted-foreground">
               Password
             </label>
             <input
+              id="register-password"
               type="password"
               placeholder="••••••••"
-              className="h-10 rounded-xl border border-input bg-muted/40 focus:bg-background px-3.5 py-2 text-xs text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary transition-all disabled:cursor-not-allowed disabled:opacity-50"
+              className="h-10 rounded-xl border border-input bg-muted/40 focus:bg-background px-3.5 py-2 text-xs text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary transition-[background-color,border-color,box-shadow] disabled:cursor-not-allowed disabled:opacity-50"
               {...register("password")}
             />
             {errors.password && (
@@ -120,21 +122,21 @@ export default function RegisterPage() {
           <Button
             type="submit"
             size="default"
-            className="w-full mt-2 h-10 rounded-xl font-semibold text-xs glass-btn-indigo-solid active:scale-[0.98] transition-all cursor-pointer shadow-xs"
+            className="w-full mt-2 h-10 rounded-xl font-semibold text-xs glass-btn-indigo-solid active:scale-[0.98] transition-[transform,box-shadow,background-color] cursor-pointer shadow-xs"
             disabled={mutation.isPending}
           >
-            {mutation.isPending ? "Creating account..." : "Create account"}
+            {mutation.isPending ? "Creating account…" : "Create account"}
           </Button>
         </form>
 
         {/* Footer */}
         <div className="text-center text-xs text-muted-foreground pt-1 border-t border-border/60">
           Already registered?{" "}
-          <Link href="/auth/login" className="font-semibold text-primary hover:underline">
+          <Link href="/auth/login" className="inline-flex items-center font-semibold text-primary hover:underline py-2 px-1">
             Sign in
           </Link>
         </div>
       </div>
-    </div>
+    </main>
   );
 }

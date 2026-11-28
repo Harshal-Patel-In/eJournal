@@ -132,7 +132,7 @@ export default function AdminAuditLogsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-border/60">
         <div>
-          <h1 className="text-2xl font-black tracking-tight text-foreground">Security Audit Trail</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground font-serif">Security Audit Trail</h1>
           <p className="text-xs text-muted-foreground mt-0.5">
             Track institutional activity, authentication events, and administrative actions over the past 5 days
           </p>
@@ -143,7 +143,7 @@ export default function AdminAuditLogsPage() {
           size="sm"
           onClick={() => refetch()}
           disabled={isRefetching}
-          className="rounded-xl text-xs font-semibold gap-1.5 cursor-pointer self-start sm:self-auto"
+          className="rounded-xl h-10 sm:h-8 px-3 text-xs font-semibold gap-1.5 cursor-pointer self-start sm:self-auto"
         >
           <RefreshCw className={`size-3.5 ${isRefetching ? "animate-spin" : ""}`} />
           <span>Refresh Logs</span>
@@ -157,7 +157,7 @@ export default function AdminAuditLogsPage() {
             <ShieldCheck className="size-5" />
           </div>
           <div>
-            <h4 className="text-xs font-bold text-foreground">5-Day Security Retention Policy</h4>
+            <h2 className="text-xs font-bold text-foreground">5-Day Security Retention Policy</h2>
             <p className="text-[11px] text-muted-foreground leading-relaxed">
               Logs record actor identification, target resource, and client IP addresses. Automatically retains events from the last 5 days.
             </p>
@@ -179,9 +179,52 @@ export default function AdminAuditLogsPage() {
         </div>
       </div>
 
-      {/* Audit Log Table */}
+      {/* Audit Log Table & Mobile Cards */}
       <div className="rounded-3xl bg-card border border-border/80 overflow-hidden shadow-xs">
-        <div className="overflow-x-auto">
+        {/* Mobile & Tablet Cards (< 1024px) */}
+        <div className="lg:hidden p-3.5 sm:p-4 space-y-3">
+          {isLoading ? (
+            <div className="py-12 text-center text-muted-foreground text-xs">
+              <Loader2 className="size-5 animate-spin mx-auto mb-2 text-primary" />
+              Loading audit trail…
+            </div>
+          ) : !data?.logs || data.logs.length === 0 ? (
+            <div className="py-12 text-center text-muted-foreground text-xs">
+              No audit records found matching this event filter.
+            </div>
+          ) : (
+            data.logs.map((log: any) => (
+              <div
+                key={log.id}
+                className="p-4 rounded-2xl border border-border/80 bg-card shadow-xs space-y-2"
+              >
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  {getActionBadge(log.action)}
+                  <span className="text-[11px] text-muted-foreground tabular-nums">
+                    {formatDateTimeIST(log.timestamp)}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                  <User className="size-3.5 text-muted-foreground shrink-0" />
+                  <span className="truncate">{log.userEmail}</span>
+                </div>
+                <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-1.5 border-t border-border/50">
+                  <span>
+                    {log.entity}
+                    {log.entityId ? `:${log.entityId.slice(-6)}` : ""}
+                  </span>
+                  <span className="flex items-center gap-1 font-mono">
+                    <Laptop className="size-3" />
+                    {log.ipAddress}
+                  </span>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Desktop Table (>= 1024px) */}
+        <div className="hidden lg:block overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead className="bg-muted/40 border-b border-border text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
               <tr>

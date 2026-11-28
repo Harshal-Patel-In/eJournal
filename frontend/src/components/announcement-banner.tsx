@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Info,
@@ -41,8 +41,12 @@ interface ActiveAnnouncement {
 }
 
 export function GlobalAnnouncementBanner() {
+  const pathname = usePathname();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const bannerRef = useRef<HTMLDivElement>(null);
+
+  const isEditorRoute = pathname?.startsWith("/editor");
 
   const [dismissedIds, setDismissedIds] = useState<string[]>([]);
   const [activeModalContent, setActiveModalContent] = useState<{ title: string; content: string } | null>(null);
@@ -65,16 +69,18 @@ export function GlobalAnnouncementBanner() {
     queryFn: () => api.get<ActiveAnnouncement[]>("/announcements/active"),
     staleTime: 30000,
     retry: 1,
+    enabled: !isEditorRoute,
   });
 
   // 2. Real-Time Push Listener (SSE + 45s Heartbeat Protocol)
   useEffect(() => {
+    if (isEditorRoute) return;
     let eventSource: EventSource | null = null;
     try {
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
       eventSource = new EventSource(`${baseUrl}/announcements/stream`);
 
-      eventSource.addEventListener("announcement", (e) => {
+      eventSource.addEventListener("announcement", () => {
         try {
           queryClient.invalidateQueries({ queryKey: ["active-announcements"] });
           refetch();
@@ -95,7 +101,7 @@ export function GlobalAnnouncementBanner() {
         eventSource.close();
       }
     };
-  }, [queryClient, refetch]);
+  }, [queryClient, refetch, isEditorRoute]);
 
   // Acknowledgment Mutation
   const ackMutation = useMutation({
@@ -126,7 +132,33 @@ export function GlobalAnnouncementBanner() {
     return true;
   });
 
-  const current = visible && visible.length > 0 ? visible[0] : null;
+  const current = !isEditorRoute && visible && visible.length > 0 ? visible[0] : null;
+
+  // Keep fixed shells (like Admin sidebar) synchronized with banner height
+  useEffect(() => {
+    const updateVar = () => {
+      if (typeof document === "undefined") return;
+      const h = current && bannerRef.current ? bannerRef.current.offsetHeight : 0;
+      document.documentElement.style.setProperty("--announcement-height", `${h}px`);
+    };
+    updateVar();
+    if (!current || !bannerRef.current || typeof ResizeObserver === "undefined") {
+      return () => {
+        if (typeof document !== "undefined") {
+          document.documentElement.style.setProperty("--announcement-height", "0px");
+        }
+      };
+    }
+    const observer = new ResizeObserver(updateVar);
+    observer.observe(bannerRef.current);
+    return () => {
+      observer.disconnect();
+      if (typeof document !== "undefined") {
+        document.documentElement.style.setProperty("--announcement-height", "0px");
+      }
+    };
+  }, [current]);
+
   if (!current) return null;
 
   // Visual Category Semantics
@@ -174,23 +206,24 @@ export function GlobalAnnouncementBanner() {
   return (
     <>
       <div
+        ref={bannerRef}
         role="alert"
         aria-live={current.category === "system_alert" ? "assertive" : "polite"}
-        className={`w-full min-h-[38px] px-4 py-1.5 transition-colors duration-150 ease-out z-40 flex items-center justify-between gap-3 text-xs ${styles.bannerBg}`}
+        className={`w-full min-h-[38px] px-3 sm:px-4 py-1.5 transition-colors duration-150 ease-out z-40 flex items-center justify-between gap-2.5 sm:gap-3 text-xs ${styles.bannerBg}`}
       >
-        <div className="flex items-center gap-2.5 flex-1 min-w-0">
+        <div className="flex items-center gap-2 sm:gap-2.5 flex-1 min-w-0">
           {styles.icon}
-          <span className={`px-1.5 py-0.2 rounded text-[10px] font-semibold border ${styles.badge}`}>
+          <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold border whitespace-nowrap shrink-0 ${styles.badge}`}>
             {styles.badgeText}
           </span>
-          <div className="flex items-center gap-2 truncate">
-            <span className="font-semibold truncate">{current.title}:</span>
+          <div className="flex items-center gap-1.5 flex-1 min-w-0 overflow-hidden">
+            <span className="font-semibold shrink-0 max-w-[45%] sm:max-w-none truncate">{current.title}:</span>
             <span className="text-muted-foreground truncate">{current.content}</span>
           </div>
         </div>
 
         {/* Action Controls */}
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           {action.actionType === "link" && action.actionUrl && (
             <Button
               variant="outline"
@@ -250,7 +283,7 @@ export function GlobalAnnouncementBanner() {
             <button
               onClick={() => handleDismiss(current.id)}
               aria-label="Dismiss Announcement"
-              className="p-1 rounded opacity-70 hover:opacity-100 hover:bg-muted transition-colors cursor-pointer"
+              className="size-8 sm:size-7 flex items-center justify-center rounded-md opacity-75 hover:opacity-100 hover:bg-muted transition-colors cursor-pointer"
             >
               <X className="size-3.5" />
             </button>

@@ -42,11 +42,13 @@ export function MobileBottomDock() {
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [isClassroomOpen, setIsClassroomOpen] = useState(false);
 
-  // Hide on public landing, auth pages, and immersive full-screen document editor
+  // Hide on public landing, auth pages, profile setup, admin suite, and full-screen document editor
   const isAuthPage = pathname.startsWith("/auth");
   const isLandingPage = pathname === "/";
   const isEditorPage = pathname.startsWith("/editor");
   const isCompilePage = pathname.includes("/compile-journal");
+  const isAdminPage = pathname.startsWith("/admin");
+  const isProfileSetupPage = pathname.startsWith("/profile/setup");
 
   // Fetch active authenticated user profile
   const { data: user } = useQuery<ProfileResponse>({
@@ -54,7 +56,7 @@ export function MobileBottomDock() {
     queryFn: () => api.get("/profile"),
     retry: false,
     staleTime: 60000,
-    enabled: !isAuthPage && !isLandingPage,
+    enabled: !isAuthPage && !isLandingPage && !isAdminPage && !isProfileSetupPage,
   });
 
   // Fetch enrolled/managed classrooms for smart contextual navigation
@@ -62,15 +64,24 @@ export function MobileBottomDock() {
     queryKey: ["classrooms"],
     queryFn: () => api.get("/classrooms"),
     staleTime: 60000,
-    enabled: !isAuthPage && !isLandingPage && !!user,
+    enabled: !isAuthPage && !isLandingPage && !isAdminPage && !isProfileSetupPage && !!user,
   });
 
-  if (isAuthPage || isLandingPage || isEditorPage || isCompilePage || !user) {
+  if (
+    isAuthPage ||
+    isLandingPage ||
+    isEditorPage ||
+    isCompilePage ||
+    isAdminPage ||
+    isProfileSetupPage ||
+    !user ||
+    user.role === "admin"
+  ) {
     return null;
   }
 
   const isTeacher = user.role === "teacher";
-  const isAdmin = user.role === "admin" || user.is_admin || user.isAdmin;
+  const isAdmin = Boolean(user.is_admin || user.isAdmin);
 
   // Context-aware handler for Practicals / Classrooms tap
   const handleClassroomsClick = () => {

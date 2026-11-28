@@ -128,9 +128,10 @@ export default function DefaultersRadarPage() {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
+    const timestamp = new Date().toISOString().slice(0, 10);
     link.setAttribute(
       "download",
-      `charusat_defaulters_radar_${threshold}pct_${Date.now()}.csv`
+      `charusat_defaulters_radar_${threshold}pct_${timestamp}.csv`
     );
     document.body.appendChild(link);
     link.click();
@@ -248,14 +249,14 @@ export default function DefaultersRadarPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-border/60">
           <div>
             <div className="flex items-center gap-2">
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+              <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
                 Continuous Assessment Radar
               </span>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-muted text-muted-foreground border border-border">
+              <span className="px-2 py-0.5 rounded-full text-[11px] font-mono font-semibold bg-muted text-muted-foreground border border-border">
                 Mandatory &ge; 75% Rule
               </span>
             </div>
-            <h1 className="text-2xl font-black tracking-tight text-foreground mt-1">
+            <h1 className="text-2xl font-bold tracking-tight text-foreground mt-1.5 font-serif">
               Academic Defaulters Radar
             </h1>
             <p className="text-xs text-muted-foreground mt-0.5">
@@ -263,13 +264,13 @@ export default function DefaultersRadarPage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-2 self-start sm:self-auto">
+          <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
             <Button
               variant="outline"
               size="sm"
               onClick={handleExportCSV}
               disabled={filteredDefaulters.length === 0}
-              className="rounded-xl text-xs font-semibold gap-1.5 cursor-pointer"
+              className="rounded-xl h-10 sm:h-8 px-3 text-xs font-semibold gap-1.5 cursor-pointer"
             >
               <Download className="size-3.5" />
               <span>Export CSV</span>
@@ -280,7 +281,7 @@ export default function DefaultersRadarPage() {
               size="sm"
               onClick={handlePrint}
               disabled={filteredDefaulters.length === 0}
-              className="rounded-xl text-xs font-semibold gap-1.5 cursor-pointer"
+              className="rounded-xl h-10 sm:h-8 px-3 text-xs font-semibold gap-1.5 cursor-pointer"
             >
               <Printer className="size-3.5" />
               <span>Print Circular</span>
@@ -291,7 +292,7 @@ export default function DefaultersRadarPage() {
               size="sm"
               onClick={() => refetch()}
               disabled={isRefetching}
-              className="rounded-xl text-xs font-semibold gap-1.5 cursor-pointer"
+              className="rounded-xl h-10 sm:h-8 px-3 text-xs font-semibold gap-1.5 cursor-pointer"
             >
               <RefreshCw className={`size-3.5 ${isRefetching ? "animate-spin" : ""}`} />
               <span>Refresh</span>
@@ -362,22 +363,25 @@ export default function DefaultersRadarPage() {
                   {threshold}%
                 </span>
               </div>
-              <input
-                type="range"
-                min="10"
-                max="95"
-                step="5"
-                value={threshold}
-                onChange={(e) => setThreshold(Number(e.target.value))}
-                className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
-              />
-              <div className="flex items-center gap-1.5 pt-0.5">
+              <div className="py-2">
+                <input
+                  type="range"
+                  aria-label="Completion threshold percentage"
+                  min="10"
+                  max="95"
+                  step="5"
+                  value={threshold}
+                  onChange={(e) => setThreshold(Number(e.target.value))}
+                  className="w-full h-3 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
+                />
+              </div>
+              <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
                 {[50, 65, 75, 80].map((t) => (
                   <button
                     key={t}
                     type="button"
                     onClick={() => setThreshold(t)}
-                    className={`px-2 py-0.5 rounded-md text-[10px] font-bold transition-all cursor-pointer ${
+                    className={`px-3 py-1.5 sm:px-2 sm:py-0.5 rounded-md text-[11px] sm:text-[10px] font-bold transition-[background-color,color] cursor-pointer ${
                       threshold === t
                         ? "bg-primary text-primary-foreground shadow-2xs"
                         : "bg-muted text-muted-foreground hover:bg-muted/80"
@@ -446,7 +450,7 @@ export default function DefaultersRadarPage() {
         <div className="rounded-3xl bg-card border border-border/80 shadow-xs overflow-hidden">
           <div className="p-4 border-b border-border/60 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <h3 className="text-sm font-bold text-foreground">Defaulters Compliance Register</h3>
+              <h2 className="text-sm font-bold text-foreground">Defaulters Compliance Register</h2>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-muted text-muted-foreground border border-border">
                 {filteredDefaulters.length} flagged
               </span>
@@ -470,8 +474,56 @@ export default function DefaultersRadarPage() {
               </p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
+            <>
+              {/* Mobile & Tablet Adaptive Cards (< 1024px) */}
+              <div className="lg:hidden p-3.5 sm:p-4 space-y-3">
+                {filteredDefaulters.map((s: any, idx: number) => {
+                  const pct = s.completionRate ?? s.overallCompletionPercentage ?? 0;
+                  const isSevere = pct < 50;
+                  return (
+                    <div
+                      key={s.studentId ? `mob-${s.studentId}` : `mob-${idx}`}
+                      className="p-4 rounded-2xl border border-border/80 bg-card shadow-xs space-y-2.5"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="font-bold text-foreground text-sm truncate">{s.name}</div>
+                          <div className="text-[11px] text-muted-foreground font-mono">
+                            {s.enrollmentNumber} · {s.email}
+                          </div>
+                        </div>
+                        {isSevere ? (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 shrink-0 inline-flex items-center gap-1">
+                            <AlertTriangle className="size-2.5" /> Debarred
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 shrink-0">
+                            Warning
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                        <span>
+                          {s.department || "Engineering"} · Batch {s.batch || "—"}
+                        </span>
+                        <span className="font-mono font-bold text-foreground text-xs">{pct}%</span>
+                      </div>
+
+                      <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full ${isSevere ? "bg-rose-500" : "bg-amber-500"}`}
+                          style={{ width: `${Math.min(pct, 100)}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Desktop Table (>= 1024px) */}
+              <div className="hidden lg:block overflow-x-auto">
+                <table className="w-full text-left text-xs">
                 <thead>
                   <tr className="border-b border-border/60 bg-muted/20 text-muted-foreground font-semibold">
                     <th className="py-3 px-4">Student</th>
@@ -562,7 +614,8 @@ export default function DefaultersRadarPage() {
                   })}
                 </tbody>
               </table>
-            </div>
+              </div>
+            </>
           )}
         </div>
       </div>

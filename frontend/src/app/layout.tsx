@@ -51,6 +51,12 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <Providers>
+          <a
+            href="#main-content"
+            className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[100] focus:px-4 focus:py-2 focus:rounded-lg focus:bg-primary focus:text-primary-foreground focus:text-xs focus:font-semibold focus:shadow-lg"
+          >
+            Skip to content
+          </a>
           <GlobalAnnouncementBanner />
           {children}
           <MobileBottomDock />

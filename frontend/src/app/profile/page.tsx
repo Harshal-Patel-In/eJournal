@@ -68,7 +68,12 @@ const teacherProfileSchema = zod.object({
 export default function ProfilePage() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const [isMounted, setIsMounted] = useState(false);
   const [activeTab, setActiveTab] = useState<"general" | "preview">("general");
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   // Correction Request Modal states
   const [showCorrectionModal, setShowCorrectionModal] = useState(false);
@@ -251,7 +256,7 @@ export default function ProfilePage() {
     });
   };
 
-  if (isLoading) {
+  if (!isMounted || isLoading) {
     return (
       <AppLoadingScreen
         title="Loading Academic Profile..."
@@ -320,7 +325,7 @@ export default function ProfilePage() {
       </header>
 
       {/* Main Profile Canvas */}
-      <main className="max-w-5xl w-full mx-auto p-4 pb-24 sm:p-6 sm:pb-8 md:p-8 flex flex-col gap-6 relative z-10">
+      <main id="main-content" className="max-w-5xl w-full mx-auto p-4 pb-24 sm:p-6 sm:pb-8 md:p-8 flex flex-col gap-6 relative z-10">
         {/* Top Header Card */}
         <div className="p-5 sm:p-6 rounded-lg border border-border bg-card shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
           <div className="flex items-center gap-4">
@@ -383,7 +388,7 @@ export default function ProfilePage() {
         </div>
 
         {/* ACTIVE PROFILE CORRECTION BANNER */}
-        {activeRequest && (
+        {activeRequest?.id && (
           <div className="p-4 sm:p-5 rounded-lg border border-amber-500/30 bg-amber-500/10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex flex-col gap-1.5">
               <div className="flex items-center gap-2 flex-wrap">
@@ -492,54 +497,22 @@ export default function ProfilePage() {
         {activeTab === "general" && (
           <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-6 pb-12">
             <div className="p-5 sm:p-6 rounded-lg border border-border bg-card shadow-xs flex flex-col gap-6">
-              {/* Card Header with Inline Action Bar */}
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-border">
-                <div className="flex items-center gap-3">
-                  <div className="size-9 rounded-md bg-muted text-foreground flex items-center justify-center font-bold shrink-0 border border-border">
-                    <IdCard className="size-4 text-primary" />
-                  </div>
-                  <div>
-                    <h2 className="text-base font-bold text-foreground tracking-tight font-serif">
-                      {isStudent
-                        ? "Student academic parameters"
-                        : "Faculty appointment credentials"}
-                    </h2>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {isStudent
-                        ? "Institutional identifiers and cohort details printed across your laboratory journals and certificates."
-                        : "Official appointment credentials, academic designation, and institutional affiliation."}
-                    </p>
-                  </div>
+              {/* Card Header */}
+              <div className="flex items-center gap-3 pb-4 border-b border-border">
+                <div className="size-9 rounded-md bg-muted text-foreground flex items-center justify-center font-bold shrink-0 border border-border">
+                  <IdCard className="size-4 text-primary" />
                 </div>
-
-                {/* Quick Save / Discard Controls in Header */}
-                <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
-                  {isDirty && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => reset()}
-                      disabled={updateMutation.isPending}
-                      className="rounded-md h-8 px-3 text-xs font-medium cursor-pointer"
-                    >
-                      Discard
-                    </Button>
-                  )}
-
-                  <Button
-                    type="submit"
-                    size="sm"
-                    disabled={!isDirty || updateMutation.isPending}
-                    className="gap-1.5 rounded-md h-8 px-3.5 text-xs font-semibold transition-all cursor-pointer active:scale-[0.98]"
-                  >
-                    {updateMutation.isPending ? (
-                      <Loader2 className="size-3.5 animate-spin" />
-                    ) : (
-                      <Save className="size-3.5" />
-                    )}
-                    <span>Save changes</span>
-                  </Button>
+                <div>
+                  <h2 className="text-base font-bold text-foreground tracking-tight font-serif">
+                    {isStudent
+                      ? "Student academic parameters"
+                      : "Faculty appointment credentials"}
+                  </h2>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {isStudent
+                      ? "Institutional identifiers and cohort details printed across your laboratory journals and certificates."
+                      : "Official appointment credentials, academic designation, and institutional affiliation."}
+                  </p>
                 </div>
               </div>
 
@@ -796,12 +769,12 @@ export default function ProfilePage() {
                         <span>Request Correction</span>
                       </button>
                     </div>
-                    <div className="flex items-center justify-between h-9 px-3 rounded-md border border-border bg-muted/30 text-foreground text-xs font-medium">
-                      <span>{collegeLabel || "Institute not configured"}</span>
-                      <span className="text-[10px] font-sans font-medium text-muted-foreground">
-                        {isStudent ? "Governed institute" : "Governed appointment"}
-                      </span>
-                    </div>
+                        <div className="flex items-center justify-between gap-2 min-h-[2.25rem] px-3 py-1.5 rounded-md border border-border bg-muted/30 text-foreground text-xs font-medium">
+                          <span className="truncate">{collegeLabel || "Institute not configured"}</span>
+                          <span className="text-[10px] font-sans font-medium text-muted-foreground whitespace-nowrap shrink-0">
+                            {isStudent ? "Governed institute" : "Governed appointment"}
+                          </span>
+                        </div>
                     {errors.college && (
                       <span className="text-[11px] text-destructive font-medium">
                         {String(errors.college.message)}
@@ -816,9 +789,9 @@ export default function ProfilePage() {
                       <span>Affiliated university</span>
                       <Lock className="size-3 text-muted-foreground/70" />
                     </label>
-                    <div className="flex items-center justify-between h-9 px-3 rounded-md border border-border bg-muted/30 text-foreground text-xs font-medium select-all">
-                      <span>{CHARUSAT_UNIVERSITY_NAME}</span>
-                      <span className="text-[10px] font-sans font-medium text-muted-foreground">
+                    <div className="flex items-center justify-between gap-2 min-h-[2.25rem] px-3 py-1.5 rounded-md border border-border bg-muted/30 text-foreground text-xs font-medium select-all">
+                      <span className="truncate">{CHARUSAT_UNIVERSITY_NAME}</span>
+                      <span className="text-[10px] font-sans font-medium text-muted-foreground whitespace-nowrap shrink-0">
                         Permanent charter
                       </span>
                     </div>
